@@ -1,0 +1,290 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-pixel: var(--font-pixel);
+}
+
+/* Control Lab / landing palette: near-black, hairline grid, one spectrum accent. */
+@theme {
+  --color-void: #040506;
+  --color-panel: #0a0b0e;
+  --color-panel-2: #101217;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-2: rgb(255 255 255 / 0.14);
+  --color-fg: #eceef2;
+  --color-mute: #8b909c;
+  --color-dim: #50555f;
+  --color-spec-1: #3ff0ff;
+  --color-spec-2: #5a86ff;
+  --color-spec-3: #b06bff;
+  --color-spec-4: #ff5fa2;
+  --color-spec-5: #ff9a3d;
+  --color-spec-6: #ffe45c;
+  --color-ok: #4ade80;
+  --color-warn: #fbbf24;
+  --color-bad: #f87171;
+}
+
+@theme {
+  --color-ink-950: #070b12;
+  --color-ink-900: #0c121c;
+  --color-ink-850: #111926;
+  --color-ink-800: #172131;
+  --color-ink-700: #243044;
+  --color-ink-600: #34425a;
+  --color-ink-400: #7d8ba3;
+  --color-ink-300: #a8b3c7;
+  --color-ink-100: #e6ebf3;
+  --color-brand-300: #7ee8f5;
+  --color-brand-400: #3dd6ec;
+  --color-brand-500: #16b8d2;
+  --color-brand-600: #0e93aa;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-ink-100);
+}
+
+/* Range inputs styled to match the studio */
+input[type="range"].rc-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--color-brand-400) 0%,
+    var(--color-brand-400) var(--fill, 50%),
+    var(--color-ink-700) var(--fill, 50%),
+    var(--color-ink-700) 100%
+  );
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"].rc-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--color-ink-100);
+  border: 2px solid var(--color-brand-400);
+  box-shadow: 0 0 0 3px rgb(61 214 236 / 0.15);
+}
+input[type="range"].rc-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--color-ink-100);
+  border: 2px solid var(--color-brand-400);
+}
+input[type="range"].rc-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgb(61 214 236 / 0.4);
+}
+
+.rc-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-700) transparent;
+}
+
+.rc-grid-bg {
+  background-image:
+    linear-gradient(to right, rgb(125 139 163 / 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(125 139 163 / 0.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Control Lab + landing                                                                       */
+/* ------------------------------------------------------------------------------------------ */
+
+:root {
+  --spectrum: linear-gradient(
+    90deg,
+    var(--color-spec-1),
+    var(--color-spec-2),
+    var(--color-spec-3),
+    var(--color-spec-4),
+    var(--color-spec-5),
+    var(--color-spec-6)
+  );
+  --spectrum-conic: conic-gradient(
+    from 200deg,
+    var(--color-spec-1),
+    var(--color-spec-2),
+    var(--color-spec-3),
+    var(--color-spec-4),
+    var(--color-spec-5),
+    var(--color-spec-6),
+    var(--color-spec-1)
+  );
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: rgb(176 107 255 / 0.4);
+}
+
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.text-spectrum {
+  background: var(--spectrum);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 1px gradient border on any element (put content inside, keep its own background). */
+.spectrum-border {
+  position: relative;
+  isolation: isolate;
+}
+.spectrum-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--spectrum);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Corner brackets, as on the reference button and headline boxes. */
+.brackets {
+  position: relative;
+}
+.brackets::before,
+.brackets::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  border-color: currentColor;
+  opacity: 0.6;
+}
+.brackets::before {
+  top: -4px;
+  left: -4px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+.brackets::after {
+  right: -4px;
+  bottom: -4px;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+}
+
+.grid-lines {
+  background-image:
+    linear-gradient(to right, var(--color-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-line) 1px, transparent 1px);
+  background-size: 120px 120px;
+}
+.grid-fine {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.glow-spectrum {
+  box-shadow:
+    0 0 40px -10px rgb(63 240 255 / 0.35),
+    0 0 60px -20px rgb(176 107 255 / 0.35);
+}
+
+@keyframes rc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes rc-blink {
+  0%,
+  92%,
+  100% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.15;
+  }
+}
+@keyframes rc-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes rc-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.caret::after {
+  content: "▍";
+  margin-left: 1px;
+  animation: rc-caret 1s steps(1) infinite;
+}
+.flow-dash {
+  stroke-dasharray: 4 8;
+  animation: rc-dash 0.8s linear infinite;
+}
+
+.lab-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, var(--color-fg) var(--fill, 50%), var(--color-line-2) var(--fill, 50%));
+  outline: none;
+  cursor: pointer;
+}
+.lab-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--color-void);
+  border: 1.5px solid var(--color-fg);
+}
+.lab-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--color-void);
+  border: 1.5px solid var(--color-fg);
+}
+.lab-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgb(176 107 255 / 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .flow-dash,
+  .caret::after {
+    animation: none;
+  }
+}

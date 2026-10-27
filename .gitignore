@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+*.db
+.DS_Store
+.claude/settings.local.json
+engine/build/
+engine/tests/*.exe
