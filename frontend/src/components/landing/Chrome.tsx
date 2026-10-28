@@ -15,10 +15,10 @@ export const SECTIONS = [
   { id: "builder", label: "Builder" },
 ];
 
-export function LaunchButton({ className = "", label = "Launch lab" }: { className?: string; label?: string }) {
+export function LaunchButton({ className = "", label = "Launch lab", href = "/lab" }: { className?: string; label?: string; href?: string }) {
   return (
     <Link
-      href="/lab"
+      href={href}
       className={`spectrum-border group inline-flex h-9 items-center gap-2 rounded-[3px] bg-void px-4 font-mono text-[11px] tracking-[0.08em] text-fg uppercase transition-colors hover:bg-panel-2 ${className}`}
     >
       <span className="text-mute transition-colors group-hover:text-fg">··</span> {label}
