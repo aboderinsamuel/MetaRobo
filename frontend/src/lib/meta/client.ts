@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { z } from "zod";
 
-const BASE_URL = "https://api.meta.ai/v1";
+export const BASE_URL = "https://api.meta.ai/v1";
 
 export const TEXT_MODEL = process.env.META_TEXT_MODEL || "muse-spark-1.3";
 
@@ -122,7 +122,18 @@ function dailyBudget(): number {
   return Number.isFinite(v) && v > 0 ? v : 1;
 }
 
-async function recordUsage(model: string, schemaName: string, usage: Usage): Promise<void> {
+/** Throws unless a live call is allowed right now: live mode on and today's budget not spent. */
+export async function assertCanSpend(): Promise<void> {
+  if (!metaEnabled()) throw new MetaError("Live Meta calls are off (set META_LIVE=1 and MODEL_API_KEY).");
+  if ((await todaysSpend()) >= dailyBudget()) throw new MetaError(`Daily Meta budget of $${dailyBudget().toFixed(2)} reached.`, 429);
+}
+
+/** Path of the on-disk cache entry for a request hash. */
+export async function cachePath(key: string): Promise<string> {
+  return path.join(await ensureDir(), `${key}.json`);
+}
+
+export async function recordUsage(model: string, schemaName: string, usage: Usage): Promise<void> {
   const day = today();
   await todaysSpend();
   spend = { day, usd: (spend?.usd ?? 0) + usage.costUsd };
@@ -158,8 +169,7 @@ export async function metaJson<S extends z.ZodType>(req: JsonRequest<S>): Promis
     },
   };
   const key = createHash("sha256").update(JSON.stringify(body)).digest("hex");
-  const dir = await ensureDir();
-  const file = path.join(dir, `${key}.json`);
+  const file = await cachePath(key);
 
   try {
     const hit = JSON.parse(await readFile(file, "utf8")) as { content: string };
@@ -168,9 +178,7 @@ export async function metaJson<S extends z.ZodType>(req: JsonRequest<S>): Promis
     // Cache miss (or a stale entry that no longer validates): go live.
   }
 
-  if (!metaEnabled()) throw new MetaError("Live Meta calls are off (set META_LIVE=1 and MODEL_API_KEY).");
-  const spent = await todaysSpend();
-  if (spent >= dailyBudget()) throw new MetaError(`Daily Meta budget of $${dailyBudget().toFixed(2)} reached.`, 429);
+  await assertCanSpend();
 
   const res = await fetch(`${BASE_URL}/chat/completions`, {
     method: "POST",
@@ -200,7 +208,7 @@ export async function metaJson<S extends z.ZodType>(req: JsonRequest<S>): Promis
   return { data, usage, cached: false, model };
 }
 
-function zeroUsage(): Usage {
+export function zeroUsage(): Usage {
   return { inputTokens: 0, cachedTokens: 0, outputTokens: 0, reasoningTokens: 0, costUsd: 0 };
 }
 

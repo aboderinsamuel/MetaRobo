@@ -6,6 +6,7 @@ import {
   Copy,
   Download,
   FileSpreadsheet,
+  Film,
   Loader2,
   Mic,
   MicOff,
@@ -28,6 +29,7 @@ import type { CheckResult } from "@/lib/lab/validate";
 import type { Metrics } from "@/lib/sim/core";
 import { TimeChart } from "./charts";
 import { useSpeech } from "./useSpeech";
+import VideoTrack, { normaliseClip, type VideoTrackOptions } from "./VideoTrack";
 
 export function SectionLabel({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
@@ -62,8 +64,8 @@ export function PrimaryButton({ className = "", ...props }: React.ButtonHTMLAttr
 
 // Each step names who does it, so you can watch the work move between Meta's model and our engine.
 export const PIPELINE: { label: string; who: "meta" | "engine" }[] = [
-  { label: "Reading your description", who: "meta" },
-  { label: "Deriving the physics", who: "meta" },
+  { label: "Checking what can be built", who: "meta" },
+  { label: "Deriving the physics and 3D build", who: "meta" },
   { label: "Choosing a controller", who: "meta" },
   { label: "Simulating in the engine", who: "engine" },
   { label: "Explaining the response", who: "meta" },
@@ -107,6 +109,8 @@ export function DescribePanel({
   pipeline,
   aiOn,
   spend,
+  onVideo,
+  error,
 }: {
   text: string;
   setText: (s: string) => void;
@@ -118,7 +122,13 @@ export function DescribePanel({
   pipeline: number;
   aiOn: boolean | null;
   spend: { usd: number; budgetUsd: number } | null;
+  onVideo: (file: File, opts: VideoTrackOptions, durationS: number) => Promise<void>;
+  /** Why the last description couldn't be built. */
+  error?: string | null;
 }) {
+  const [clip, setClip] = useState<File | null>(null);
+  const [clipError, setClipError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
   const [interim, setInterim] = useState("");
   const baseRef = useRef("");
   const speech = useSpeech((finalText, live) => {
@@ -174,6 +184,23 @@ export function DescribePanel({
               <button onClick={() => fileRef.current?.click()} title="Upload step-response CSV" className="flex size-8 items-center justify-center text-mute hover:text-fg">
                 <Upload className="size-4" />
               </button>
+              <button onClick={() => videoRef.current?.click()} title="Film it: learn your robot's physics from a video (SAM 3.1)" className="flex size-8 items-center justify-center text-mute hover:text-fg">
+                <Film className="size-4" />
+              </button>
+              <input
+                ref={videoRef}
+                type="file"
+                accept="video/mp4,video/quicktime,.mp4,.mov,.m4v"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!f) return;
+                  const ok = normaliseClip(f);
+                  setClipError(ok ? null : "Use an MP4 or MOV clip, as phones record by default.");
+                  setClip(ok);
+                }}
+              />
               <input
                 ref={fileRef}
                 type="file"
@@ -197,6 +224,18 @@ export function DescribePanel({
           </div>
         </div>
         {speech.error && <p className="mt-2 text-xs text-bad">{speech.error}</p>}
+        {clipError && <p className="mt-2 text-xs text-bad">{clipError}</p>}
+        {error && <p className="mt-2 border border-warn/40 bg-warn/5 px-2.5 py-2 text-[11.5px] leading-relaxed text-warn">{error}</p>}
+        {clip && (
+          <VideoTrack
+            file={clip}
+            busy={busy}
+            aiOn={!!aiOn}
+            defaultPrompt={RIGS[pickRig(text)].name.toLowerCase().includes("arm") ? "robot arm" : "robot"}
+            onCancel={() => setClip(null)}
+            onTrack={(opts, d) => void onVideo(clip, opts, d).then(() => setClip(null))}
+          />
+        )}
         {text.trim() && (
           <p className="mono-label mt-2 flex items-center gap-1.5 text-[10px] text-mute">
             <span className="size-1.5 rounded-full" style={{ background: "var(--spectrum-conic)" }} />

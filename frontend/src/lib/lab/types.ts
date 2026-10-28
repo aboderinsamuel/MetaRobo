@@ -1,6 +1,8 @@
 // Shared shapes for the Control Lab: what the modeler (Muse Spark or the offline library) returns,
 // and what the studio keeps per design iteration.
 import type { Complex, Metrics } from "@/lib/sim/core";
+import type { Assembly } from "./assembly";
+import type { Review } from "./review";
 
 export type PlantSpec =
   | { kind: "tf"; num: number[]; den: number[]; delay?: number }
@@ -58,6 +60,10 @@ export interface DriveModel {
 
 export interface LabModel {
   rig?: RigSpec;
+  /** AI-designed 3D machine (Muse Spark). When present, the 3D view builds and animates it instead of a preset rig. */
+  assembly?: Assembly;
+  /** Muse Spark's feasibility review: can it be built from buyable parts, and with what. */
+  review?: Review;
   drive?: DriveModel;
   title: string;
   summary: string;

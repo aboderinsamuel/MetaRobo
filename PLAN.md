@@ -64,11 +64,11 @@ Skip Muse Image unless a real use appears. Bolted-on model calls hurt with judge
 - [x] Pricing section (Free / Maker / Classroom)
 
 ### Oct 30–31: Video to physics model (SAM 3.1)
-- [ ] Video upload in the lab UI (cap ~10 s)
+- [x] Video upload in the lab UI ("Film it", cap 20 s, cost shown before running)
 - [ ] Muse Spark vision: identify the robot, scale reference, moving part
-- [ ] SAM 3.1: segment and track the moving part (sample a few frames per second, cache results)
-- [ ] Turn tracks into a motion curve (pixels → real units using scale)
-- [ ] Fit a plant model in the backend; overlay measured vs. simulated response
+- [x] SAM 3.1: track the moving part (cached by video hash, cost logged; live call not yet verified)
+- [x] Turn tracks into a motion curve (pixels → metres using the robot's real length)
+- [x] Fit a plant model (reuses the step-data fitter) — overlay of measured vs simulated still to check
 
 ### Nov 1: Visible agent loop + voice
 - [ ] Agent loop: propose → simulate → check against specs → revise, with a live trace in the UI
