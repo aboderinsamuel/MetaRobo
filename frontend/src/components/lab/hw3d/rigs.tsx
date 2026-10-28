@@ -10,7 +10,7 @@ import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { fmtNum } from "@/lib/lab/analysis";
 import type { DerivedHardware, Telemetry } from "@/lib/lab/hardware/build";
-import { ARM_ELBOW, ARM_GRIP, ARM_START, payloadSize } from "@/lib/lab/hardware/build";
+import { ARM_ELBOW, ARM_GRIP, ARM_START, payloadSize, roverWheelWidth } from "@/lib/lab/hardware/build";
 import { batteryDims, boardDims, driverDims, motorDims } from "@/lib/lab/hardware/dims";
 import { BatteryMesh, BoardMesh, Dimension, DriverMesh, GearMotorMesh, Label, PartSlot, SensorMesh, Wheel, Wire, curve } from "./parts3d";
 
@@ -27,6 +27,16 @@ export interface Motion {
   u: ArrayLike<number>;
   target: number;
   distTime: number;
+  /** All setpoints the program visits (flags, rings). */
+  targets: number[];
+  events: { t: number; kind: "grip" | "release" }[];
+  /** Rover programs: planar pose, distance rolled by each wheel, commanded and driven paths. */
+  pose?: { x: Float64Array; z: Float64Array; h: Float64Array };
+  wheelS?: [Float64Array, Float64Array];
+  plan?: [number, number][];
+  path?: [number, number][];
+  /** Arm programs: base yaw. */
+  yaw?: Float64Array;
 }
 
 export interface RigProps {
@@ -48,7 +58,7 @@ export function sample(arr: ArrayLike<number>, dt: number, t: number): number {
 const clampAbs = (v: number, m: number) => Math.max(-m, Math.min(m, v));
 
 /** Keeps the orbit target (and camera) gliding after a moving robot along one axis. */
-function useFollow(get: () => number, axis: "x" | "y" = "x") {
+function useFollow(get: () => number, axis: "x" | "y" | "z" = "x") {
   useFrame((state, delta) => {
     const controls = state.controls as OrbitControlsImpl | null;
     if (!controls) return;
@@ -78,19 +88,24 @@ function useElectricalGlow(p: RigProps) {
   return { mot1: m0, mot2: m1, heat };
 }
 
-function TrackMarks({ upto, z = 0.13 }: { upto: number; z?: number }) {
-  const n = Math.min(80, Math.max(8, Math.ceil(Math.abs(upto) / 0.1) + 6));
+function TrackMarks({ upto, from = 0, z = 0.13 }: { upto: number; from?: number; z?: number }) {
+  const start = Math.floor(Math.min(0, from) / 0.5) * 5;
+  const n = Math.min(90, Math.max(8, Math.ceil(Math.abs(upto) / 0.1) + 6 - start));
   return (
     <group>
-      {Array.from({ length: n }).map((_, i) => (
-        <mesh key={i} position={[i * 0.1, 0.0006, z]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.003, i % 5 === 0 ? 0.04 : 0.018]} />
-          <meshBasicMaterial color="#8b909c" transparent opacity={i % 5 === 0 ? 0.8 : 0.35} />
-        </mesh>
-      ))}
-      {Array.from({ length: Math.ceil(n / 5) }).map((_, i) => (
-        <Label key={i} text={`${(i * 0.5).toFixed(1)} m`} position={[i * 0.5, 0.004, z + 0.045]} size={0.016} color="#8b909c" box={false} />
-      ))}
+      {Array.from({ length: n }).map((_, k) => {
+        const i = start + k;
+        return (
+          <mesh key={i} position={[i * 0.1, 0.0006, z]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.003, i % 5 === 0 ? 0.04 : 0.018]} />
+            <meshBasicMaterial color="#8b909c" transparent opacity={i % 5 === 0 ? 0.8 : 0.35} />
+          </mesh>
+        );
+      })}
+      {Array.from({ length: Math.ceil(n / 5) }).map((_, k) => {
+        const i = start / 5 + k;
+        return <Label key={i} text={`${(i * 0.5).toFixed(1)} m`} position={[i * 0.5, 0.004, z + 0.045]} size={0.016} color="#8b909c" box={false} />;
+      })}
     </group>
   );
 }
@@ -155,7 +170,7 @@ export function RoverRig(p: RigProps) {
     W = g.chassisW,
     r = g.wheelD / 2;
   const md = motorDims(motor.look);
-  const ww = Math.min(0.04, Math.max(0.012, r * 0.55));
+  const ww = roverWheelWidth(g.wheelD);
   const deckY = Math.max(r + md.r + 0.004, 0.03);
   const axleX = -L / 2 + Math.max(r * 0.7, md.r + 0.012);
   const slope = hw.facts.slope;
@@ -164,23 +179,42 @@ export function RoverRig(p: RigProps) {
   const rampX = rampAt > 0 ? sample(m.main, m.dt, rampAt) + L * 0.5 : Infinity;
 
   const body = useRef<THREE.Group>(null);
+  const pitchG = useRef<THREE.Group>(null);
   const wl = useRef<THREE.Group>(null);
   const wr = useRef<THREE.Group>(null);
   const beam = useRef<THREE.Mesh>(null);
-  const xNow = () => clampAbs(sample(m.main, m.dt, clock.current.t), 80);
+  const pose = m.pose;
+  const xNow = () => clampAbs(pose ? sample(pose.x, m.dt, clock.current.t) : sample(m.main, m.dt, clock.current.t), 80);
+  const zNow = () => (pose ? clampAbs(sample(pose.z, m.dt, clock.current.t), 80) : 0);
   useFollow(xNow);
+  useFollow(zNow, "z");
   const { mot1, mot2, heat } = useElectricalGlow(p);
   useFrame(({ clock: c }) => {
+    const t = clock.current.t;
     const x = xNow();
-    if (body.current) {
-      // The nose tips up as it rolls onto the ramp; once the tail is on too, it climbs the incline.
-      const k = rampX < Infinity ? Math.min(1, Math.max(0, (x + L / 2 - rampX) / L)) : 0;
-      const pitch = slope * k;
-      const climb = rampX < Infinity ? Math.max(0, x - L / 2 - rampX) * Math.tan(slope) : 0;
-      body.current.position.set(x, (L / 2) * Math.sin(pitch) + climb, 0);
-      body.current.rotation.z = pitch;
+    if (body.current && pitchG.current) {
+      if (pose) {
+        // Programs: the pose is the middle of the rear axle, the point a differential drive turns about.
+        body.current.position.set(x, 0, zNow());
+        body.current.rotation.y = sample(pose.h, m.dt, t);
+        pitchG.current.position.y = 0;
+        pitchG.current.rotation.z = 0;
+      } else {
+        // The nose tips up as it rolls onto the ramp; once the tail is on too, it climbs the incline.
+        const k = rampX < Infinity ? Math.min(1, Math.max(0, (x + L / 2 - rampX) / L)) : 0;
+        const pitch = slope * k;
+        const climb = rampX < Infinity ? Math.max(0, x - L / 2 - rampX) * Math.tan(slope) : 0;
+        body.current.position.set(x, 0, 0);
+        body.current.rotation.y = 0;
+        pitchG.current.position.y = (L / 2) * Math.sin(pitch) + climb;
+        pitchG.current.rotation.z = pitch;
+      }
     }
-    for (const w of [wl.current, wr.current]) if (w) w.rotation.z = -x / r;
+    // Side +z is the right wheel, −z the left.
+    const sL = m.wheelS ? sample(m.wheelS[0], m.dt, t) : x;
+    const sR = m.wheelS ? sample(m.wheelS[1], m.dt, t) : x;
+    if (wr.current) wr.current.rotation.z = -sR / r;
+    if (wl.current) wl.current.rotation.z = -sL / r;
     if (beam.current) (beam.current.material as THREE.MeshBasicMaterial).opacity = 0.08 + 0.05 * Math.sin(c.elapsedTime * 8);
   });
 
@@ -197,8 +231,10 @@ export function RoverRig(p: RigProps) {
 
   return (
     <>
-      <TrackMarks upto={Math.max(1.5, m.main[m.main.length - 1] ?? 1)} z={W / 2 + 0.07} />
-      {rampX < Infinity && slope > 0.001 && (
+      {!pose && <TrackMarks upto={Math.max(1.5, m.main[m.main.length - 1] ?? 1)} z={W / 2 + 0.07} />}
+      {m.plan && <Line points={m.plan.map(([x, z]) => [x, 0.0015, z] as V3)} color="#5fe0c8" lineWidth={1.6} dashed dashSize={0.02} gapSize={0.012} transparent opacity={0.85} />}
+      {m.path && <Line points={m.path.map(([x, z]) => [x, 0.002, z] as V3)} color="#b06bff" lineWidth={1.2} transparent opacity={0.6} />}
+      {!pose && rampX < Infinity && slope > 0.001 && (
         <group position={[rampX, 0, 0]}>
           <mesh position={[0.6 * Math.cos(slope), 0.6 * Math.sin(slope) - 0.006, 0]} rotation={[0, 0, slope]} receiveShadow>
             <boxGeometry args={[1.2, 0.012, W + 0.16]} />
@@ -208,6 +244,8 @@ export function RoverRig(p: RigProps) {
         </group>
       )}
       <group ref={body}>
+       <group ref={pitchG}>
+        <group position={[pose ? -axleX : 0, 0, 0]}>
         {/* Chassis */}
         <RoundedBox args={[L, 0.004, W]} radius={0.002} smoothness={2} position={[0, deckY, 0]} castShadow receiveShadow>
           <meshStandardMaterial color="#1b3550" roughness={0.55} />
@@ -282,6 +320,8 @@ export function RoverRig(p: RigProps) {
         <Wire points={wirePts([xs[1] + cd[0] / 2, top + 0.005, -W * 0.12], [xs[2] - dd[0] / 2, top + 0.006, W * 0.1 - 0.01], 0.012)} color="#3ff0ff" width={1.2} />
         <Dimension a={[-L / 2, deckY, -W / 2 - 0.02]} b={[L / 2, deckY, -W / 2 - 0.02]} text={`chassis ${Math.round(L * 1000)} mm`} offset={[0, 0, -0.02]} />
         <Label text={`⌀${Math.round(g.wheelD * 1000)} mm`} position={[axleX, r * 2 + 0.014, W / 2 + ww + 0.01]} size={0.011} color="#aab2bf" />
+        </group>
+       </group>
       </group>
     </>
   );
@@ -358,39 +398,59 @@ export function ArmRig(p: RigProps) {
   };
   const pick = tip(ARM_START, 0);
   const place = tip(thEnd, yawMax);
-  const release = m.distTime > 0 ? m.distTime : Infinity;
+  const liftAt = (t: number) => clampAbs(sample(m.main, m.dt, t), 2.8);
+  const yawAt = (t: number) => (m.yaw ? sample(m.yaw, m.dt, t) : yawMax * (m.target ? Math.max(-0.2, Math.min(1.15, liftAt(t) / m.target)) : 0));
+  // One part per grip/release pair; each rests where the gripper let go of it.
+  const parts = (() => {
+    const grips = m.events.filter((e) => e.kind === "grip").map((e) => e.t);
+    const rels = m.events.filter((e) => e.kind === "release").map((e) => e.t);
+    return g.payload > 0
+      ? grips.map((gt, k) => {
+          const rt = rels[k] ?? Infinity;
+          return { grip: gt, release: rt, rest: Number.isFinite(rt) ? tip(ARM_START + liftAt(rt), yawAt(rt)) : place, restYaw: Number.isFinite(rt) ? yawAt(rt) : yawMax };
+        })
+      : [];
+  })();
 
   const turret = useRef<THREE.Group>(null);
   const shoulder = useRef<THREE.Group>(null);
-  const crate = useRef<THREE.Group>(null);
+  const crates = useRef<(THREE.Group | null)[]>([]);
   const jaw = useRef<THREE.Group>(null);
   const servoGlow = useRef<THREE.MeshStandardMaterial>(null);
   const { mot1: glow, heat } = useElectricalGlow(p);
   useFrame(() => {
     const t = clock.current.t;
-    const lift = clampAbs(sample(m.main, m.dt, t), 2.8);
-    const frac = m.target ? Math.max(-0.2, Math.min(1.15, lift / m.target)) : 0;
-    const yaw = yawMax * frac;
+    const lift = liftAt(t);
+    const yaw = yawAt(t);
     const th = ARM_START + lift;
     if (turret.current) turret.current.rotation.y = yaw;
     if (shoulder.current) shoulder.current.rotation.z = th;
     if (servoGlow.current) servoGlow.current.emissiveIntensity = 0.05;
-    const held = t < release;
+    let holding = false;
+    parts.forEach((pt, k) => {
+      const c = crates.current[k];
+      if (!c) return;
+      const prevDone = k === 0 || t >= parts[k - 1].release;
+      if (t < pt.grip) {
+        c.visible = prevDone;
+        c.position.set(pick[0], pick[1], pick[2]);
+        c.rotation.set(0, 0, 0);
+      } else if (t < pt.release) {
+        holding = true;
+        c.visible = true;
+        const [x, y, z] = tip(th, yaw);
+        c.position.set(x, y, z);
+        c.rotation.set(0, yaw, 0);
+      } else {
+        c.visible = true;
+        c.position.set(pt.rest[0], pt.rest[1], pt.rest[2]);
+        c.rotation.set(0, pt.restYaw, 0);
+      }
+    });
     if (jaw.current)
       jaw.current.children.forEach((c, i) => {
-        c.position.z = (i === 0 ? 1 : -1) * (held && g.payload > 0 ? box / 2 + 0.002 : box / 2 + 0.01);
+        c.position.z = (i === 0 ? 1 : -1) * (holding ? box / 2 + 0.002 : box / 2 + 0.01);
       });
-    if (crate.current) {
-      if (held) {
-        const [x, y, z] = tip(th, yaw);
-        crate.current.position.set(x, y, z);
-        crate.current.rotation.set(0, yaw, 0);
-      } else {
-        const k = Math.min(1, (t - release) / 0.15);
-        crate.current.position.set(place[0], place[1] - k * 0.003, place[2]);
-        crate.current.rotation.set(0, yawMax, 0);
-      }
-    }
   });
   const comBad = hw.checks.some((c) => c.id === "tip" && c.level !== "pass");
   const bd = batteryDims(hw.battery),
@@ -505,11 +565,17 @@ export function ArmRig(p: RigProps) {
           <ArmLinks hw={hw} ghost />
         </group>
       </group>
-      {g.payload > 0 && (
-        <group ref={crate}>
+      {parts.map((_, k) => (
+        <group
+          key={k}
+          ref={(el) => {
+            crates.current[k] = el;
+          }}
+          visible={false}
+        >
           <Crate s={box} />
         </group>
-      )}
+      ))}
       <group position={[Math.max(0, hw.facts.comX), 0.016, 0]}>
         <ComMarker y={H * 0.55} bad={comBad} />
       </group>
@@ -560,8 +626,10 @@ export function BalancerRig(p: RigProps) {
   const curNow = () => sample(p.tel.perMotor, m.dt, clock.current.t);
   return (
     <>
-      <TrackMarks upto={Math.max(0.8, m.target * 2)} z={bodyW / 2 + ww + 0.06} />
-      <Flag x={m.target} label={`target ${fmtNum(m.target)} m`} z={-(bodyW / 2 + 0.1)} />
+      <TrackMarks upto={Math.max(0.8, ...m.targets.map((v) => v * 1.6))} from={Math.min(0, ...m.targets) - 0.3} z={bodyW / 2 + ww + 0.06} />
+      {m.targets.map((v) => (
+        <Flag key={v} x={v} label={`${v < 0 ? "" : "target "}${fmtNum(v)} m`} z={-(bodyW / 2 + 0.1)} />
+      ))}
       <group ref={base}>
         {[1, -1].map((s) => (
           <group key={s} position={[0, r, s * (bodyW / 2 + 0.004 + ww / 2)]}>
@@ -701,7 +769,7 @@ export function DroneRig(p: RigProps) {
     }
   });
   const arms = [45, 135, 225, 315].map((d) => (d * Math.PI) / 180);
-  const targetY = legH + m.target;
+  const targetY = legH + Math.max(m.target, ...m.targets);
   const plate = Math.max(0.05, arm * 0.55);
   const bd = batteryDims(hw.battery);
   const tick = targetY > 2.5 ? 0.5 : 0.25;
@@ -733,12 +801,16 @@ export function DroneRig(p: RigProps) {
         <boxGeometry args={[0.002, (nTicks - 1) * tick, 0.002]} />
         <meshBasicMaterial color="#50555f" />
       </mesh>
-      {/* Target altitude ring */}
-      <mesh position={[0, targetY, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[arm * 1.7, 0.003, 8, 96]} />
-        <meshBasicMaterial color="#3ff0ff" transparent opacity={0.7} toneMapped={false} />
-      </mesh>
-      <Label text={`TARGET +${fmtNum(m.target)} M`} position={[arm * 2.3, targetY, 0]} size={0.04} />
+      {/* Target altitude rings */}
+      {m.targets.map((v) => (
+        <group key={v} position={[0, legH + v, 0]}>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[arm * 1.7, 0.003, 8, 96]} />
+            <meshBasicMaterial color="#3ff0ff" transparent opacity={0.7} toneMapped={false} />
+          </mesh>
+          <Label text={`TARGET +${fmtNum(v)} M`} position={[arm * 2.3, 0, 0]} size={0.04} />
+        </group>
+      ))}
       <group ref={gust} visible={false}>
         {[-1, 0, 1].map((k) => (
           <group key={k} position={[k * arm * 0.9, 0, arm * 0.4]}>

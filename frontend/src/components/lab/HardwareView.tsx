@@ -6,18 +6,21 @@ import { Grid, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { AlertTriangle, CheckCircle2, Info, Pause, Play, RotateCcw, Tag, Wand2, X, XCircle } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtNum } from "@/lib/lab/analysis";
 import { SLOTS } from "@/lib/lab/hardware/build";
 import type { CheckLevel, DesignCheck, DerivedHardware, HardwareBuild, Telemetry } from "@/lib/lab/hardware/build";
 import type { SlotId } from "@/lib/lab/hardware/parts";
 import { RIGS, displayScale, integrate, tiltFromPosition } from "@/lib/lab/rig";
+import { usePlayback } from "@/lib/lab/playback";
+import type { Playback } from "@/lib/lab/playback";
+import { segmentAt } from "@/lib/lab/programs";
+import type { ProgramDef, ProgramRun } from "@/lib/lab/programs";
 import type { LabModel } from "@/lib/lab/types";
-import type { SimOut } from "@/lib/sim/core";
 import { Scene } from "./hw3d/parts3d";
 import type { PartStatus, SceneCtx } from "./hw3d/parts3d";
 import { ArmRig, BalancerRig, DroneRig, RoverRig } from "./hw3d/rigs";
-import type { Clock, Motion } from "./hw3d/rigs";
+import type { Motion } from "./hw3d/rigs";
 
 /** Calls `onFrame` from inside the render loop; the owner of the clock advances it there. */
 function Driver({ onFrame }: { onFrame: (delta: number) => void }) {
@@ -53,83 +56,102 @@ const LEVEL_ICON: Record<CheckLevel, typeof Info> = { pass: CheckCircle2, info: 
 const LEVEL_CLS: Record<CheckLevel, string> = { pass: "text-ok", info: "text-spec-1", warn: "text-warn", error: "text-bad" };
 const RANK: Record<CheckLevel, number> = { pass: 0, info: 1, warn: 2, error: 3 };
 
+const Rover = memo(RoverRig);
+const Arm = memo(ArmRig);
+const Balancer = memo(BalancerRig);
+const Drone = memo(DroneRig);
+
 export default function HardwareView({
   hw,
   model,
-  sim,
-  tilt,
+  run,
   tel,
   checks,
   stable,
   settlingTime,
   resetKey,
+  playback,
+  programs,
+  program,
+  onProgram,
   selected,
   onSelect,
   onBuild,
-  onTime,
   dock,
   className,
 }: {
   hw: DerivedHardware;
   model: LabModel;
-  sim: SimOut;
-  tilt?: Float64Array;
+  run: ProgramRun;
   tel: Telemetry;
   checks: DesignCheck[];
   stable: boolean;
   settlingTime: number;
   resetKey: number;
+  playback: Playback;
+  programs: ProgramDef[];
+  program: string;
+  onProgram: (id: string) => void;
   selected: SlotId | null;
   onSelect: (s: SlotId | null) => void;
   onBuild: (b: HardwareBuild, note: string) => void;
-  onTime?: (t: number) => void;
   dock?: React.ReactNode;
   className?: string;
 }) {
   const rig = useMemo(() => model.rig ?? { kind: hw.build.kind, signal: "position" as const }, [model.rig, hw.build.kind]);
-  const tEnd = (sim.y.length - 1) * sim.dt;
-  // Fast systems play in slow motion and slow ones speed up, so every run lasts a few seconds.
-  const baseRate = tEnd / Math.min(10, Math.max(4, tEnd));
+  const tEnd = run.tEnd;
+  // Short missions play in slow motion so the motion is readable; long programs run in real time.
+  const baseRate = tEnd / Math.min(30, Math.max(4, tEnd));
   const [mult, setMult] = useState(1);
   const [labels, setLabels] = useState(false);
   const [camKey, setCamKey] = useState(0);
-  const clock = useRef<Clock>({ t: 0, playing: true, rate: baseRate });
-  const [ui, setUi] = useState({ t: 0, playing: true });
+  const clock = useMemo(() => ({ current: playback }), [playback]);
   const load = useRef<Partial<Record<SlotId, number>>>({});
+  const hasRun = useRef(false);
 
+  // A new design rewinds; after the first Simulate, design changes replay on their own.
   useEffect(() => {
-    clock.current.t = 0;
-    clock.current.playing = true;
-  }, [resetKey, rig.kind]);
+    playback.set({ t: 0, tEnd, playing: hasRun.current });
+  }, [playback, resetKey, rig.kind, tEnd]);
+  // Picking a program shows its route and waits for Simulate.
   useEffect(() => {
-    clock.current.rate = baseRate * mult;
-  }, [baseRate, mult]);
+    playback.set({ t: 0, playing: false });
+  }, [playback, program]);
+  useEffect(() => {
+    playback.set({ rate: baseRate * mult }, false);
+  }, [playback, baseRate, mult]);
 
-  // Advances playback each frame and publishes the time to React about 15 times a second.
-  const lastPublish = useRef(0);
-  const advance = (delta: number) => {
-    const c = clock.current;
-    if (c.playing) {
-      c.t = Math.min(tEnd, c.t + Math.min(delta, 0.1) * c.rate);
-      if (c.t >= tEnd) c.playing = false;
-    }
-    const now = performance.now();
-    if (now - lastPublish.current > 66 || !c.playing) {
-      lastPublish.current = now;
-      const { t: tt, playing } = c;
-      setUi((prev) => (Math.abs(prev.t - tt) > 1e-9 || prev.playing !== playing ? { t: tt, playing } : prev));
-      onTime?.(tt);
-    }
-  };
+  const advance = useCallback((delta: number) => playback.tick(delta), [playback]);
+  const simulate = useCallback(() => {
+    hasRun.current = true;
+    playback.toggle();
+  }, [playback]);
 
   const scale = displayScale(model, rig);
   const motionData: Motion = useMemo(() => {
-    const y = Float64Array.from(sim.y, (v) => v * scale);
-    const base = { dt: sim.dt, tEnd, u: sim.u, target: model.sim.ref * scale, distTime: model.sim.disturbance?.time ?? -1 };
-    if (rig.kind === "rover" && rig.signal === "speed") return { ...base, main: integrate(y, sim.dt), speed: y };
-    if (rig.kind === "balancer") return { ...base, main: y, tilt: tilt ?? tiltFromPosition(y, sim.dt) };
+    const y = Float64Array.from(run.y, (v) => v * scale);
+    const base = {
+      dt: run.dt,
+      tEnd: run.tEnd,
+      u: run.u,
+      target: model.sim.ref * scale,
+      distTime: run.disturbance,
+      targets: run.targets.map((v) => v * scale),
+      events: run.events,
+    };
+    if (rig.kind === "rover") {
+      if (run.pose && run.vL && run.vR) {
+        const every = Math.max(1, Math.floor(run.pose.x.length / 800));
+        const path: [number, number][] = [];
+        for (let i = 0; i < run.pose.x.length; i += every) path.push([run.pose.x[i], run.pose.z[i]]);
+        return { ...base, main: integrate(y, run.dt), speed: y, pose: run.pose, wheelS: [integrate(run.vL, run.dt), integrate(run.vR, run.dt)], plan: run.plan, path };
+      }
+      return rig.signal === "speed" ? { ...base, main: integrate(y, run.dt), speed: y } : { ...base, main: y };
+    }
+    if (rig.kind === "balancer") return { ...base, main: y, tilt: run.tilt ?? tiltFromPosition(y, run.dt) };
+    if (rig.kind === "arm") return { ...base, main: y, yaw: run.yaw };
     return { ...base, main: y };
-  }, [sim, scale, model, rig, tilt, tEnd]);
+  }, [run, scale, model, rig]);
 
   // Worst check per part drives the outline and callout on that part.
   const status = useMemo(() => {
@@ -142,43 +164,44 @@ export default function HardwareView({
     }
     return s;
   }, [checks]);
-  const ctx: SceneCtx = { selected, status, onSelect, labels, load };
+  const ctx: SceneCtx = useMemo(() => ({ selected, status, onSelect, labels, load }), [selected, status, onSelect, labels]);
 
-  const t = ui.t;
-  const idx = Math.min(sim.y.length - 1, Math.round(t / sim.dt));
-  const value = sim.y[idx] ?? 0;
-  const tiltNow = motionData.tilt ? motionData.tilt[idx] : 0;
-  const fallen = rig.kind === "balancer" && (!Number.isFinite(tiltNow) || Math.abs(tiltNow) > 1.25);
-  const status_ = !stable && (fallen || t > tEnd * 0.25) ? (fallen ? "FELL OVER" : "UNSTABLE") : settlingTime >= 0 && t >= settlingTime ? "SETTLED" : "TRACKING";
-  const statusCls = status_ === "SETTLED" ? "text-ok border-ok/40" : status_ === "TRACKING" ? "text-spec-1 border-spec-1/40" : "text-bad border-bad/50";
   // Portrait phones see a narrow slice horizontally: pull the camera back so the machine fits.
   const [narrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 640);
+  const wide = !!run.pose;
   const cam = useMemo(() => {
     const c = camera(hw);
-    const k = narrow ? 1.6 : 1;
+    const k = (narrow ? 1.6 : 1) * (wide ? 1.6 : 1);
     return { target: c.target, pos: c.pos.map((v, i) => c.target[i] + (v - c.target[i]) * k) as [number, number, number] };
-  }, [hw, narrow]);
-  const curNow = tel.perMotor[idx] ?? 0;
-  const curFrac = curNow / tel.limitA;
+  }, [hw, narrow, wide]);
   const isDrone = rig.kind === "drone";
-  const power = isDrone ? (tel.current[idx] ?? 0) * hw.battery.vNom : Math.abs((sim.u[idx] ?? 0) * (tel.current[idx] ?? 0));
   const errors = checks.filter((c) => c.level === "error").length;
   const warns = checks.filter((c) => c.level === "warn").length;
 
   return (
     <div className={`relative overflow-hidden bg-[#06080b] ${className ?? ""}`}>
       <Canvas
-        key={`${rig.kind}-${camKey}`}
+        key={`${rig.kind}-${camKey}-${wide ? "w" : "n"}`}
         shadows
         camera={{ position: cam.pos, fov: 38, near: 0.003, far: 60 }}
-        dpr={[1, 2]}
+        dpr={[1, 1.75]}
+        gl={{ antialias: true, powerPreference: "high-performance" }}
         onPointerMissed={() => onSelect(null)}
       >
         <Scene.Provider value={ctx}>
           <color attach="background" args={["#06080b"]} />
           <fog attach="fog" args={["#06080b", 2.5, isDrone ? 9 : 6]} />
           <hemisphereLight args={["#bcd3ff", "#0b0f14", 0.65]} />
-          <directionalLight position={[1.2, 2, 1]} intensity={1.7} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-1.5} shadow-camera-right={1.5} shadow-camera-top={1.5} shadow-camera-bottom={-1.5} />
+          <directionalLight
+            position={[1.2, 2, 1]}
+            intensity={1.7}
+            castShadow
+            shadow-mapSize={[1024, 1024]}
+            shadow-camera-left={-1.5}
+            shadow-camera-right={1.5}
+            shadow-camera-top={1.5}
+            shadow-camera-bottom={-1.5}
+          />
           <directionalLight position={[-1.5, 0.8, -1]} intensity={0.6} color="#7f5bff" />
           <pointLight position={[0.3, 0.4, 0.5]} intensity={0.4} color="#3ff0ff" />
           <Grid infiniteGrid cellSize={0.05} sectionSize={0.25} cellColor="#16222f" sectionColor="#1f4257" fadeDistance={isDrone ? 7 : 3.5} fadeStrength={1.5} position={[0, -0.0005, 0]} />
@@ -187,10 +210,10 @@ export default function HardwareView({
             <shadowMaterial opacity={0.35} />
           </mesh>
           <Driver onFrame={advance} />
-          {rig.kind === "rover" && <RoverRig hw={hw} m={motionData} clock={clock} tel={tel} />}
-          {rig.kind === "arm" && <ArmRig hw={hw} m={motionData} clock={clock} tel={tel} />}
-          {rig.kind === "balancer" && <BalancerRig hw={hw} m={motionData} clock={clock} tel={tel} />}
-          {rig.kind === "drone" && <DroneRig hw={hw} m={motionData} clock={clock} tel={tel} />}
+          {rig.kind === "rover" && <Rover hw={hw} m={motionData} clock={clock} tel={tel} />}
+          {rig.kind === "arm" && <Arm hw={hw} m={motionData} clock={clock} tel={tel} />}
+          {rig.kind === "balancer" && <Balancer hw={hw} m={motionData} clock={clock} tel={tel} />}
+          {rig.kind === "drone" && <Drone hw={hw} m={motionData} clock={clock} tel={tel} />}
           <OrbitControls makeDefault target={cam.target} enableDamping maxPolarAngle={Math.PI / 2.05} minDistance={0.08} maxDistance={6} />
         </Scene.Provider>
       </Canvas>
@@ -209,7 +232,7 @@ export default function HardwareView({
             {errors ? `${errors} blocking issue${errors > 1 ? "s" : ""}` : warns ? `${warns} warning${warns > 1 ? "s" : ""}` : "feasible"}
           </span>
         </div>
-        <p className="font-mono text-[10px] text-dim">Drag to orbit · scroll to zoom · click a part to inspect or swap it</p>
+        <p className="font-mono text-[10px] text-dim">Drag to orbit · scroll to zoom · click a part to inspect or swap it, then simulate</p>
       </div>
 
       {/* Top-right: live telemetry */}
@@ -225,20 +248,7 @@ export default function HardwareView({
             <RotateCcw className="size-3" />
           </button>
         </div>
-        <span className={`mono-label inline-block border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${statusCls}`}>{status_}</span>
-        <div className="w-52 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
-          <Row k={model.output.name} v={`${fmtNum(value)} / ${fmtNum(model.sim.ref)} ${model.output.unit}`} />
-          <Row k={isDrone ? "thrust Δ" : "motor V"} v={`${fmtNum(sim.u[idx] ?? 0)} ${model.input.unit}`} />
-          {rig.kind === "rover" && motionData.speed && <Row k="distance" v={`${fmtNum(motionData.main[idx])} m`} />}
-          {rig.kind === "balancer" && <Row k="tilt" v={`${fmtNum(((tiltNow || 0) * 180) / Math.PI)}°`} />}
-          <Row k={tel.label} v={`${curNow.toFixed(2)} A`} cls={curFrac > 1 ? "text-bad" : curFrac > 0.75 ? "text-warn" : ""} />
-          <div className="mt-1 h-1 w-full bg-line">
-            <div className={`h-full transition-[width] duration-75 ${curFrac > 1 ? "bg-bad" : curFrac > 0.75 ? "bg-warn" : "bg-ok"}`} style={{ width: `${Math.min(100, curFrac * 100)}%` }} />
-          </div>
-          <p className="mt-0.5 text-[9px] text-dim">
-            {hw.driver.name.split(" ")[0]} limit {tel.limitA} A · {fmtNum(power, 2)} W
-          </p>
-        </div>
+        <Hud playback={playback} hw={hw} model={model} run={run} tel={tel} motion={motionData} stable={stable} settlingTime={settlingTime} />
       </div>
 
       {/* Part inspector */}
@@ -256,60 +266,167 @@ export default function HardwareView({
         )}
       </AnimatePresence>
 
-      {/* Bottom: dock (mini scope) + playback */}
+      {/* Bottom: dock (mini scope), then program picker and the Simulate control */}
       <div className="absolute inset-x-0 bottom-0">
         {dock}
-        <div className="flex items-center gap-3 border-t border-line bg-void/85 px-3 py-2 backdrop-blur">
-          <button
-            onClick={() => {
-              const c = clock.current;
-              if (c.t >= tEnd) c.t = 0;
-              c.playing = !c.playing;
-            }}
-            className="flex size-7 items-center justify-center border border-line-2 text-fg hover:bg-panel-2"
-            aria-label={ui.playing ? "Pause" : "Play"}
-          >
-            {ui.playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-          </button>
-          <button
-            onClick={() => {
-              clock.current.t = 0;
-              clock.current.playing = true;
-            }}
-            className="flex size-7 items-center justify-center text-mute hover:text-fg"
-            aria-label="Replay"
-          >
-            <RotateCcw className="size-3.5" />
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={1000}
-            value={tEnd > 0 ? (t / tEnd) * 1000 : 0}
-            onChange={(e) => {
-              clock.current.t = (Number(e.target.value) / 1000) * tEnd;
-              clock.current.playing = false;
-            }}
-            className="lab-range flex-1"
-            style={{ "--fill": `${tEnd > 0 ? (t / tEnd) * 100 : 0}%` } as React.CSSProperties}
-            aria-label="Scrub time"
-          />
-          <span className="w-24 text-right font-mono text-[11px] tabular-nums">
-            {fmtNum(t)} / {fmtNum(tEnd)} s
-          </span>
-          <div className="hidden items-center gap-0.5 sm:flex">
-            {[0.25, 1, 3].map((k) => (
-              <button key={k} onClick={() => setMult(k)} className={`mono-label px-1.5 py-0.5 text-[10px] ${mult === k ? "bg-panel-2 text-fg" : "text-dim hover:text-mute"}`}>
-                {k}×
-              </button>
-            ))}
+        <div className="border-t border-line bg-void/90 backdrop-blur">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-2">
+            <div className="flex items-center gap-0.5 border border-line p-0.5">
+              {programs.map((pr) => (
+                <button
+                  key={pr.id}
+                  title={pr.blurb}
+                  onClick={() => onProgram(pr.id)}
+                  className={`mono-label px-2 py-1 text-[10px] transition-colors ${program === pr.id ? "bg-panel-2 text-fg" : "text-dim hover:text-mute"}`}
+                >
+                  {pr.name}
+                </button>
+              ))}
+            </div>
+            <PlaybackBar playback={playback} onSimulate={simulate} mult={mult} setMult={setMult} baseRate={baseRate} />
           </div>
-          <span className="mono-label hidden text-[9px] text-dim md:inline">
-            {baseRate * mult < 0.98 ? `slow-mo ×${fmtNum(1 / (baseRate * mult), 2)}` : baseRate * mult > 1.02 ? `fast ×${fmtNum(baseRate * mult, 2)}` : "real time"}
-          </span>
+          <Caption playback={playback} run={run} />
         </div>
       </div>
     </div>
+  );
+}
+
+/** Live readouts: subscribes to the clock, so only this box re-renders during playback. */
+function Hud({
+  playback,
+  hw,
+  model,
+  run,
+  tel,
+  motion: mo,
+  stable,
+  settlingTime,
+}: {
+  playback: Playback;
+  hw: DerivedHardware;
+  model: LabModel;
+  run: ProgramRun;
+  tel: Telemetry;
+  motion: Motion;
+  stable: boolean;
+  settlingTime: number;
+}) {
+  const { t } = usePlayback(playback);
+  const kind = model.rig?.kind ?? hw.build.kind;
+  const idx = Math.min(run.y.length - 1, Math.max(0, Math.round(t / run.dt)));
+  const value = run.y[idx] ?? 0;
+  const tiltNow = mo.tilt ? mo.tilt[idx] : 0;
+  const fallen = kind === "balancer" && (!Number.isFinite(tiltNow) || Math.abs(tiltNow) > 1.25);
+  const done = run.tEnd > 0 && t >= run.tEnd - 1e-9;
+  const status =
+    !stable && (fallen || t > run.tEnd * 0.25)
+      ? fallen
+        ? "FELL OVER"
+        : "UNSTABLE"
+      : t === 0
+        ? "READY"
+        : run.id === "mission"
+          ? settlingTime >= 0 && t >= settlingTime
+            ? "SETTLED"
+            : "TRACKING"
+          : done
+            ? "DONE"
+            : "RUNNING";
+  const statusCls =
+    status === "SETTLED" || status === "DONE"
+      ? "text-ok border-ok/40"
+      : status === "READY"
+        ? "text-mute border-line-2"
+        : status === "TRACKING" || status === "RUNNING"
+          ? "text-spec-1 border-spec-1/40"
+          : "text-bad border-bad/50";
+  const curNow = tel.perMotor[idx] ?? 0;
+  const curFrac = curNow / tel.limitA;
+  const isDrone = kind === "drone";
+  const power = isDrone ? (tel.current[idx] ?? 0) * hw.battery.vNom : Math.abs((run.u[idx] ?? 0) * (tel.current[idx] ?? 0));
+  const heading = mo.pose ? Math.round(((((mo.pose.h[idx] * 180) / Math.PI) % 360) + 360) % 360) : 0;
+  return (
+    <>
+      <span className={`mono-label inline-block border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${statusCls}`}>{status}</span>
+      <div className="w-52 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
+        <Row k={model.output.name} v={`${fmtNum(value)} / ${fmtNum(run.r[idx] ?? model.sim.ref)} ${model.output.unit}`} />
+        <Row k={isDrone ? "thrust Δ" : "motor V"} v={`${fmtNum(run.u[idx] ?? 0)} ${model.input.unit}`} />
+        {kind === "rover" && mo.speed && <Row k="distance" v={`${fmtNum(mo.main[idx])} m`} />}
+        {kind === "rover" && mo.pose && <Row k="heading" v={`${heading}°`} />}
+        {kind === "balancer" && <Row k="tilt" v={`${fmtNum(((tiltNow || 0) * 180) / Math.PI)}°`} />}
+        <Row k={tel.label} v={`${curNow.toFixed(2)} A`} cls={curFrac > 1 ? "text-bad" : curFrac > 0.75 ? "text-warn" : ""} />
+        <div className="mt-1 h-1 w-full bg-line">
+          <div className={`h-full ${curFrac > 1 ? "bg-bad" : curFrac > 0.75 ? "bg-warn" : "bg-ok"}`} style={{ width: `${Math.min(100, curFrac * 100)}%` }} />
+        </div>
+        <p className="mt-0.5 text-[9px] text-dim">
+          {hw.driver.name.split(" ")[0]} limit {tel.limitA} A · {fmtNum(power, 2)} W
+        </p>
+      </div>
+    </>
+  );
+}
+
+function PlaybackBar({ playback, onSimulate, mult, setMult, baseRate }: { playback: Playback; onSimulate: () => void; mult: number; setMult: (k: number) => void; baseRate: number }) {
+  const { t, playing } = usePlayback(playback);
+  const tEnd = playback.tEnd;
+  const done = t >= tEnd - 1e-9;
+  const label = playing ? "Pause" : t > 0 && !done ? "Resume" : done ? "Simulate again" : "Simulate";
+  return (
+    <>
+      <button
+        onClick={onSimulate}
+        className={`relative inline-flex h-8 items-center gap-2 overflow-hidden px-4 text-[12px] font-medium transition-colors ${playing ? "border border-line-2 text-fg hover:bg-panel-2" : "text-void"}`}
+        style={playing ? undefined : { background: "var(--spectrum)" }}
+      >
+        {!playing && t === 0 && <span className="absolute inset-0 animate-pulse bg-white/20" />}
+        {playing ? <Pause className="relative size-3.5" /> : <Play className="relative size-3.5 fill-current" />}
+        <span className="relative">{label}</span>
+      </button>
+      <button
+        onClick={() => playback.set({ t: 0, playing: true })}
+        className="flex size-7 items-center justify-center text-mute hover:text-fg"
+        aria-label="Restart"
+        title="Restart"
+      >
+        <RotateCcw className="size-3.5" />
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={1000}
+        value={tEnd > 0 ? (t / tEnd) * 1000 : 0}
+        onChange={(e) => playback.set({ t: (Number(e.target.value) / 1000) * tEnd, playing: false })}
+        className="lab-range min-w-[80px] flex-1"
+        style={{ "--fill": `${tEnd > 0 ? (t / tEnd) * 100 : 0}%` } as React.CSSProperties}
+        aria-label="Scrub time"
+      />
+      <span className="w-24 text-right font-mono text-[11px] tabular-nums">
+        {fmtNum(t)} / {fmtNum(tEnd)} s
+      </span>
+      <div className="hidden items-center gap-0.5 sm:flex">
+        {[0.25, 1, 3].map((k) => (
+          <button key={k} onClick={() => setMult(k)} className={`mono-label px-1.5 py-0.5 text-[10px] ${mult === k ? "bg-panel-2 text-fg" : "text-dim hover:text-mute"}`}>
+            {k}×
+          </button>
+        ))}
+      </div>
+      <span className="mono-label hidden text-[9px] text-dim lg:inline">
+        {baseRate * mult < 0.98 ? `slow-mo ×${fmtNum(1 / (baseRate * mult), 2)}` : baseRate * mult > 1.02 ? `fast ×${fmtNum(baseRate * mult, 2)}` : "real time"}
+      </span>
+    </>
+  );
+}
+
+function Caption({ playback, run }: { playback: Playback; run: ProgramRun }) {
+  const { t } = usePlayback(playback);
+  const i = segmentAt(run, t);
+  return (
+    <p className="truncate px-3 pt-1 pb-2 font-mono text-[10.5px] text-mute">
+      {run.segs.length > 1 && <span className="text-dim">{`step ${i + 1}/${run.segs.length} · `}</span>}
+      {run.segs[i]?.label}
+      {run.linear && <span className="text-dim"> · from the closed-loop step response</span>}
+    </p>
   );
 }
 
