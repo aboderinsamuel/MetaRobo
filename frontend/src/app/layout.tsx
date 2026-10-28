@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Silkscreen } from "next/font/google";
+import { Figtree, Geist_Mono, Silkscreen } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
+const sans = Figtree({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} h-full antialiased`}>
+    <html lang="en" className={`${sans.variable} ${geistMono.variable} ${pixel.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">{children}</body>
     </html>
   );

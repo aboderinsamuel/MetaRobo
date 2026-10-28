@@ -107,7 +107,7 @@ function Panel({ children, label }: { children: React.ReactNode; label: string }
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
         <span className="mono-label text-mute">{label}</span>
         <span className="flex gap-1">
-          {["#3ff0ff", "#b06bff", "#ff9a3d"].map((c) => (
+          {["#2dd4ff", "#9b5cff", "#ff5ca8"].map((c) => (
             <span key={c} className="size-1.5 rounded-full" style={{ background: c }} />
           ))}
         </span>
@@ -278,9 +278,9 @@ export default function LoopStory() {
                         <text x="102" y="100" fill="#8b909c">−</text>
                       </g>
                       <linearGradient id="spec" x1="0" x2="1">
-                        <stop offset="0" stopColor="#3ff0ff" />
-                        <stop offset="0.5" stopColor="#b06bff" />
-                        <stop offset="1" stopColor="#ffe45c" />
+                        <stop offset="0" stopColor="#2dd4ff" />
+                        <stop offset="0.5" stopColor="#9b5cff" />
+                        <stop offset="1" stopColor="#ff8ac4" />
                       </linearGradient>
                     </svg>
                     <div className="mt-4 grid grid-cols-3 gap-3">

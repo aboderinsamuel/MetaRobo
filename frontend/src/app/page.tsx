@@ -1,9 +1,13 @@
+import AgentTrace from "@/components/landing/AgentTrace";
 import { Nav, SideIndex } from "@/components/landing/Chrome";
 import EngineSection from "@/components/landing/EngineSection";
 import Footer from "@/components/landing/Footer";
+import HackathonLog from "@/components/landing/HackathonLog";
 import Hero from "@/components/landing/Hero";
 import Loader from "@/components/landing/Loader";
 import LoopStory from "@/components/landing/LoopStory";
+import MetaStack from "@/components/landing/MetaStack";
+import Pricing from "@/components/landing/Pricing";
 import Systems from "@/components/landing/Systems";
 
 export default function Home() {
@@ -14,9 +18,13 @@ export default function Home() {
       <SideIndex />
       <main>
         <Hero />
+        <MetaStack />
         <LoopStory />
+        <AgentTrace />
         <EngineSection />
         <Systems />
+        <Pricing />
+        <HackathonLog />
       </main>
       <Footer />
     </div>

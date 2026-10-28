@@ -194,7 +194,7 @@ export function TimeChart({
         </g>
         {playback && (
           <g ref={cursorRef} style={{ display: "none" }}>
-            <line y1={PAD.t} y2={PAD.t + ih} stroke="rgb(63 240 255 / 0.5)" />
+            <line y1={PAD.t} y2={PAD.t + ih} stroke="rgb(45 212 255 / 0.5)" />
             {series
               .filter((s) => !s.dash)
               .map((s) => (
@@ -276,7 +276,7 @@ export function PoleMap({ poles, openPoles, className }: { poles: Complex[]; ope
           const bad = p.re >= -1e-9;
           return (
             <motion.g key={`c${i}`} initial={{ scale: 0 }} animate={{ x: q.x, y: q.y, scale: 1 }} transition={{ type: "spring", stiffness: 200, damping: 20 }}>
-              <path d="M-5,-5 L5,5 M-5,5 L5,-5" stroke={bad ? "#f87171" : "#3ff0ff"} strokeWidth={2} />
+              <path d="M-5,-5 L5,5 M-5,5 L5,-5" stroke={bad ? "#f87171" : "#2dd4ff"} strokeWidth={2} />
             </motion.g>
           );
         })}
@@ -317,8 +317,8 @@ export function BodePlot({ w: ws, mag, phase, wcp, pm, className }: { w: number[
         <text x={36} y={YP(-180) + 3} textAnchor="end" className="fill-dim font-mono text-[10px]">
           −180°
         </text>
-        <path d={line(mag, YM)} fill="none" stroke="#5a86ff" strokeWidth={1.5} />
-        <path d={line(phase, YP)} fill="none" stroke="#ff5fa2" strokeWidth={1.5} />
+        <path d={line(mag, YM)} fill="none" stroke="#0082fb" strokeWidth={1.5} />
+        <path d={line(phase, YP)} fill="none" stroke="#d946ef" strokeWidth={1.5} />
         {wcp > 0 && pm < 1e8 && (
           <g>
             <line x1={X(wcp)} x2={X(wcp)} y1={6} y2={h - 6} stroke="rgb(255 255 255 / 0.3)" />

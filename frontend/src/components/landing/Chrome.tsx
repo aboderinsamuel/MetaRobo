@@ -6,14 +6,32 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import RoboMark from "@/components/brand/RoboMark";
 
+// `nav` marks the sections linked from the top bar; the side rail shows them all.
 export const SECTIONS = [
   { id: "intro", label: "Intro" },
-  { id: "loop", label: "The loop" },
-  { id: "engine", label: "Engine" },
+  { id: "meta", label: "Meta stack", nav: true },
+  { id: "loop", label: "The loop", nav: true },
+  { id: "trace", label: "Agent", nav: true },
+  { id: "engine", label: "Engine", nav: true },
   { id: "validation", label: "Validation" },
   { id: "systems", label: "Systems" },
+  { id: "pricing", label: "Pricing", nav: true },
+  { id: "log", label: "Hackathon", nav: true },
   { id: "builder", label: "Builder" },
 ];
+
+/** "Powered by Meta Muse" badge: plain-text attribution, no Meta logo. */
+export function MetaBadge({ className = "" }: { className?: string }) {
+  return (
+    <span className={`meta-ring inline-flex h-6 items-center gap-1.5 rounded-full bg-void/70 px-2.5 text-[11px] font-medium text-fg backdrop-blur ${className}`}>
+      <span className="relative flex size-1.5">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-spec-2 opacity-70" />
+        <span className="relative inline-flex size-1.5 rounded-full bg-spec-2" />
+      </span>
+      Powered by <span className="text-spectrum font-semibold">Meta Muse</span>
+    </span>
+  );
+}
 
 export function LaunchButton({ className = "", label = "Launch lab", href = "/lab" }: { className?: string; label?: string; href?: string }) {
   return (
@@ -45,8 +63,8 @@ export function Nav() {
           <span className="text-[15px] font-medium tracking-tight">RoboCraft</span>
           <span className="mono-label hidden rounded-[2px] border border-line-2 px-1.5 py-0.5 text-[9px] text-mute sm:inline">Control lab</span>
         </Link>
-        <nav className="hidden items-center gap-7 md:flex">
-          {SECTIONS.slice(1).map((s) => (
+        <nav className="hidden items-center gap-6 md:flex">
+          {SECTIONS.filter((s) => s.nav).map((s) => (
             <a key={s.id} href={`#${s.id}`} className="mono-label text-mute transition-colors hover:text-fg">
               {s.label}
             </a>
@@ -67,7 +85,7 @@ export function Nav() {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden border-t border-line bg-void md:hidden"
           >
-            {SECTIONS.slice(1).map((s) => (
+            {SECTIONS.filter((s) => s.nav).map((s) => (
               <a key={s.id} href={`#${s.id}`} onClick={() => setOpen(false)} className="mono-label flex items-center justify-between border-b border-line px-4 py-4 text-mute">
                 {s.label} <ArrowUpRight className="size-3.5" />
               </a>
@@ -97,7 +115,7 @@ export function SideIndex() {
     return () => io.disconnect();
   }, []);
   return (
-    <aside className="fixed top-1/2 right-5 z-40 hidden -translate-y-1/2 xl:block">
+    <aside className="fixed top-1/2 right-5 z-40 hidden -translate-y-1/2 2xl:block">
       <ol className="flex flex-col items-end gap-3">
         {SECTIONS.map((s) => {
           const on = s.id === active;

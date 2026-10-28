@@ -89,6 +89,15 @@ export interface Advice {
   proposals: Proposal[];
   meetsSpecs: boolean;
   source: "meta" | "offline";
+  usage?: CallUsage;
+}
+
+/** What one Meta model call cost, shown in the lab's cost meter. Cached replays cost nothing. */
+export interface CallUsage {
+  model: string;
+  cached: boolean;
+  tokens: number;
+  costUsd: number;
 }
 
 export interface Analysis {

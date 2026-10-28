@@ -7,12 +7,12 @@ export default function RoboMark({ className, animate = false }: { className?: s
     <svg viewBox="0 0 48 48" className={className} aria-hidden fill="none">
       <defs>
         <linearGradient id={`g${id}`} x1="4" y1="6" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#3ff0ff" />
-          <stop offset="0.3" stopColor="#5a86ff" />
-          <stop offset="0.55" stopColor="#b06bff" />
-          <stop offset="0.75" stopColor="#ff5fa2" />
-          <stop offset="0.9" stopColor="#ff9a3d" />
-          <stop offset="1" stopColor="#ffe45c" />
+          <stop offset="0" stopColor="#2dd4ff" />
+          <stop offset="0.3" stopColor="#0082fb" />
+          <stop offset="0.55" stopColor="#9b5cff" />
+          <stop offset="0.75" stopColor="#d946ef" />
+          <stop offset="0.9" stopColor="#ff5ca8" />
+          <stop offset="1" stopColor="#ff8ac4" />
         </linearGradient>
       </defs>
       {/* Rim: a rounded square with a gap at the top right, like a loop that hasn't closed yet. */}

@@ -33,7 +33,7 @@ export interface SceneCtx {
 export const Scene = createContext<SceneCtx | null>(null);
 export const useScene = () => useContext(Scene)!;
 
-const LEVEL_COLOR: Record<CheckLevel, string> = { pass: "#4ade80", info: "#3ff0ff", warn: "#ffb020", error: "#ff4d5e" };
+const LEVEL_COLOR: Record<CheckLevel, string> = { pass: "#4ade80", info: "#2dd4ff", warn: "#ffb020", error: "#ff4d5e" };
 
 /**
  * Text drawn into a canvas texture on a sprite. It stays inside the WebGL scene, so mounting
@@ -117,7 +117,7 @@ export function PartSlot({
   useFrame(({ clock }) => {
     if (mat.current) mat.current.opacity = st?.level === "error" ? 0.08 + 0.1 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 6)) : selected ? 0.07 : 0;
   });
-  const color = selected ? "#3ff0ff" : bad ? LEVEL_COLOR[st!.level] : "#3ff0ff";
+  const color = selected ? "#2dd4ff" : bad ? LEVEL_COLOR[st!.level] : "#2dd4ff";
   const pad: V3 = [size[0] + 0.006, size[1] + 0.006, size[2] + 0.006];
   const top: V3 = calloutAt ?? [center[0], center[1] + size[1] / 2 + 0.022, center[2]];
   return (
@@ -143,7 +143,7 @@ export function PartSlot({
         </mesh>
       )}
       {bad && st?.callout && <Label text={`${st.level === "error" ? "✕" : "!"} ${st.callout}`} position={top} size={0.014} color={LEVEL_COLOR[st.level]} border={LEVEL_COLOR[st.level]} />}
-      {!bad && selected && label && <Label text={label} position={top} size={0.013} color="#3ff0ff" border="#3ff0ff" />}
+      {!bad && selected && label && <Label text={label} position={top} size={0.013} color="#2dd4ff" border="#2dd4ff" />}
       {!bad && !selected && label && s.labels && <Label text={label} position={top} size={0.011} color="#aab2bf" />}
     </group>
   );

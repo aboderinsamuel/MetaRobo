@@ -208,7 +208,7 @@ export default function HardwareView({
             shadow-camera-bottom={-1.5}
           />
           <directionalLight position={[-1.5, 0.8, -1]} intensity={0.6} color="#7f5bff" />
-          <pointLight position={[0.3, 0.4, 0.5]} intensity={0.4} color="#3ff0ff" />
+          <pointLight position={[0.3, 0.4, 0.5]} intensity={0.4} color="#2dd4ff" />
           <Grid infiniteGrid cellSize={0.05} sectionSize={0.25} cellColor="#16222f" sectionColor="#1f4257" fadeDistance={isDrone ? 7 : 3.5} fadeStrength={1.5} position={[0, -0.0005, 0]} />
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]} receiveShadow>
             <planeGeometry args={[60, 60]} />

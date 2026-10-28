@@ -44,24 +44,24 @@ Skip Muse Image unless a real use appears. Bolted-on model calls hurt with judge
 ## 5. Schedule and checklist
 
 ### Oct 28–29: Move to Meta's models
-- [ ] Get Meta Model API key; confirm endpoint, model IDs, and SDK/HTTP format from the docs
+- [x] Get Meta Model API key; confirm endpoint, model IDs, and SDK/HTTP format from the docs
 - [x] Replace the Anthropic client in `frontend/src/lib/lab/ai.ts` with Muse Spark
 - [x] Keep structured outputs (zod schemas) working and keep the offline fallback (`presets.ts` / `advisor.ts`)
 - [x] Remove `@anthropic-ai/sdk` from `frontend/package.json`; update env var names and docs
-- [ ] Verify end to end in the running app
+- [x] Verify end to end in the running app
 
 ### Oct 29–30: Meta-inspired redesign (our own brand)
-- [ ] Check Meta's developer brand guidelines; use an official "Built with Meta" badge only if allowed, else plain-text "Powered by Meta Muse". **No Meta logo otherwise** (rights rule + impersonation risk).
-- [ ] Design tokens: Meta-style blue-to-violet gradient, free Meta-like font, light/dark
-- [ ] Signature motif: animated ∞ control loop (sense → think → act → check) with a travelling light pulse
-- [ ] Landing page: loop hero, "Model stack" flow diagram (Voice Transcribe → Muse Spark → SAM 3.1 → engine check → firmware) with animated connections, live agent trace, "Built during the hackathon", pricing
-- [ ] Lab: pipeline strip lighting up the active Meta model per step + token/cost meter
-- [ ] Animations with `motion`; respect reduced-motion settings
+- [x] Check Meta's developer brand guidelines (none published → plain-text "Powered by Meta Muse"); use an official "Built with Meta" badge only if allowed, else plain-text "Powered by Meta Muse". **No Meta logo otherwise** (rights rule + impersonation risk).
+- [x] Design tokens: Meta-style blue-to-violet gradient, Figtree font (dark theme only)
+- [x] Signature motif: animated ∞ control loop (sense → think → act → check) with a travelling light pulse
+- [x] Landing page: loop hero, "Model stack" flow diagram (Voice Transcribe → Muse Spark → SAM 3.1 → engine check → firmware) with animated connections, live agent trace, "Built during the hackathon", pricing
+- [x] Lab: pipeline strip lighting up the active Meta model per step + token/cost meter
+- [x] Animations with `motion`; respect reduced-motion settings
 
 ### Revenue: sponsored parts
 - [ ] Sponsored placements in generated parts lists, clearly labelled, affiliate links, from a config file
 - [ ] Impression and click counts
-- [ ] Pricing section (Free / Pro)
+- [x] Pricing section (Free / Maker / Classroom)
 
 ### Oct 30–31: Video to physics model (SAM 3.1)
 - [ ] Video upload in the lab UI (cap ~10 s)

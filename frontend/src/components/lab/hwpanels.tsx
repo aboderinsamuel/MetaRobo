@@ -342,8 +342,8 @@ export function ChecksPanel({
 // Wiring diagram
 // ---------------------------------------------------------------------------
 
-const EDGE_COLOR: Record<NetEdge["kind"], string> = { power: "#ff4d5e", ground: "#8b909c", signal: "#3ff0ff", motor: "#c46bff" };
-const SIGNAL_HUES = ["#3ff0ff", "#4ade80", "#ffd23f", "#ff9a3d", "#5b8cff", "#ff6fd8"];
+const EDGE_COLOR: Record<NetEdge["kind"], string> = { power: "#ff4d5e", ground: "#8b909c", signal: "#2dd4ff", motor: "#c46bff" };
+const SIGNAL_HUES = ["#2dd4ff", "#4ade80", "#ffd23f", "#ff5ca8", "#5b8cff", "#ff6fd8"];
 
 export function WiringDiagram({ wiring }: { wiring: { nodes: NetNode[]; edges: NetEdge[] } }) {
   const [hover, setHover] = useState<string | null>(null);
@@ -408,7 +408,7 @@ export function WiringDiagram({ wiring }: { wiring: { nodes: NetNode[]; edges: N
             [
               ["Power", "#ff4d5e", false],
               ["Ground", "#8b909c", true],
-              ["Signal", "#3ff0ff", false],
+              ["Signal", "#2dd4ff", false],
               ["Motor", "#c46bff", false],
             ] as const
           ).map(([l, c, dash]) => (
@@ -449,7 +449,7 @@ export function WiringDiagram({ wiring }: { wiring: { nodes: NetNode[]; edges: N
           })}
           {[...layout.pos.values()].map(({ x, y, h, node }) => (
             <g key={node.id}>
-              <rect x={x} y={y} width={layout.NODE_W} height={h} rx="3" fill="#0b0f15" stroke={node.auto ? "#3ff0ff" : "#2a3342"} strokeDasharray={node.auto ? "4 3" : undefined} />
+              <rect x={x} y={y} width={layout.NODE_W} height={h} rx="3" fill="#0b0f15" stroke={node.auto ? "#2dd4ff" : "#2a3342"} strokeDasharray={node.auto ? "4 3" : undefined} />
               <text x={x + 9} y={y + 15} fill="#eceef2" fontSize="11" fontWeight="600" fontFamily="var(--font-geist-sans), sans-serif">
                 {node.name.length > 24 ? `${node.name.slice(0, 23)}…` : node.name}
               </text>
@@ -461,8 +461,8 @@ export function WiringDiagram({ wiring }: { wiring: { nodes: NetNode[]; edges: N
               </text>
               {node.auto && (
                 <g>
-                  <rect x={x + layout.NODE_W - 34} y={y - 7} width="30" height="13" rx="6" fill="#0d3a40" stroke="#3ff0ff" strokeWidth="0.8" />
-                  <text x={x + layout.NODE_W - 19} y={y + 2.5} fill="#3ff0ff" fontSize="8" textAnchor="middle" fontFamily="var(--font-geist-mono), monospace">
+                  <rect x={x + layout.NODE_W - 34} y={y - 7} width="30" height="13" rx="6" fill="#0d3a40" stroke="#2dd4ff" strokeWidth="0.8" />
+                  <text x={x + layout.NODE_W - 19} y={y + 2.5} fill="#2dd4ff" fontSize="8" textAnchor="middle" fontFamily="var(--font-geist-mono), monospace">
                     auto
                   </text>
                 </g>
@@ -502,7 +502,7 @@ export function WiringDiagram({ wiring }: { wiring: { nodes: NetNode[]; edges: N
               <span className="text-mute">
                 {nameOf(e.from[0])} <span className="font-mono text-fg">{e.from[1]}</span>
               </span>
-              <span className="pt-0.5 font-mono text-[9px]" style={{ color: e.kind === "signal" ? "#3ff0ff" : EDGE_COLOR[e.kind] }}>
+              <span className="pt-0.5 font-mono text-[9px]" style={{ color: e.kind === "signal" ? "#2dd4ff" : EDGE_COLOR[e.kind] }}>
                 → {e.net}
               </span>
               <span className="text-right text-mute">
