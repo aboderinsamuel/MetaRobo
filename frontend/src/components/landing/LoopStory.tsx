@@ -17,7 +17,7 @@ import MiniChart, { pathFrom } from "./MiniChart";
 
 const STEPS = [
   { k: "Describe", t: "Type it, say it, or upload data", d: "Plain language, your voice, or a CSV from a step test. No equations needed." },
-  { k: "Model", t: "Physics in, transfer function out", d: "Claude derives the equations, picks realistic parameters, and states every assumption." },
+  { k: "Model", t: "Physics in, transfer function out", d: "Muse Spark derives the equations, picks realistic parameters, and states every assumption." },
   { k: "Control", t: "A controller with starting gains", d: "PID for most loops, LQR state feedback for unstable multi-state systems like balancing robots." },
   { k: "Simulate", t: "Watch the hardware move", d: "A C++ engine compiled to WebAssembly drives a live 3D rover, arm, balancing robot or drone, synced to the graphs: actuator limits, dead time, noise and disturbances included." },
   { k: "Explain", t: "Why it overshoots, in plain words", d: "Pole locations, damping and margins turned into a diagnosis and concrete fixes. Iterate until it behaves." },

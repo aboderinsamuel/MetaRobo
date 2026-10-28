@@ -5,7 +5,7 @@ import { LaunchButton } from "./Chrome";
 
 const CREDITS: [string, string[]][] = [
   ["Simulation", ["PlantSim · C++17", "WebAssembly + TS port"]],
-  ["Modeling AI", ["Claude Opus 5.5", "Offline physics library"]],
+  ["Modeling AI", ["Meta Muse Spark", "Offline physics library"]],
   ["Interface", ["Next.js · React Three Fiber", "Motion"]],
   ["Validation", ["21 native checks", "20 cross-engine tests"]],
 ];

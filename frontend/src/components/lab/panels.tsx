@@ -94,7 +94,7 @@ export function DescribePanel({
 
   return (
     <div>
-      <SectionLabel right={<span className={`mono-label ${aiOn ? "text-ok" : "text-warn"}`}>{aiOn === null ? "…" : aiOn ? "Claude online" : "Offline modeler"}</span>}>
+      <SectionLabel right={<span className={`mono-label ${aiOn ? "text-ok" : "text-warn"}`}>{aiOn === null ? "…" : aiOn ? "Muse Spark online" : "Offline modeler"}</span>}>
         01 · Describe the system
       </SectionLabel>
       <div
@@ -221,7 +221,7 @@ export function DescribePanel({
 
 export function ModelCard({ model, notice }: { model: LabModel; notice: string | null }) {
   const [open, setOpen] = useState(false);
-  const src = { claude: "Claude Opus 5.5", offline: "Physics library", data: "Identified from data" }[model.source];
+  const src = { meta: "Meta Muse Spark", offline: "Physics library", data: "Identified from data" }[model.source];
   return (
     <div className="border-t border-line">
       <SectionLabel right={<span className="mono-label rounded-[2px] border border-line-2 px-1.5 py-0.5 text-[10px] text-mute">{src}</span>}>02 · Model</SectionLabel>
@@ -571,7 +571,7 @@ export function Copilot({
                       );
                     })}
                   </div>
-                  <p className="mono-label mt-2 text-[9px] text-dim">{m.advice.source === "claude" ? "Claude Opus 5.5" : "Offline advisor"} · on v{m.forIteration}</p>
+                  <p className="mono-label mt-2 text-[9px] text-dim">{m.advice.source === "meta" ? "Meta Muse Spark" : "Offline advisor"} · on v{m.forIteration}</p>
                 </div>
               )}
             </motion.div>

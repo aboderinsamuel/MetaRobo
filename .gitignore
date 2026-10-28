@@ -10,3 +10,6 @@ __pycache__/
 .claude/settings.local.json
 engine/build/
 engine/tests/*.exe
+
+# Meta API response cache and usage log
+.meta-cache/

@@ -13,13 +13,13 @@ RoboCraft has two tools:
 | Step | What happens | Where |
 | --- | --- | --- |
 | Describe | Text, dictation (Web Speech API) or a CSV step test (`t,u,y`) | `src/components/lab/panels.tsx` |
-| Build the hardware | Every design is one of four machines (rover, 3-axis arm, self-balancing robot, quadcopter) built from real parts: motors, drivers, batteries, boards, sensors and props, plus dimensions and payload. Any description (typed, spoken or Claude-modelled) is mapped to the closest machine and sized from the words ("climb 2 m with a 200 g camera"). | `src/lib/lab/hardware/parts.ts`, `build.ts`, `src/components/lab/hwpanels.tsx` |
+| Build the hardware | Every design is one of four machines (rover, 3-axis arm, self-balancing robot, quadcopter) built from real parts: motors, drivers, batteries, boards, sensors and props, plus dimensions and payload. Any description (typed, spoken or Muse Spark-modelled) is mapped to the closest machine and sized from the words ("climb 2 m with a 200 g camera"). | `src/lib/lab/hardware/parts.ts`, `build.ts`, `src/components/lab/hwpanels.tsx` |
 | Model | The plant comes from the part datasheets: motor R, Kt, Ke from stall and no-load points, inertia from masses and geometry, actuator limits from the battery minus the driver drop, sensor latency and noise from the sensor. Swap a part and the physics changes. Uploaded step data is fitted (FOPDT / second order) by the engine instead. | `src/lib/lab/hardware/build.ts`, `data.ts` |
 | Control | PID (filtered derivative, anti-windup) or LQR with starting weights | `src/lib/lab/analysis.ts` |
 | Simulate | PlantSim engine: RK4, dead time, saturation, noise, load steps, closed-loop poles, Bode margins, LQR, system ID | `engine/src/plantsim.cpp` |
 | Watch it move | The 3D view fills the lab: the machine is drawn from the selected parts (gearmotor sizes, L298N heatsink, LiPo packs, ESP32 shield, prop sizes) and driven by the simulation with play / scrub / slow-motion. Motors glow with current, drivers heat up past their rating, wires show current flow, and parts that fail a check are outlined with a callout. Rover climbs a ramp, the arm does pick-and-place and releases the part, the balancer leans by its tilt state and falls when unstable, the drone climbs on its thrust through a down-gust. Click a part to inspect or swap it in place. A live scope (output and motor current) is docked under the view; the full scope, poles/Bode, wiring, validation and firmware are views you switch to. | `src/components/lab/HardwareView.tsx`, `hw3d/` |
 | Design checks | Electrical and mechanical rules from the original studio: driver voltage and current, stall and battery current, motor over/under-volting, 5 V rail and level shifting (auto-added), fuses and noise caps (auto-added), top speed, ramp torque, traction, holding torque and max payload, tip-over, fit on the chassis, gripper clearance, lean recovery, IMU rate, thrust-to-weight, ESC cell range, prop matching, altimeter range. Live checks use the simulated motor current, saturation and loop bandwidth. Each failing check names the part and offers a one-click fix. Bill of materials with CSV export, auto-generated wiring diagram. | `src/lib/lab/hardware/build.ts` |
-| Explain & iterate | Claude (or the offline advisor) explains the response from the poles, damping, margins and saturation, and proposes fixes with predicted metrics. "Iterate" applies the best fix until the specs pass; "Auto-tune" runs a simulator-in-the-loop search in a Web Worker that also keeps the motor current inside the driver's rating. | `src/app/api/lab/explain`, `src/lib/lab/advisor.ts` |
+| Explain & iterate | Meta Muse Spark (or the offline advisor) explains the response from the poles, damping, margins and saturation, and proposes fixes with predicted metrics. "Iterate" applies the best fix until the specs pass; "Auto-tune" runs a simulator-in-the-loop search in a Web Worker that also keeps the motor current inside the driver's rating. | `src/app/api/lab/explain`, `src/lib/lab/advisor.ts` |
 | Validate | 8 checks: stability, margins, specs, actuator limits, ±30% model error, sensor noise, load disturbance, WASM-vs-TS cross-check | `src/lib/lab/validate.ts` |
 | Code | Arduino C++ for the same discrete controller | `src/lib/lab/codegen.ts` |
 
@@ -27,7 +27,7 @@ RoboCraft has two tools:
 
 ```bash
 cd frontend
-cp .env.example .env.local     # optional: add ANTHROPIC_API_KEY for the Claude modeler/explainer
+cp .env.example .env.local     # optional: add MODEL_API_KEY and META_LIVE=1 for the Muse Spark modeler/explainer
 npm install
 npm run dev                    # http://localhost:3000 (landing) and /lab (studio)
 ```
@@ -137,7 +137,7 @@ The web app proxies `/api/*` to the backend (`BACKEND_URL`, default
 
 | Path | Service | What it is |
 | --- | --- | --- |
-| `/api/lab/*` | `frontend` | The Control Lab's own routes (Claude modelling and explanations) |
+| `/api/lab/*` | `frontend` | The Control Lab's own routes (Muse Spark modelling and explanations) |
 | `/api/*` | `backend` | FastAPI engines for the studio (`backend/`) |
 | everything else | `frontend` | Next.js web app (`frontend/`) |
 
@@ -149,7 +149,7 @@ no `BACKEND_URL` is needed on Vercel.
 2. Optional: under *Storage*, create a **Neon (Postgres)** database and connect it, which sets
    `DATABASE_URL` so saved projects persist. Without it the API uses a throw-away SQLite file in
    `/tmp`.
-3. Optional: add `ANTHROPIC_API_KEY` to turn on Claude in the Control Lab. Without it the lab uses
+3. Optional: add `MODEL_API_KEY` and `META_LIVE=1` to turn on Meta Muse Spark in the Control Lab. Without it the lab uses
    its offline modeller and advisor.
 4. Deploy, then check `https://<project>.vercel.app/api/health` (`{"status":"ok"}`) and
    `https://<project>.vercel.app/api/lab/status`.

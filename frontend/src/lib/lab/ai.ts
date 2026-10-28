@@ -1,28 +1,21 @@
-// Server-side Claude integration for the Control Lab.
+// Server-side Meta Muse Spark integration for the Control Lab.
 //
-// Claude does two jobs: turn a plain-language description (or identified step data) into a
+// Muse Spark does two jobs: turn a plain-language description (or identified step data) into a
 // physical model + starting controller, and explain a simulated response with proposed fixes.
-// Everything Claude returns is checked numerically before the studio uses it, and every route
-// falls back to the offline library in presets.ts / advisor.ts when no API key is configured.
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+// Everything it returns is checked numerically before the studio uses it, and every route
+// falls back to the offline library in presets.ts / advisor.ts when live calls are off.
 import { z } from "zod";
+import { MetaError, TEXT_MODEL, metaEnabled, metaJson } from "@/lib/meta/client";
 import { tsEngine } from "@/lib/sim/engine";
 import { offlineAdvice } from "./advisor";
 import { checkSpecs, fmtNum, run } from "./analysis";
 import { matchPreset, presetById } from "./presets";
 import type { Advice, Analysis, ControllerSpec, LabModel, PlantSpec } from "./types";
 
-export const MODEL_ID = "claude-opus-5-5";
+export const MODEL_ID = TEXT_MODEL;
 
 export function aiEnabled(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
-}
-
-let client: Anthropic | null = null;
-function getClient(): Anthropic {
-  client ??= new Anthropic();
-  return client;
+  return metaEnabled();
 }
 
 // Flat schemas: unused fields are empty arrays / zeros. Flat shapes are easier for the model to
@@ -150,29 +143,20 @@ export function offlineModel(description: string, presetId?: string): ModelResul
     notice: aiEnabled()
       ? undefined
       : confident
-        ? `Offline modeler: matched "${preset.name}" from the physics library. Add ANTHROPIC_API_KEY to model any system you describe.`
-        : `Offline modeler couldn't match that description, so it loaded "${preset.name}". Add ANTHROPIC_API_KEY to model any system you describe.`,
+        ? `Offline modeler: matched "${preset.name}" from the physics library. Turn on Muse Spark to model any system you describe.`
+        : `Offline modeler couldn't match that description, so it loaded "${preset.name}". Turn on Muse Spark to model any system you describe.`,
   };
 }
 
 export async function modelFromDescription(description: string, dataSummary?: string): Promise<ModelResult> {
-  const response = await getClient().beta.messages.parse({
-    model: MODEL_ID,
-    max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
+  const { data: out } = await metaJson({
+    schema: ModelOut,
+    schemaName: "plant_model",
     system: MODELER_SYSTEM,
-    output_config: { effort: "medium", format: betaZodOutputFormat(ModelOut) },
-    messages: [
-      {
-        role: "user",
-        content: dataSummary ? `${description}\n\nIdentified from uploaded step-response data:\n${dataSummary}` : description,
-      },
-    ],
+    user: dataSummary ? `${description}\n\nIdentified from uploaded step-response data:\n${dataSummary}` : description,
+    maxTokens: 6000,
+    effort: "medium",
   });
-  if (response.stop_reason === "refusal") throw new Error("The model declined this request.");
-  const out = response.parsed_output;
-  if (!out) throw new Error("The model did not return a valid model.");
 
   const plant = toPlant(out.plant);
   const nStates = plant.kind === "ss" ? plant.B.length : plant.den.length - 1;
@@ -202,7 +186,7 @@ export async function modelFromDescription(description: string, dataSummary?: st
       ref: out.sim.ref || 1,
       disturbance: out.sim.disturbanceTime > 0 && out.sim.disturbanceTime < tEnd ? { time: out.sim.disturbanceTime, magnitude: out.sim.disturbanceMagnitude } : undefined,
     },
-    source: dataSummary ? "data" : "claude",
+    source: dataSummary ? "data" : "meta",
   };
   // Smoke-run it: a model the engine can't simulate is worse than the offline library.
   const { analysis } = run(tsEngine, model, model.controller);
@@ -244,37 +228,28 @@ export async function explain(
     specs: model.specs,
     sim: model.sim,
   };
-  const response = await getClient().beta.messages.parse({
-    model: MODEL_ID,
-    max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
+  const { data: out } = await metaJson({
+    schema: AdviceOut,
+    schemaName: "controller_advice",
     system: EXPLAINER_SYSTEM,
-    output_config: { effort: "medium", format: betaZodOutputFormat(AdviceOut) },
-    messages: [
-      {
-        role: "user",
-        content: [
-          `Model:\n${JSON.stringify(modelDigest)}`,
-          history.length ? `Earlier iterations:\n${history.map((h) => `- ${h.label}: ${JSON.stringify(h.controller)} → ${h.summary}`).join("\n")}` : "",
-          `Current simulation:\n${analysisDigest(model, controller, analysis)}`,
-          question ? `User: ${question}` : "Explain this response and propose fixes.",
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
-      },
-    ],
+    user: [
+      `Model:\n${JSON.stringify(modelDigest)}`,
+      history.length ? `Earlier iterations:\n${history.map((h) => `- ${h.label}: ${JSON.stringify(h.controller)} → ${h.summary}`).join("\n")}` : "",
+      `Current simulation:\n${analysisDigest(model, controller, analysis)}`,
+      question ? `User: ${question}` : "Explain this response and propose fixes.",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+    maxTokens: 4000,
+    effort: "low",
   });
-  if (response.stop_reason === "refusal") throw new Error("The model declined this request.");
-  const out = response.parsed_output;
-  if (!out) throw new Error("The model did not return valid advice.");
   return {
     headline: out.headline,
     explanation: out.explanation,
     diagnosis: out.diagnosis,
     proposals: out.proposals.slice(0, 3).map((p) => ({ label: p.label, rationale: p.rationale, controller: toController(p.controller, nStates) })),
     meetsSpecs: out.meetsSpecs,
-    source: "claude",
+    source: "meta",
   };
 }
 
@@ -283,8 +258,11 @@ export function offlineExplain(model: LabModel, controller: ControllerSpec, anal
 }
 
 export function describeError(err: unknown): string {
-  if (err instanceof Anthropic.AuthenticationError) return "The Anthropic API key was rejected.";
-  if (err instanceof Anthropic.RateLimitError) return "Claude is rate-limited right now.";
-  if (err instanceof Anthropic.APIError) return `Claude API error ${err.status ?? ""}`.trim();
+  if (err instanceof MetaError) {
+    if (err.status === 401 || err.status === 403) return "The Meta API key was rejected.";
+    if (err.status === 429) return err.message.startsWith("Daily") ? err.message : "Muse Spark is rate-limited right now.";
+    return err.message;
+  }
+  if (err instanceof z.ZodError) return "Muse Spark returned data that failed validation.";
   return err instanceof Error ? err.message : String(err);
 }

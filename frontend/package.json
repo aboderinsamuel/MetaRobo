@@ -15,7 +15,6 @@
     "engine:wasm": "bash ../engine/build-wasm.sh"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.3.0",
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.8.0",
     "lucide-react": "^1.47.0",

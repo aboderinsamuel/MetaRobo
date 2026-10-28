@@ -78,7 +78,7 @@ export default function Hero() {
             <span className="text-fg">[RC-LAB]</span> Your idea → real parts → 3D simulation → Robo helps you fix it
           </p>
           <ul className="mono-label hidden space-y-1.5 text-right text-mute md:block">
-            {["Ages 10 to engineer", "Simple & Pro modes", "Real part physics", "C++ → WebAssembly", "Claude Opus 5.5"].map((t, i) => (
+            {["Ages 10 to engineer", "Simple & Pro modes", "Real part physics", "C++ → WebAssembly", "Meta Muse Spark"].map((t, i) => (
               <motion.li key={t} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.08 }}>
                 {t}
               </motion.li>

@@ -1,4 +1,4 @@
-// Shared shapes for the Control Lab: what the modeler (Claude or the offline library) returns,
+// Shared shapes for the Control Lab: what the modeler (Muse Spark or the offline library) returns,
 // and what the studio keeps per design iteration.
 import type { Complex, Metrics } from "@/lib/sim/core";
 
@@ -72,7 +72,7 @@ export interface LabModel {
   controllerRationale: string;
   specs: Specs;
   sim: SimSetup;
-  source: "claude" | "offline" | "data";
+  source: "meta" | "offline" | "data";
   presetId?: string;
 }
 
@@ -88,7 +88,7 @@ export interface Advice {
   diagnosis: string[];
   proposals: Proposal[];
   meetsSpecs: boolean;
-  source: "claude" | "offline";
+  source: "meta" | "offline";
 }
 
 export interface Analysis {

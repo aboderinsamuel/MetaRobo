@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       return Response.json(await explain(model, controller, analysis, (body.history ?? []).slice(-6), body.question?.slice(0, 2000)));
     } catch (err) {
       const advice = offlineExplain(model, controller, analysis);
-      return Response.json({ ...advice, notice: `Claude was unavailable (${describeError(err)}); this explanation comes from the offline advisor.` });
+      return Response.json({ ...advice, notice: `Muse Spark was unavailable (${describeError(err)}); this explanation comes from the offline advisor.` });
     }
   }
   const advice = offlineExplain(model, controller, analysis);

@@ -266,7 +266,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
       // The words pick the closest of the four rigs and size it; the parts give the physics.
       const kind = rigFor(body.model, text).kind;
       const b = applyHints(defaultBuild(kind), text);
-      const why = body.model.source === "claude" ? `Claude matched this to the ${RIGS[kind].name.toLowerCase()}.` : `Matched to the ${RIGS[kind].name.toLowerCase()}.`;
+      const why = body.model.source === "meta" ? `Muse Spark matched this to the ${RIGS[kind].name.toLowerCase()}.` : `Matched to the ${RIGS[kind].name.toLowerCase()}.`;
       await adopt(b, body.notice ? `${body.notice} ${why}` : `${why} Sizes and targets came from your description; swap parts on the left to change the physics.`);
       setLeftTab("hardware");
     } catch (err) {
