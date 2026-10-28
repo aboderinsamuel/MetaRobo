@@ -22,15 +22,27 @@ export default function Loader() {
       raf = requestAnimationFrame(() => setShow(false));
       return () => cancelAnimationFrame(raf);
     }
+    // Ends as soon as the hero robot has drawn its first frame (at least 0.6 s, at most 2.4 s),
+    // so the boot screen never hides a robot that is already there.
     const t0 = performance.now();
+    let ready = false;
+    const onReady = () => (ready = true);
+    window.addEventListener("rc-hero-ready", onReady, { once: true });
     const tick = () => {
-      const k = Math.min(1, (performance.now() - t0) / 1700);
+      const el = performance.now() - t0;
+      const k = ready && el > 600 ? 1 : Math.min(0.92, el / 1800);
       setPct(Math.round(100 * (1 - Math.pow(1 - k, 3))));
-      if (k < 1) raf = requestAnimationFrame(tick);
-      else setTimeout(() => setShow(false), 250);
+      if (k < 1 && el < 2400) raf = requestAnimationFrame(tick);
+      else {
+        setPct(100);
+        setTimeout(() => setShow(false), 150);
+      }
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("rc-hero-ready", onReady);
+    };
   }, []);
 
   return (

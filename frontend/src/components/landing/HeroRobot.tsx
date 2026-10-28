@@ -210,9 +210,29 @@ function Robot({ scrollRef }: { scrollRef: React.RefObject<number> }) {
   );
 }
 
-export default function HeroRobot({ scrollRef }: { scrollRef: React.RefObject<number> }) {
+/** Signals once the first frame with the robot has been drawn. */
+function FirstFrame({ onReady }: { onReady?: () => void }) {
+  const done = useRef(false);
+  useFrame(() => {
+    if (done.current) return;
+    done.current = true;
+    requestAnimationFrame(() => {
+      onReady?.();
+      window.dispatchEvent(new Event("rc-hero-ready"));
+    });
+  });
+  return null;
+}
+
+export default function HeroRobot({ scrollRef, onReady }: { scrollRef: React.RefObject<number>; onReady?: () => void }) {
   return (
-    <Canvas camera={{ position: [0, 0, 10.5], fov: 32 }} dpr={[1, 2]} gl={{ alpha: true, antialias: true }} className="!absolute inset-0">
+    <Canvas
+      camera={{ position: [0, 0, 10.5], fov: 32 }}
+      dpr={[1, 2]}
+      gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+      className="!absolute inset-0"
+    >
+      <FirstFrame onReady={onReady} />
       <ambientLight intensity={0.12} />
       <directionalLight position={[2, 4, 6]} intensity={0.5} />
       {/* Coloured rim lights give the iridescent edge highlights. */}

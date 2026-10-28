@@ -3,14 +3,16 @@
 import { ArrowDown } from "lucide-react";
 import { motion } from "motion/react";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtNum, run } from "@/lib/lab/analysis";
 import { presetById } from "@/lib/lab/presets";
 import { useEngine } from "@/lib/sim/useEngine";
 import { LaunchButton } from "./Chrome";
 import MiniChart from "./MiniChart";
 
-const HeroRobot = dynamic(() => import("./HeroRobot"), { ssr: false });
+// Start downloading the 3D robot as soon as this module runs (during hydration), not after mount.
+const robotChunk = typeof window !== "undefined" ? import("./HeroRobot") : null;
+const HeroRobot = dynamic(() => robotChunk ?? import("./HeroRobot"), { ssr: false });
 
 const ease = [0.6, 0, 0.2, 1] as const;
 
@@ -25,6 +27,12 @@ function Crosshair({ className }: { className: string }) {
 
 export default function Hero() {
   const scrollRef = useRef(0);
+  const [robotReady, setRobotReady] = useState(false);
+  // Never leave the hero empty if WebGL is slow or unavailable.
+  useEffect(() => {
+    const id = setTimeout(() => setRobotReady(true), 4000);
+    return () => clearTimeout(id);
+  }, []);
   const engine = useEngine();
   useEffect(() => {
     const on = () => (scrollRef.current = Math.min(1.5, window.scrollY / window.innerHeight));
@@ -45,8 +53,15 @@ export default function Hero() {
         className="pointer-events-none absolute inset-0"
         style={{ background: "radial-gradient(ellipse 50% 45% at 50% 42%, rgb(90 134 255 / 0.13), transparent 70%)" }}
       />
-      <div className="absolute inset-0 mx-auto max-w-[1440px]">
-        <HeroRobot scrollRef={scrollRef} />
+      {/* Placeholder glow in the robot's spot until its first 3D frame is drawn. */}
+      <div
+        className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-700 ${robotReady ? "opacity-0" : "opacity-100"}`}
+        aria-hidden
+      >
+        <div className="-mt-[8vh] size-[min(46vw,420px)] animate-pulse rounded-[38%] border border-white/5 bg-[radial-gradient(circle_at_50%_45%,rgb(90_134_255/0.22),rgb(176_107_255/0.08)_45%,transparent_70%)]" />
+      </div>
+      <div className={`absolute inset-0 mx-auto max-w-[1440px] transition-[opacity,transform] duration-700 ease-out ${robotReady ? "scale-100 opacity-100" : "scale-[0.97] opacity-0"}`}>
+        <HeroRobot scrollRef={scrollRef} onReady={() => setRobotReady(true)} />
       </div>
 
       {/* Fades the robot into the page at the bottom. */}
