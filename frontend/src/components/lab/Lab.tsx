@@ -3,7 +3,7 @@
 // RoboCraft Control Lab: describe → build the hardware → model → control → simulate → explain →
 // iterate → validate. The hardware build is the source of truth: parts and dimensions give the
 // plant, the actuator limits and the design checks.
-import { Activity, Box, Cable, ChevronDown, Code2, Cpu, Download, MessageSquare, ShieldCheck, SlidersHorizontal, Sparkles, Waves } from "lucide-react";
+import { Activity, Box, Cable, ChevronDown, CircleHelp, Code2, Cpu, Download, MessageSquare, ShieldCheck, SlidersHorizontal, Sparkles, Waves } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -28,6 +28,8 @@ import type { CheckResult } from "@/lib/lab/validate";
 import { useEngine } from "@/lib/sim/useEngine";
 import { BodePlot, PoleMap, TimeChart } from "./charts";
 import { ChecksPanel, GeometryPanel, PartsPanel, RigPicker, WiringDiagram } from "./hwpanels";
+import { CoachPanel, FRIENDLY, ReportCard, SLOT_HELP, Tour, Welcome, report, tourSteps } from "./onboarding";
+import type { Mode } from "./onboarding";
 import type { ChatMsg } from "./panels";
 import { CodePanel, Copilot, DescribePanel, GhostButton, ModelCard, SectionLabel, SpecStrip, TunerPanel, ValidatePanel, describeCtrl, diffCtrl } from "./panels";
 
@@ -60,7 +62,7 @@ function applyScenario(m: LabModel, s: Scenario): LabModel {
   };
 }
 
-export default function Lab({ initialPreset }: { initialPreset?: string }) {
+export default function Lab({ initialPreset, onboard = false }: { initialPreset?: string; onboard?: boolean }) {
   const engine = useEngine();
   const [text, setText] = useState("");
   const [build, setBuild] = useState<HardwareBuild | null>(null);
@@ -83,6 +85,31 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
   const [simKey, setSimKey] = useState(0);
   const [program, setProgram] = useState("mission");
   const [playback] = useState(createPlayback);
+  // Simple mode (plain words, no graphs) is the default until someone picks Pro.
+  const [mode, setModeState] = useState<Mode>("simple");
+  const [welcome, setWelcome] = useState(false);
+  const [touring, setTouring] = useState(false);
+  const [coachNote, setCoachNote] = useState<string | null>(null);
+  const simple = mode === "simple";
+  const setMode = useCallback((m: Mode) => {
+    setModeState(m);
+    try {
+      localStorage.setItem("rc-mode", m);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    let saved: string | null = null,
+      seen = false;
+    try {
+      saved = localStorage.getItem("rc-mode");
+      seen = localStorage.getItem("rc-onboarded") === "1";
+    } catch {}
+    const id = requestAnimationFrame(() => {
+      if (saved === "pro" || saved === "simple") setModeState(saved);
+      if (onboard || !seen) setWelcome(true);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [onboard]);
   const iterSeq = useRef(0);
 
   useEffect(() => {
@@ -130,6 +157,13 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
   }, [hw, result, tel]);
   const checks = useMemo(() => (result && effModel ? checkSpecs(result.analysis.metrics, effModel.specs, effModel.sim.ref) : []), [result, effModel]);
   const specOk = checks.length > 0 && checks.every((c) => c.pass);
+  const reportItems = useMemo(() => (effModel && result ? report(effModel, result.analysis.metrics, checks, allChecks) : []), [effModel, result, checks, allChecks]);
+  // A new design or tune clears Robo's last remark after a while.
+  useEffect(() => {
+    if (!coachNote || busy) return;
+    const id = setTimeout(() => setCoachNote(null), 9000);
+    return () => clearTimeout(id);
+  }, [coachNote, busy]);
   const prevIteration = iterations.length > 1 ? iterations[iterations.length - 2] : null;
   const ghost = useMemo(() => {
     if (!effModel || !prevIteration || !ctrl || JSON.stringify(prevIteration.controller) === JSON.stringify(ctrl)) return null;
@@ -347,7 +381,7 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
   const tune = useCallback(async () => {
     if (!model || !ctrl || !effModel) return;
     setBusy("tune");
-    setRightTab("copilot");
+    if (mode === "pro") setRightTab("copilot");
     setMessages((prev) => [...prev, { kind: "event", text: "auto-tuning with the simulator in the loop…" }]);
     try {
       const tuned = await tuneAsync(effModel, ctrl);
@@ -356,7 +390,20 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
       setMessages((prev) => [...prev, { kind: "event", text: `Auto-tune failed: ${String(err)}` }]);
     }
     setBusy(null);
-  }, [model, ctrl, effModel, apply]);
+  }, [model, ctrl, effModel, apply, mode]);
+
+  // Simple mode's "Make it better": tune with the simulator in the loop, then say what changed.
+  const improve = useCallback(async () => {
+    if (!effModel || !ctrl) return;
+    const before = run(engine, effModel, ctrl).analysis.metrics;
+    setCoachNote("Let me try lots of settings in the simulator…");
+    await tune();
+    setCoachNote(
+      before.stable
+        ? `Done! I tested hundreds of settings and kept the best. Press Simulate to see the difference.`
+        : "Done! It's back under control. Press Simulate to watch it.",
+    );
+  }, [effModel, ctrl, engine, tune]);
 
   const autoIterate = useCallback(async () => {
     if (!model || !ctrl || !effModel) return;
@@ -464,56 +511,100 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
             <span className="hidden text-[14px] font-medium sm:inline">RoboCraft</span>
           </Link>
           <span className="text-dim">/</span>
-          <span className="truncate text-[13px] font-medium">{model ? model.title : "Control lab"}</span>
+          <span className="truncate text-[13px] font-medium">{simple && hw ? `Your ${FRIENDLY[hw.build.kind].name.toLowerCase()}` : model ? model.title : "Control lab"}</span>
           {hw && (
             <span
               className={`mono-label hidden rounded-[2px] px-1.5 py-0.5 text-[10px] md:inline ${allChecks.some((c) => c.level === "error") ? "bg-bad/10 text-bad" : issues ? "bg-warn/10 text-warn" : "bg-ok/10 text-ok"}`}
             >
-              {allChecks.some((c) => c.level === "error") ? "not feasible" : issues ? `${issues} warning${issues > 1 ? "s" : ""}` : "feasible"}
+              {allChecks.some((c) => c.level === "error") ? (simple ? "needs fixing" : "not feasible") : issues ? `${issues} warning${issues > 1 ? "s" : ""}` : simple ? "ready to build" : "feasible"}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className={`mono-label hidden rounded-[2px] px-1.5 py-0.5 text-[10px] sm:inline ${engine.backend === "wasm" ? "bg-ok/10 text-ok" : "bg-warn/10 text-warn"}`}>
-            {engine.backend === "wasm" ? "C++/WASM engine" : "TS engine"}
-          </span>
-          <GhostButton onClick={exportJson} disabled={!model}>
-            <Download className="size-3" /> <span className="hidden sm:inline">Export</span>
-          </GhostButton>
+          <div data-tour="mode" className="flex items-center gap-0.5 border border-line-2 p-0.5" role="radiogroup" aria-label="Mode">
+            {(
+              [
+                ["simple", "Simple"],
+                ["pro", "Pro"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                role="radio"
+                aria-checked={mode === id}
+                onClick={() => {
+                  setMode(id);
+                  if (id === "simple") setView("hardware");
+                }}
+                className={`mono-label px-2.5 py-1 text-[10px] transition-colors ${mode === id ? "bg-fg text-void" : "text-dim hover:text-mute"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setTouring(true)} className="flex size-8 items-center justify-center border border-line-2 text-mute hover:text-fg" aria-label="Show me around" title="Show me around">
+            <CircleHelp className="size-4" />
+          </button>
+          {!simple && (
+            <>
+              <span className={`mono-label hidden rounded-[2px] px-1.5 py-0.5 text-[10px] xl:inline ${engine.backend === "wasm" ? "bg-ok/10 text-ok" : "bg-warn/10 text-warn"}`}>
+                {engine.backend === "wasm" ? "C++/WASM engine" : "TS engine"}
+              </span>
+              <GhostButton onClick={exportJson} disabled={!model}>
+                <Download className="size-3" /> <span className="hidden sm:inline">Export</span>
+              </GhostButton>
+            </>
+          )}
         </div>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[300px_minmax(0,1fr)_340px]">
         {/* Left: hardware / control / describe */}
-        <aside className="flex max-h-[85vh] min-h-0 flex-col border-b border-line lg:max-h-none lg:border-r lg:border-b-0">
+        <aside data-tour="parts" className="flex max-h-[85vh] min-h-0 flex-col border-b border-line lg:max-h-none lg:border-r lg:border-b-0">
           <Tabs
-            value={leftTab}
+            value={simple && leftTab === "control" ? "hardware" : leftTab}
             onChange={setLeftTab}
-            items={[
-              { id: "hardware", label: "Hardware", icon: Cpu },
-              { id: "control", label: "Control", icon: SlidersHorizontal },
-              { id: "describe", label: "Describe", icon: Sparkles },
-            ]}
+            items={
+              simple
+                ? [
+                    { id: "hardware", label: "Build", icon: Cpu },
+                    { id: "describe", label: "Describe", icon: Sparkles },
+                  ]
+                : [
+                    { id: "hardware", label: "Hardware", icon: Cpu },
+                    { id: "control", label: "Control", icon: SlidersHorizontal },
+                    { id: "describe", label: "Describe", icon: Sparkles },
+                  ]
+            }
             layoutId="left-tab"
           />
           <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
-            {leftTab === "hardware" && (
+            {(leftTab === "hardware" || (simple && leftTab === "control")) && (
               <>
-                <RigPicker kind={build?.kind ?? null} onPick={(k) => void loadRig(k)} busy={!!busy} />
+                <RigPicker
+                  kind={build?.kind ?? null}
+                  onPick={(k) => void loadRig(k)}
+                  busy={!!busy}
+                  names={simple ? { rover: "car", arm: "arm", balancer: "balancer", drone: "drone" } : undefined}
+                />
                 {notice && <p className="border-b border-line bg-panel/60 px-4 py-2.5 text-[11.5px] leading-relaxed text-mute">{notice}</p>}
                 {hw && allChecks && (
                   <>
-                    <SectionLabel>Parts</SectionLabel>
-                    <PartsPanel hw={hw} checks={allChecks} selected={selected} onSelect={setSelected} onBuild={onBuild} />
+                    <SectionLabel>{simple ? "Parts · what your robot is made of" : "Parts"}</SectionLabel>
+                    <PartsPanel hw={hw} checks={allChecks} selected={selected} onSelect={setSelected} onBuild={onBuild} help={simple ? SLOT_HELP : undefined} />
                     <div className="border-t border-line" />
-                    <GeometryPanel hw={hw} onBuild={onBuild} />
-                    <SectionLabel>Test scenario</SectionLabel>
-                    <ScenarioToggles scenario={scenario} setScenario={setScenario} model={effModel} />
+                    <GeometryPanel hw={hw} onBuild={onBuild} groups={simple ? ["Mission", "Mass & payload"] : undefined} />
+                    {!simple && (
+                      <>
+                        <SectionLabel>Test scenario</SectionLabel>
+                        <ScenarioToggles scenario={scenario} setScenario={setScenario} model={effModel} />
+                      </>
+                    )}
                   </>
                 )}
               </>
             )}
-            {leftTab === "control" && model && ctrl && result && (
+            {!simple && leftTab === "control" && model && ctrl && result && (
               <>
                 <SectionLabel
                   right={
@@ -569,7 +660,7 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
 
         {/* Centre: the machine */}
         <main className="order-first flex min-h-[78vh] flex-col border-b border-line lg:order-none lg:min-h-0 lg:border-b-0">
-          <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-2 [scrollbar-width:none]">
+          <div className={`flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-2 [scrollbar-width:none] ${simple ? "hidden" : ""}`}>
             {views.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -591,8 +682,10 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
             </div>
           ) : (
             <>
-              {view === "hardware" && (
+              {(view === "hardware" || simple) && (
                 <HardwareView
+                  simple={simple}
+                  title={simple ? FRIENDLY[hw!.build.kind].name : undefined}
                   className="min-h-[520px] flex-1"
                   hw={hw!}
                   model={effModel!}
@@ -610,6 +703,9 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
                   onSelect={setSelected}
                   onBuild={onBuild}
                   dock={
+                    simple ? (
+                      <ReportCard items={reportItems} onImprove={() => void improve()} busy={busy === "tune"} />
+                    ) : (
                     <div className="border-t border-line bg-void/80 backdrop-blur">
                       <button onClick={() => setDockOpen((v) => !v)} className="mono-label flex w-full items-center justify-between px-3 py-1 text-[9.5px] text-dim hover:text-mute">
                         <span className="flex items-center gap-2">
@@ -655,10 +751,11 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
                         )}
                       </AnimatePresence>
                     </div>
+                    )
                   }
                 />
               )}
-              {view === "scope" && (
+              {!simple && view === "scope" && (
                 <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
                   <SpecStrip checks={checks} metrics={m!} pm={result!.analysis.pmDeg} unit={effModel!.input.unit} />
                   <div className="relative px-2 pt-3">
@@ -697,7 +794,7 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
                   </p>
                 </div>
               )}
-              {view === "analysis" && (
+              {!simple && view === "analysis" && (
                 <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
                   <SpecStrip checks={checks} metrics={m!} pm={result!.analysis.pmDeg} unit={effModel!.input.unit} />
                   <div className="grid gap-px bg-line md:grid-cols-2">
@@ -730,13 +827,13 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
                   </div>
                 </div>
               )}
-              {view === "wiring" && <WiringDiagram wiring={hw!.wiring} />}
-              {view === "validate" && (
+              {!simple && view === "wiring" && <WiringDiagram wiring={hw!.wiring} />}
+              {!simple && view === "validate" && (
                 <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
                   <ValidatePanel results={validation.results} running={validation.running} total={CHECK_COUNT} onRun={() => void runValidation()} refValue={effModel!.sim.ref} />
                 </div>
               )}
-              {view === "code" && code && (
+              {!simple && view === "code" && code && (
                 <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
                   <CodePanel code={code.text} ts={code.ts} filename={`${(model!.presetId ?? "controller").replace(/\W+/g, "_")}.ino`} />
                 </div>
@@ -746,7 +843,27 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
         </main>
 
         {/* Right: checks / copilot */}
-        <aside className="flex min-h-[560px] flex-col border-t border-line lg:min-h-0 lg:border-t-0 lg:border-l">
+        <aside data-tour="coach" className="flex min-h-[560px] flex-col border-t border-line lg:min-h-0 lg:border-t-0 lg:border-l">
+          {simple ? (
+            <>
+              <SectionLabel>Robo · your coach</SectionLabel>
+              <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
+                {hw && (
+                  <CoachPanel
+                    hw={hw}
+                    items={reportItems}
+                    checks={allChecks}
+                    onBuild={onBuild}
+                    onSelect={setSelected}
+                    onImprove={() => void improve()}
+                    busy={busy === "tune"}
+                    lastNote={coachNote}
+                  />
+                )}
+              </div>
+            </>
+          ) : (
+          <>
           <Tabs
             value={rightTab}
             onChange={setRightTab}
@@ -777,8 +894,38 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
               }}
             />
           </div>
+          </>
+          )}
         </aside>
       </div>
+
+      <AnimatePresence>
+        {welcome && (
+          <Welcome
+            onClose={() => {
+              setWelcome(false);
+              try {
+                localStorage.setItem("rc-onboarded", "1");
+              } catch {}
+            }}
+            onDone={(m, pick, tour) => {
+              setWelcome(false);
+              setMode(m);
+              setView("hardware");
+              try {
+                localStorage.setItem("rc-onboarded", "1");
+              } catch {}
+              if (pick === "describe") setLeftTab("describe");
+              else {
+                setLeftTab("hardware");
+                if (pick !== build?.kind) void loadRig(pick);
+              }
+              if (tour) setTimeout(() => setTouring(true), pick !== "describe" && pick !== build?.kind ? 1600 : 500);
+            }}
+          />
+        )}
+      </AnimatePresence>
+      {touring && ready && <Tour steps={tourSteps(mode, hw!.build.kind)} onClose={() => setTouring(false)} />}
     </div>
   );
 }

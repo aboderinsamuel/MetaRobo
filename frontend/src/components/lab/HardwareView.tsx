@@ -79,7 +79,12 @@ export default function HardwareView({
   onBuild,
   dock,
   className,
+  simple = false,
+  title,
 }: {
+  simple?: boolean;
+  /** Friendly machine name shown in the corner (Simple mode). */
+  title?: string;
   hw: DerivedHardware;
   model: LabModel;
   run: ProgramRun;
@@ -179,7 +184,7 @@ export default function HardwareView({
   const warns = checks.filter((c) => c.level === "warn").length;
 
   return (
-    <div className={`relative overflow-hidden bg-[#06080b] ${className ?? ""}`}>
+    <div data-tour="robot" className={`relative overflow-hidden bg-[#06080b] ${className ?? ""}`}>
       <Canvas
         key={`${rig.kind}-${camKey}-${wide ? "w" : "n"}`}
         shadows
@@ -223,16 +228,16 @@ export default function HardwareView({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mono-label inline-flex items-center gap-2 border border-line-2 bg-void/80 px-2 py-1 text-[10px] backdrop-blur">
             <span className="size-1.5 rounded-full" style={{ background: "var(--spectrum-conic)" }} />
-            {RIGS[rig.kind].name}
+            {title ?? RIGS[rig.kind].name}
           </span>
           <span
             className={`mono-label inline-flex items-center gap-1.5 border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${errors ? "border-bad/50 text-bad" : warns ? "border-warn/50 text-warn" : "border-ok/40 text-ok"}`}
           >
             {errors ? <XCircle className="size-3" /> : warns ? <AlertTriangle className="size-3" /> : <CheckCircle2 className="size-3" />}
-            {errors ? `${errors} blocking issue${errors > 1 ? "s" : ""}` : warns ? `${warns} warning${warns > 1 ? "s" : ""}` : "feasible"}
+            {errors ? (simple ? `${errors} thing${errors > 1 ? "s" : ""} to fix` : `${errors} blocking issue${errors > 1 ? "s" : ""}`) : warns ? `${warns} warning${warns > 1 ? "s" : ""}` : simple ? "ready to build" : "feasible"}
           </span>
         </div>
-        <p className="font-mono text-[10px] text-dim">Drag to orbit · scroll to zoom · click a part to inspect or swap it, then simulate</p>
+        <p className="font-mono text-[10px] text-dim">{simple ? "Drag to look around · click a part to learn about it" : "Drag to orbit · scroll to zoom · click a part to inspect or swap it, then simulate"}</p>
       </div>
 
       {/* Top-right: live telemetry */}
@@ -248,7 +253,7 @@ export default function HardwareView({
             <RotateCcw className="size-3" />
           </button>
         </div>
-        <Hud playback={playback} hw={hw} model={model} run={run} tel={tel} motion={motionData} stable={stable} settlingTime={settlingTime} />
+        <Hud playback={playback} hw={hw} model={model} run={run} tel={tel} motion={motionData} stable={stable} settlingTime={settlingTime} simple={simple} />
       </div>
 
       {/* Part inspector */}
@@ -271,7 +276,7 @@ export default function HardwareView({
         {dock}
         <div className="border-t border-line bg-void/90 backdrop-blur">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-2">
-            <div className="flex items-center gap-0.5 border border-line p-0.5">
+            <div data-tour="programs" className="flex items-center gap-0.5 border border-line p-0.5">
               {programs.map((pr) => (
                 <button
                   key={pr.id}
@@ -285,7 +290,7 @@ export default function HardwareView({
             </div>
             <PlaybackBar playback={playback} onSimulate={simulate} mult={mult} setMult={setMult} baseRate={baseRate} />
           </div>
-          <Caption playback={playback} run={run} />
+          <Caption playback={playback} run={run} simple={simple} />
         </div>
       </div>
     </div>
@@ -302,7 +307,9 @@ function Hud({
   motion: mo,
   stable,
   settlingTime,
+  simple,
 }: {
+  simple?: boolean;
   playback: Playback;
   hw: DerivedHardware;
   model: LabModel;
@@ -341,6 +348,8 @@ function Hud({
         : status === "TRACKING" || status === "RUNNING"
           ? "text-spec-1 border-spec-1/40"
           : "text-bad border-bad/50";
+  // Simple mode reads angles in degrees.
+  const friendly = (v: number) => (model.output.unit === "rad" ? `${Math.round((v * 180) / Math.PI)}°` : `${fmtNum(v, 2)} ${model.output.unit}`);
   const curNow = tel.perMotor[idx] ?? 0;
   const curFrac = curNow / tel.limitA;
   const isDrone = kind === "drone";
@@ -349,6 +358,13 @@ function Hud({
   return (
     <>
       <span className={`mono-label inline-block border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${statusCls}`}>{status}</span>
+      {simple ? (
+        <div className="w-44 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
+          <Row k={model.output.name.replace(/ change$/, "")} v={friendly(value)} />
+          <Row k="goal" v={friendly(run.r[idx] ?? model.sim.ref)} />
+          {kind === "balancer" && <Row k="lean" v={`${fmtNum(((tiltNow || 0) * 180) / Math.PI, 2)}°`} />}
+        </div>
+      ) : (
       <div className="w-52 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
         <Row k={model.output.name} v={`${fmtNum(value)} / ${fmtNum(run.r[idx] ?? model.sim.ref)} ${model.output.unit}`} />
         <Row k={isDrone ? "thrust Δ" : "motor V"} v={`${fmtNum(run.u[idx] ?? 0)} ${model.input.unit}`} />
@@ -363,6 +379,7 @@ function Hud({
           {hw.driver.name.split(" ")[0]} limit {tel.limitA} A · {fmtNum(power, 2)} W
         </p>
       </div>
+      )}
     </>
   );
 }
@@ -375,6 +392,7 @@ function PlaybackBar({ playback, onSimulate, mult, setMult, baseRate }: { playba
   return (
     <>
       <button
+        data-tour="simulate"
         onClick={onSimulate}
         className={`relative inline-flex h-8 items-center gap-2 overflow-hidden px-4 text-[12px] font-medium transition-colors ${playing ? "border border-line-2 text-fg hover:bg-panel-2" : "text-void"}`}
         style={playing ? undefined : { background: "var(--spectrum)" }}
@@ -418,14 +436,14 @@ function PlaybackBar({ playback, onSimulate, mult, setMult, baseRate }: { playba
   );
 }
 
-function Caption({ playback, run }: { playback: Playback; run: ProgramRun }) {
+function Caption({ playback, run, simple }: { playback: Playback; run: ProgramRun; simple?: boolean }) {
   const { t } = usePlayback(playback);
   const i = segmentAt(run, t);
   return (
     <p className="truncate px-3 pt-1 pb-2 font-mono text-[10.5px] text-mute">
       {run.segs.length > 1 && <span className="text-dim">{`step ${i + 1}/${run.segs.length} · `}</span>}
       {run.segs[i]?.label}
-      {run.linear && <span className="text-dim"> · from the closed-loop step response</span>}
+      {run.linear && !simple && <span className="text-dim"> · from the closed-loop step response</span>}
     </p>
   );
 }

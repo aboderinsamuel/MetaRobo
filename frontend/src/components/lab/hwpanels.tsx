@@ -21,7 +21,7 @@ function worstFor(checks: DesignCheck[], slot: SlotId): CheckLevel | null {
   return w;
 }
 
-const RIG_ICON: Record<RigKind, React.ReactNode> = {
+export const RIG_ICON: Record<RigKind, React.ReactNode> = {
   rover: (
     <svg viewBox="0 0 32 20" className="h-5 w-8" fill="none" stroke="currentColor" strokeWidth="1.4">
       <rect x="3" y="5" width="24" height="7" rx="1.5" />
@@ -54,7 +54,7 @@ const RIG_ICON: Record<RigKind, React.ReactNode> = {
   ),
 };
 
-export function RigPicker({ kind, onPick, busy }: { kind: RigKind | null; onPick: (k: RigKind) => void; busy?: boolean }) {
+export function RigPicker({ kind, onPick, busy, names }: { kind: RigKind | null; onPick: (k: RigKind) => void; busy?: boolean; names?: Record<RigKind, string> }) {
   return (
     <div className="grid grid-cols-4 gap-px border-b border-line bg-line">
       {(Object.keys(RIGS) as RigKind[]).map((k) => (
@@ -65,7 +65,7 @@ export function RigPicker({ kind, onPick, busy }: { kind: RigKind | null; onPick
           className={`group relative flex flex-col items-center gap-1 bg-void px-1 py-2.5 transition-colors disabled:opacity-50 ${kind === k ? "text-fg" : "text-dim hover:bg-panel hover:text-mute"}`}
         >
           {RIG_ICON[k]}
-          <span className="mono-label text-[9px]">{k === "balancer" ? "balancer" : k}</span>
+          <span className="mono-label text-center text-[9px] leading-tight">{names?.[k] ?? k}</span>
           {kind === k && <motion.span layoutId="rig-pick" className="absolute inset-x-2 bottom-0 h-px" style={{ background: "var(--spectrum)" }} />}
         </button>
       ))}
@@ -79,12 +79,15 @@ export function PartsPanel({
   selected,
   onSelect,
   onBuild,
+  help,
 }: {
   hw: DerivedHardware;
   checks: DesignCheck[];
   selected: SlotId | null;
   onSelect: (s: SlotId | null) => void;
   onBuild: (b: HardwareBuild, note: string) => void;
+  /** Plain-language explanation per part, shown instead of the datasheet line (Simple mode). */
+  help?: Partial<Record<SlotId, string>>;
 }) {
   return (
     <div className="divide-y divide-line">
@@ -119,7 +122,7 @@ export function PartsPanel({
               </select>
               <ChevronDown className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-dim" />
             </div>
-            <p className="mt-1 truncate font-mono text-[10px] text-dim">{cur.spec}</p>
+            {help?.[s.slot] ? <p className="mt-1 text-[11.5px] leading-snug text-dim">{help[s.slot]}</p> : <p className="mt-1 truncate font-mono text-[10px] text-dim">{cur.spec}</p>}
           </div>
         );
       })}
@@ -127,8 +130,8 @@ export function PartsPanel({
   );
 }
 
-export function GeometryPanel({ hw, onBuild }: { hw: DerivedHardware; onBuild: (b: HardwareBuild, note: string | null) => void }) {
-  const specs = GEOMETRY[hw.build.kind];
+export function GeometryPanel({ hw, onBuild, groups: only }: { hw: DerivedHardware; onBuild: (b: HardwareBuild, note: string | null) => void; groups?: string[] }) {
+  const specs = GEOMETRY[hw.build.kind].filter((g) => !only || only.includes(g.group));
   const groups = [...new Set(specs.map((s) => s.group))];
   return (
     <div>

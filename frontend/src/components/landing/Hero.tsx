@@ -75,10 +75,10 @@ export default function Hero() {
           transition={{ delay: 0.3, duration: 0.8 }}
         >
           <p className="mono-label hidden max-w-[16rem] text-mute sm:block">
-            <span className="text-fg">[RC-LAB]</span> Plain words → model → controller → simulation
+            <span className="text-fg">[RC-LAB]</span> Your idea → real parts → 3D simulation → Robo helps you fix it
           </p>
           <ul className="mono-label hidden space-y-1.5 text-right text-mute md:block">
-            {["Transfer functions", "State space", "PID · LQR", "C++ → WebAssembly", "Claude Opus 5.5"].map((t, i) => (
+            {["Ages 10 to engineer", "Simple & Pro modes", "Real part physics", "C++ → WebAssembly", "Claude Opus 5.5"].map((t, i) => (
               <motion.li key={t} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.08 }}>
                 {t}
               </motion.li>
@@ -89,11 +89,11 @@ export default function Hero() {
         <div className="grid items-end gap-8 lg:grid-cols-[1fr_auto]">
           <div>
             <motion.p className="mono-label mb-4 text-mute" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-              ·· Describe it. We control it.
+              ·· No experience needed
             </motion.p>
             <h1 className="text-[clamp(2.4rem,5.6vw,5.2rem)] leading-[0.95] font-medium tracking-[-0.035em] [text-shadow:0_4px_40px_rgb(4_5_6_/_0.9)]">
               <motion.span className="block" initial={{ y: "110%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.9, ease, delay: 0.2 }}>
-                Describe a machine.
+                Build a robot.
               </motion.span>
               <motion.span
                 className="mt-2 flex flex-wrap items-center gap-x-[0.25em]"
@@ -101,14 +101,13 @@ export default function Hero() {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.9, ease, delay: 0.32 }}
               >
-                Get a
+                Watch it
                 <span className="relative inline-block px-[0.18em]">
                   <Crosshair className="-top-1.5 -left-1.5" />
                   <Crosshair className="-right-1.5 -bottom-1.5" />
                   <span className="absolute inset-0 border border-line-2" />
-                  <span className="font-pixel text-[0.86em] tracking-[-0.02em]">stable</span>
+                  <span className="font-pixel text-[0.86em] tracking-[-0.02em]">move</span>
                 </span>
-                loop.
               </motion.span>
             </h1>
           </div>
@@ -118,15 +117,14 @@ export default function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7, duration: 0.7 }}
           >
-            <p className="text-[15px] leading-relaxed text-mute">
-              Say <span className="text-fg">“a DC motor driving a conveyor”</span> or drop in step-response data. RoboCraft writes the
-              physics, designs a PID or state-feedback controller, runs it in a C++ engine compiled to WebAssembly, and tells you why it
-              overshoots until it doesn&apos;t.
+            <p className="text-[15px] leading-relaxed text-mute [text-shadow:0_2px_18px_rgb(4_5_6_/_0.95)]">
+              Pick a robot car, arm, balancer or drone, or just say <span className="text-fg">“a robot that picks up my toys”</span>. Press
+              Simulate and watch it move. Robo explains what won&apos;t work and fixes it with you. Pro mode adds the graphs, maths and firmware.
             </p>
             <div className="mt-6 flex items-center gap-3">
-              <LaunchButton label="Launch the lab" />
+              <LaunchButton label="Start building" href="/lab?onboard=1" />
               <a href="#loop" className="mono-label inline-flex h-9 items-center gap-2 px-3 text-mute transition-colors hover:text-fg">
-                See the loop <ArrowDown className="size-3.5" />
+                How it works <ArrowDown className="size-3.5" />
               </a>
             </div>
           </motion.div>
