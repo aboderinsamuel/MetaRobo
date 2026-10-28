@@ -20,9 +20,12 @@ import type { SlotId } from "@/lib/lab/hardware/parts";
 import { createPlayback } from "@/lib/lab/playback";
 import { PROGRAMS, programRun } from "@/lib/lab/programs";
 import { presetById } from "@/lib/lab/presets";
-import { RIGS, rigFor } from "@/lib/lab/rig";
+import { rigFor } from "@/lib/lab/rig";
 import { tuneAsync } from "@/lib/lab/tuneClient";
 import type { Advice, CallUsage, ControllerSpec, Iteration, LabModel, RigKind } from "@/lib/lab/types";
+import { totalMassG, updatePart, type Assembly } from "@/lib/lab/assembly";
+import { estimateFps, tracksToStepCsv } from "@/lib/lab/video";
+import type { SamBox } from "@/lib/meta/sam";
 import { CHECK_COUNT, validateDesign } from "@/lib/lab/validate";
 import type { CheckResult } from "@/lib/lab/validate";
 import { useEngine } from "@/lib/sim/useEngine";
@@ -31,7 +34,10 @@ import { ChecksPanel, GeometryPanel, PartsPanel, RigPicker, WiringDiagram } from
 import { CoachPanel, FRIENDLY, ReportCard, SLOT_HELP, Tour, Welcome, report, tourSteps } from "./onboarding";
 import type { Mode } from "./onboarding";
 import type { ChatMsg } from "./panels";
-import { CodePanel, Copilot, DescribePanel, GhostButton, ModelCard, SectionLabel, SpecStrip, TunerPanel, ValidatePanel, describeCtrl, diffCtrl } from "./panels";
+import type { VideoTrackOptions } from "./VideoTrack";
+import { CodePanel, Copilot, DescribePanel, GhostButton, ModelCard, PIPELINE, SectionLabel, SpecStrip, TunerPanel, ValidatePanel, describeCtrl, diffCtrl } from "./panels";
+import EmptyStage from "./EmptyStage";
+import MachinePanel from "./MachinePanel";
 
 const HardwareView = dynamic(() => import("./HardwareView"), {
   ssr: false,
@@ -86,6 +92,15 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
   const addSpend = useCallback((u?: CallUsage) => {
     if (u && !u.cached) setSpend((s) => (s ? { ...s, usd: s.usd + u.costUsd } : s));
   }, []);
+  /** Reads the logged total; used after failures, whose attempts still cost. */
+  const refreshSpend = useCallback(() => {
+    fetch("/api/lab/status")
+      .then((r) => r.json())
+      .then((s: { spentUsd?: number; budgetUsd?: number }) => s.budgetUsd && setSpend({ usd: s.spentUsd ?? 0, budgetUsd: s.budgetUsd }))
+      .catch(() => {});
+  }, []);
+  // Why the last description couldn't be built (shown with a retry, never replaced by a demo).
+  const [buildError, setBuildError] = useState<string | null>(null);
   const [validation, setValidation] = useState<{ results: CheckResult[]; running: boolean }>({ results: [], running: false });
   const [simKey, setSimKey] = useState(0);
   const [program, setProgram] = useState("mission");
@@ -129,6 +144,43 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
 
   const hw = useMemo(() => (build ? deriveHardware(build) : null), [build]);
   const model = dataModel ?? hw?.model ?? null;
+
+  // ---- AI-designed machine: selection, edits, undo ---------------------------------------------
+  const machine = model?.assembly ?? null;
+  const [selectedPart, setSelectedPart] = useState<string | null>(null);
+  const dataModelTitle = useRef<string | undefined>(undefined);
+  const [undoStack, setUndoStack] = useState<Assembly[]>([]);
+  const editAssembly = useCallback(
+    (next: Assembly) => {
+      if (!dataModel?.assembly) return;
+      const prev = dataModel.assembly;
+      setUndoStack((s) => [...s.slice(-49), prev]);
+      setDataModel({ ...dataModel, assembly: next });
+    },
+    [dataModel],
+  );
+  const undo = useCallback(() => {
+    if (!dataModel?.assembly || !undoStack.length) return;
+    setDataModel({ ...dataModel, assembly: undoStack[undoStack.length - 1] });
+    setUndoStack((s) => s.slice(0, -1));
+  }, [dataModel, undoStack]);
+  const transformPart = useCallback(
+    (id: string, position: [number, number, number], rotation: [number, number, number]) => machine && editAssembly(updatePart(machine, id, { position, rotation })),
+    [machine, editAssembly],
+  );
+  useEffect(() => {
+    if (!machine) return;
+    const on = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undo();
+      }
+    };
+    window.addEventListener("keydown", on);
+    return () => window.removeEventListener("keydown", on);
+  }, [machine, undo]);
   const effModel = useMemo(() => (model ? applyScenario(model, scenario) : null), [model, scenario]);
   const result = useMemo(() => (effModel && ctrl ? run(engine, effModel, ctrl) : null), [engine, effModel, ctrl]);
   const bode = useMemo(() => {
@@ -160,9 +212,11 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     return { ...a, perMotor: a.perMotor.map((v, i) => Math.max(v, b.perMotor[i])), current: a.current.map((v, i) => v + b.current[i] - 0.15) };
   }, [hw, prun]);
   const allChecks = useMemo(() => {
+    // The preset rigs' part checks (wheel slip, driver current…) don't apply to AI-designed machines.
+    if (machine) return [];
     if (!hw || !result || !tel) return hw?.checks ?? [];
     return sortChecks([...hw.checks, ...liveChecks(hw, tel, result.sim.u, result.analysis.wcp, result.analysis.metrics.stable === 1)]);
-  }, [hw, result, tel]);
+  }, [machine, hw, result, tel]);
   const checks = useMemo(() => (result && effModel ? checkSpecs(result.analysis.metrics, effModel.specs, effModel.sim.ref) : []), [result, effModel]);
   const specOk = checks.length > 0 && checks.every((c) => c.pass);
   const reportItems = useMemo(() => (effModel && result ? report(effModel, result.analysis.metrics, checks, allChecks) : []), [effModel, result, checks, allChecks]);
@@ -235,6 +289,12 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
       setCtrl(m.controller);
       setNotice(note);
       setSelected(null);
+      // A different design starts a fresh edit history; re-derived physics keeps the same design.
+      if (fromData?.assembly?.title !== dataModelTitle.current) {
+        setSelectedPart(null);
+        setUndoStack([]);
+      }
+      dataModelTitle.current = fromData?.assembly?.title;
       setProgram("mission");
       setIterations([]);
       setValidation({ results: [], running: false });
@@ -259,6 +319,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
 
   const buildFromText = useCallback(async () => {
     if (!text.trim()) return;
+    setBuildError(null);
     setBusy("model");
     setPipeline(0);
     try {
@@ -270,23 +331,27 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
       });
       await sleep(400);
       setPipeline(1);
-      const body = (await (await res).json()) as { model?: LabModel; notice?: string; error?: string; usage?: CallUsage };
-      if (!body.model) throw new Error(body.error ?? "No model returned");
+      const body = (await (await res).json()) as { model?: LabModel; error?: string; usage?: CallUsage };
+      // A description only ever becomes the machine Muse Spark designed. Never a demo robot.
+      if (!body.model?.assembly || body.model.source !== "meta") throw new Error(body.error ?? "Muse Spark didn't return a design. Try again.");
       addSpend(body.usage);
       if (performance.now() - t0 < 900) await sleep(400);
-      // The words pick the closest of the four rigs and size it; the parts give the physics.
-      const kind = rigFor(body.model, text).kind;
-      const b = applyHints(defaultBuild(kind), text);
-      const why = body.model.source === "meta" ? `Muse Spark matched this to the ${RIGS[kind].name.toLowerCase()}.` : `Matched to the ${RIGS[kind].name.toLowerCase()}.`;
-      await adopt(b, body.notice ? `${body.notice} ${why}` : `${why} Sizes and targets came from your description; swap parts on the left to change the physics.`);
+      // The 3D view builds the AI design; the hidden hardware scaffold only feeds the simulator.
+      const b = applyHints(defaultBuild(rigFor(body.model, text).kind), text);
+      await adopt(
+        b,
+        `Muse Spark designed "${body.model.assembly.title}" (${body.model.assembly.parts.length} parts) and its physics; the engine checked it. Click any part to edit it, or press Simulate to test.`,
+        body.model,
+      );
       setLeftTab("hardware");
     } catch (err) {
-      setNotice(`Modeling failed: ${err instanceof Error ? err.message : String(err)}`);
+      setBuildError(err instanceof Error ? err.message : String(err));
       setPipeline(-1);
+      refreshSpend();
     } finally {
       setBusy(null);
     }
-  }, [text, data, engine, adopt, addSpend]);
+  }, [text, data, engine, adopt, addSpend, refreshSpend]);
 
   const loadRig = useCallback(
     async (kind: RigKind, prompt?: string) => {
@@ -312,7 +377,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
   );
 
   const loadData = useCallback(
-    async (csv: string, name: string) => {
+    async (csv: string, name: string, source = `Identified from ${name}`) => {
       setBusy("model");
       setPipeline(0);
       try {
@@ -323,7 +388,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
         const fit = engine.fit(d.t, d.y, d.uStep, 0);
         const local = modelFromFit(fit, d);
         const kind = rigFor(local, text).kind;
-        await adopt(applyHints(defaultBuild(kind), text), `Identified from ${name}: ${fitSummary(fit, d)}. The plant comes from your data; swapping a part switches back to the physics model.`, local);
+        await adopt(applyHints(defaultBuild(kind), text), `${source}: ${fitSummary(fit, d)}. The plant comes from your data; swapping a part switches back to the physics model.`, local);
       } catch (err) {
         setNotice(`Couldn't read that data: ${err instanceof Error ? err.message : String(err)}`);
         setPipeline(-1);
@@ -334,12 +399,80 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     [engine, text, adopt],
   );
 
+  // Muse Spark re-derives the physics from the engineer's edited design (masses, sizes, specs).
+  const rederivePhysics = useCallback(async () => {
+    if (!machine || !build) return;
+    setBusy("model");
+    setPipeline(1);
+    try {
+      const res = await fetch("/api/lab/model", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ description: text.trim() || machine.title, assembly: machine }),
+      });
+      const body = (await res.json()) as { model?: LabModel; error?: string; usage?: CallUsage };
+      addSpend(body.usage);
+      if (!res.ok || !body.model) throw new Error(body.error ?? `HTTP ${res.status}`);
+      const keep = selectedPart;
+      // The feasibility review is about the idea, so it carries over to the re-derived physics.
+      await adopt(
+        build,
+        `Muse Spark re-derived the physics from your design (${machine.parts.length} parts, ${Math.round(totalMassG(machine))} g). Press Simulate to test it.`,
+        { ...body.model, review: body.model.review ?? model?.review },
+      );
+      setSelectedPart(keep);
+      setLeftTab("hardware");
+    } catch (err) {
+      setNotice(`Couldn't update the physics: ${err instanceof Error ? err.message : String(err)}`);
+      setPipeline(-1);
+    } finally {
+      setBusy(null);
+    }
+  }, [machine, build, text, addSpend, adopt, selectedPart, model?.review]);
+
+  // "Film it": SAM 3.1 tracks the robot in a clip; its motion becomes step data and is fitted.
+  const trackVideo = useCallback(
+    async (file: File, opts: VideoTrackOptions, durationS: number) => {
+      setBusy("model");
+      setPipeline(0);
+      try {
+        const form = new FormData();
+        form.append("video", file);
+        form.append("prompt", opts.prompt.trim());
+        form.append("frames", String(Math.ceil(durationS * 30)));
+        const res = await fetch("/api/lab/track", { method: "POST", body: form });
+        const body = (await res.json()) as { boxes?: SamBox[]; frameCount?: number; cached?: boolean; costUsd?: number; error?: string };
+        if (body.costUsd !== undefined) addSpend({ model: "sam-3.1", cached: !!body.cached, tokens: 0, costUsd: body.costUsd });
+        if (!res.ok || !body.boxes) throw new Error(body.error ?? `HTTP ${res.status}`);
+        const out = tracksToStepCsv({
+          boxes: body.boxes,
+          fps: estimateFps(body.frameCount ?? 0, durationS),
+          lengthM: opts.lengthCm / 100,
+          measure: opts.measure,
+          uStep: opts.uStep,
+        });
+        const cost = body.cached ? "replayed from cache, $0" : `$${(body.costUsd ?? 0).toFixed(3)}`;
+        await loadData(
+          out.csv,
+          file.name,
+          `SAM 3.1 tracked "${opts.prompt}" in ${out.samples} frames (${cost}): it travelled ${fmtNum(out.distanceM)} m, peaking at ${fmtNum(out.peakSpeed)} m/s. Fitted model`,
+        );
+      } catch (err) {
+        setNotice(`Video tracking failed: ${err instanceof Error ? err.message : String(err)}`);
+        setPipeline(-1);
+        setBusy(null);
+      }
+    },
+    [addSpend, loadData],
+  );
+
   const booted = useRef(false);
   useEffect(() => {
     if (booted.current) return;
     booted.current = true;
+    // The lab opens on an empty workspace; a demo robot loads only when one is asked for.
     const p = initialPreset ? presetById(initialPreset) : undefined;
-    void loadRig(p?.rig ?? "rover", p?.prompt);
+    if (p) void loadRig(p.rig, p.prompt);
   }, [initialPreset, loadRig]);
 
   // ---- Hardware changes ----------------------------------------------------------------------
@@ -497,10 +630,11 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
 
   const m = result?.analysis.metrics;
   const views: { id: View; label: string; icon: typeof Activity }[] = [
-    { id: "hardware", label: "3D hardware", icon: Box },
+    { id: "hardware", label: machine ? "3D design" : "3D hardware", icon: Box },
     { id: "scope", label: "Scope", icon: Activity },
     { id: "analysis", label: "Poles & Bode", icon: Waves },
-    { id: "wiring", label: "Wiring", icon: Cable },
+    // Wiring is generated for the preset rigs only.
+    ...(machine ? [] : [{ id: "wiring" as const, label: "Wiring", icon: Cable }]),
     { id: "validate", label: "Validate", icon: ShieldCheck },
     { id: "code", label: "Firmware", icon: Code2 },
   ];
@@ -523,8 +657,8 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
             <span className="hidden text-[14px] font-medium sm:inline">RoboCraft</span>
           </Link>
           <span className="text-dim">/</span>
-          <span className="truncate text-[13px] font-medium">{simple && hw ? `Your ${FRIENDLY[hw.build.kind].name.toLowerCase()}` : model ? model.title : "Control lab"}</span>
-          {hw && (
+          <span className="truncate text-[13px] font-medium">{machine ? machine.title : simple && hw ? `Your ${FRIENDLY[hw.build.kind].name.toLowerCase()}` : model ? model.title : "Control lab"}</span>
+          {hw && !machine && (
             <span
               className={`mono-label hidden rounded-[2px] px-1.5 py-0.5 text-[10px] md:inline ${allChecks.some((c) => c.level === "error") ? "bg-bad/10 text-bad" : issues ? "bg-warn/10 text-warn" : "bg-ok/10 text-ok"}`}
             >
@@ -579,11 +713,11 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
             items={
               simple
                 ? [
-                    { id: "hardware", label: "Build", icon: Cpu },
+                    { id: "hardware", label: machine ? "Parts" : "Demos", icon: Cpu },
                     { id: "describe", label: "Describe", icon: Sparkles },
                   ]
                 : [
-                    { id: "hardware", label: "Hardware", icon: Cpu },
+                    { id: "hardware", label: machine ? "Parts" : "Demos", icon: Cpu },
                     { id: "control", label: "Control", icon: SlidersHorizontal },
                     { id: "describe", label: "Describe", icon: Sparkles },
                   ]
@@ -591,8 +725,33 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
             layoutId="left-tab"
           />
           <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
-            {(leftTab === "hardware" || (simple && leftTab === "control")) && (
+            {(leftTab === "hardware" || (simple && leftTab === "control")) && machine && (
               <>
+                {notice && <p className="border-b border-line bg-panel/60 px-4 py-2.5 text-[11.5px] leading-relaxed text-mute">{notice}</p>}
+                <MachinePanel
+                  assembly={machine}
+                  selected={selectedPart}
+                  onSelect={setSelectedPart}
+                  onChange={(next) => editAssembly(next)}
+                  canUndo={undoStack.length > 0}
+                  onUndo={undo}
+                  onUpdatePhysics={() => void rederivePhysics()}
+                  busy={!!busy}
+                  aiOn={!!aiOn}
+                  review={model?.review}
+                />
+              </>
+            )}
+            {(leftTab === "hardware" || (simple && leftTab === "control")) && !machine && (
+              <>
+                <SectionLabel>Demo robots · built-in</SectionLabel>
+                <p className="px-4 pt-2 text-[11.5px] leading-relaxed text-dim">
+                  Four ready-made robots with real parts and wiring, for demos. To engineer your own machine, use{" "}
+                  <button onClick={() => setLeftTab("describe")} className="text-fg underline-offset-2 hover:underline">
+                    Describe
+                  </button>
+                  .
+                </p>
                 <RigPicker
                   kind={build?.kind ?? null}
                   onPick={(k) => void loadRig(k)}
@@ -666,6 +825,8 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
                 pipeline={pipeline}
                 aiOn={aiOn}
                 spend={spend}
+                onVideo={trackVideo}
+                error={buildError}
               />
             )}
           </div>
@@ -688,11 +849,14 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
           </div>
 
           {!ready ? (
-            <div className="flex flex-1 items-center justify-center">
-              <motion.div animate={{ rotate: [0, 4, -4, 0] }} transition={{ duration: 0.6, repeat: Infinity }}>
-                <RoboMark className="size-16" />
-              </motion.div>
-            </div>
+            <EmptyStage
+              busy={!!busy}
+              step={pipeline >= 0 ? (PIPELINE[pipeline]?.label ?? null) : null}
+              error={buildError}
+              onRetry={text.trim() ? () => void buildFromText() : undefined}
+              onDescribe={() => setLeftTab("describe")}
+              onDemos={() => setLeftTab("hardware")}
+            />
           ) : (
             <>
               {(view === "hardware" || simple) && (
@@ -715,6 +879,12 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
                   selected={selected}
                   onSelect={setSelected}
                   onBuild={onBuild}
+                  selectedPart={selectedPart}
+                  onSelectPart={(id) => {
+                    setSelectedPart(id);
+                    if (id) setLeftTab("hardware");
+                  }}
+                  onTransformPart={transformPart}
                   dock={
                     simple ? (
                       <ReportCard items={reportItems} onImprove={() => void improve()} busy={busy === "tune"} />

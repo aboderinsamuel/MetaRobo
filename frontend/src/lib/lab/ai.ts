@@ -9,10 +9,66 @@ import { MetaError, TEXT_MODEL, metaEnabled, metaJson, type JsonResult } from "@
 import { tsEngine } from "@/lib/sim/engine";
 import { offlineAdvice } from "./advisor";
 import { checkSpecs, fmtNum, run } from "./analysis";
+import { ASSEMBLY_GUIDE, AssemblyOut, sanitizeAssembly, type Assembly } from "./assembly";
+import { REVIEW_SYSTEM, ReviewOut, reviewBrief, sanitizeReview, type Review } from "./review";
 import { matchPreset, presetById } from "./presets";
 import type { Advice, Analysis, CallUsage, ControllerSpec, LabModel, PlantSpec } from "./types";
 
 export const MODEL_ID = TEXT_MODEL;
+
+// Output limits cover the model's reasoning too, so complex machines need room. The first try uses
+// low reasoning effort; if it still runs out, the retry thinks less and gets more room.
+const ATTEMPTS = [
+  { maxTokens: 14000, effort: "low" as const },
+  { maxTokens: 18000, effort: "minimal" as const },
+];
+export const MAX_ATTEMPTS = ATTEMPTS.length;
+
+const ASSEMBLY_SYSTEM = `You are a mechanical design engineer inside RoboCraft Control Lab. A control engineer has already modelled the machine below.
+Now engineer the physical device itself, part by part, so it can be built in 3D, simulated and edited by an engineer.
+${ASSEMBLY_GUIDE}`;
+
+/** Muse Spark checks whether the idea can be built from buyable parts, and rethinks it if so. */
+export async function reviewIdea(description: string, attempt = 0): Promise<{ review: Review; usage: CallUsage }> {
+  const res = await metaJson({
+    schema: ReviewOut,
+    schemaName: "feasibility_review",
+    system: REVIEW_SYSTEM,
+    user: description,
+    ...ATTEMPTS[Math.min(attempt, ATTEMPTS.length - 1)],
+  });
+  return { review: sanitizeReview(res.data), usage: callUsage(res) };
+}
+
+/** How the 3D step should treat the review: build the practical variant, or render the idea as imagined. */
+function designBrief(review?: Review): string {
+  if (!review) return "";
+  if (review.verdict === "not_buildable") {
+    return `Feasibility review: NOT buildable with hobbyist hardware (${review.headline}). Render the concept exactly as the user imagined it, in full: ${review.concept}`;
+  }
+  return `Feasibility review: ${review.verdict.replace("_", " ")}. Design THIS practical build, using these real parts as the actual components (use library shapes such as servo, dc_motor, wheel, controller_board, motor_driver, battery, sensor, extrusion wherever the parts are those things):\n${reviewBrief(review)}`;
+}
+
+/** Muse Spark designs the machine's 3D assembly from the description, its physics model and the review. */
+export async function designAssembly(description: string, model: LabModel, attempt = 0, review?: Review): Promise<{ assembly: Assembly; usage: CallUsage }> {
+  const res = await metaJson({
+    schema: AssemblyOut,
+    schemaName: "machine_assembly",
+    system: ASSEMBLY_SYSTEM,
+    user: [
+      `Description: ${description}`,
+      designBrief(review),
+      `Machine: ${model.title}. ${model.summary}`,
+      `Simulated output (what the motion follows): ${model.output.name} in ${model.output.unit}; reference ${model.sim.ref} ${model.output.unit}.`,
+      `Actuator input: ${model.input.name} in ${model.input.unit}.`,
+      `Parameters: ${model.params.map((p) => `${p.name} ${p.value} ${p.unit}`).join("; ")}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    ...ATTEMPTS[Math.min(attempt, ATTEMPTS.length - 1)],
+  });
+  return { assembly: sanitizeAssembly(res.data), usage: callUsage(res) };
+}
 
 function callUsage(r: JsonResult<unknown>): CallUsage {
   return { model: r.model, cached: r.cached, tokens: r.usage.inputTokens + r.usage.outputTokens, costUsd: r.usage.costUsd };
@@ -85,6 +141,8 @@ const AdviceOut = z.object({
 const MODELER_SYSTEM = `You are a senior control-systems engineer inside RoboCraft Control Lab.
 The user describes a physical system in plain language (sometimes with identified step-response data).
 Build a linear model of it from first principles and propose a starting controller.
+Model the device itself in normal use, and title it as the device (e.g. "Smartphone haptic motor"), never as a test bench or rig around it.
+If a parts list of an engineered design is given, take masses, sizes and component specs from it.
 
 Rules:
 - Use SI units unless the user's units are clearer (state them in params).
@@ -153,14 +211,13 @@ export function offlineModel(description: string, presetId?: string): ModelResul
   };
 }
 
-export async function modelFromDescription(description: string, dataSummary?: string): Promise<ModelResult> {
+export async function modelFromDescription(description: string, dataSummary?: string, attempt = 0): Promise<ModelResult> {
   const res = await metaJson({
     schema: ModelOut,
     schemaName: "plant_model",
     system: MODELER_SYSTEM,
     user: dataSummary ? `${description}\n\nIdentified from uploaded step-response data:\n${dataSummary}` : description,
-    maxTokens: 6000,
-    effort: "medium",
+    ...ATTEMPTS[Math.min(attempt, ATTEMPTS.length - 1)],
   });
   const out = res.data;
 

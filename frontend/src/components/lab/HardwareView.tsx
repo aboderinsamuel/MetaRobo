@@ -19,6 +19,9 @@ import type { ProgramDef, ProgramRun } from "@/lib/lab/programs";
 import type { LabModel } from "@/lib/lab/types";
 import { Scene } from "./hw3d/parts3d";
 import type { PartStatus, SceneCtx } from "./hw3d/parts3d";
+import MachineRig, { gizmoActive, type GizmoMode } from "./hw3d/machine";
+import { VERDICT_UI } from "./ReviewCard";
+import { bomTotal } from "@/lib/lab/review";
 import { ArmRig, BalancerRig, DroneRig, RoverRig } from "./hw3d/rigs";
 import type { Motion } from "./hw3d/rigs";
 
@@ -81,7 +84,14 @@ export default function HardwareView({
   className,
   simple = false,
   title,
+  selectedPart = null,
+  onSelectPart,
+  onTransformPart,
 }: {
+  /** AI-designed machines: the selected part and edits made with the 3D gizmo. */
+  selectedPart?: string | null;
+  onSelectPart?: (id: string | null) => void;
+  onTransformPart?: (id: string, position: [number, number, number], rotation: [number, number, number]) => void;
   simple?: boolean;
   /** Friendly machine name shown in the corner (Simple mode). */
   title?: string;
@@ -180,22 +190,48 @@ export default function HardwareView({
     return { target: c.target, pos: c.pos.map((v, i) => c.target[i] + (v - c.target[i]) * k) as [number, number, number] };
   }, [hw, narrow, wide]);
   const isDrone = rig.kind === "drone";
+  // An AI-designed machine replaces the preset rig; it frames its own camera and has no slot checks.
+  const machine = model.assembly;
+  const machineRun = useMemo(() => ({ y: run.y, dt: run.dt }), [run]);
+  const [gizmo, setGizmo] = useState<GizmoMode>("translate");
+  const selectPart = useCallback((id: string | null) => onSelectPart?.(id), [onSelectPart]);
+  const transformPart = useCallback(
+    (id: string, p: [number, number, number], r: [number, number, number]) => onTransformPart?.(id, p, r),
+    [onTransformPart],
+  );
+  // CAD-style shortcuts: G moves, R rotates, Esc deselects.
+  useEffect(() => {
+    if (!machine) return;
+    const on = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (e.key === "g" || e.key === "G") setGizmo("translate");
+      else if (e.key === "r" || e.key === "R") setGizmo("rotate");
+      else if (e.key === "Escape") onSelectPart?.(null);
+    };
+    window.addEventListener("keydown", on);
+    return () => window.removeEventListener("keydown", on);
+  }, [machine, onSelectPart]);
   const errors = checks.filter((c) => c.level === "error").length;
   const warns = checks.filter((c) => c.level === "warn").length;
 
   return (
     <div data-tour="robot" className={`relative overflow-hidden bg-[#06080b] ${className ?? ""}`}>
       <Canvas
-        key={`${rig.kind}-${camKey}-${wide ? "w" : "n"}`}
+        key={`${machine ? `machine-${machine.title}` : rig.kind}-${camKey}-${wide ? "w" : "n"}`}
         shadows
         camera={{ position: cam.pos, fov: 38, near: 0.003, far: 60 }}
         dpr={[1, 1.75]}
         gl={{ antialias: true, powerPreference: "high-performance" }}
-        onPointerMissed={() => onSelect(null)}
+        onPointerMissed={() => {
+          if (gizmoActive()) return;
+          onSelect(null);
+          onSelectPart?.(null);
+        }}
       >
         <Scene.Provider value={ctx}>
           <color attach="background" args={["#06080b"]} />
-          <fog attach="fog" args={["#06080b", 2.5, isDrone ? 9 : 6]} />
+          {!machine && <fog attach="fog" args={["#06080b", 2.5, isDrone ? 9 : 6]} />}
           <hemisphereLight args={["#bcd3ff", "#0b0f14", 0.65]} />
           <directionalLight
             position={[1.2, 2, 1]}
@@ -215,10 +251,25 @@ export default function HardwareView({
             <shadowMaterial opacity={0.35} />
           </mesh>
           <Driver onFrame={advance} />
-          {rig.kind === "rover" && <Rover hw={hw} m={motionData} clock={clock} tel={tel} />}
-          {rig.kind === "arm" && <Arm hw={hw} m={motionData} clock={clock} tel={tel} />}
-          {rig.kind === "balancer" && <Balancer hw={hw} m={motionData} clock={clock} tel={tel} />}
-          {rig.kind === "drone" && <Drone hw={hw} m={motionData} clock={clock} tel={tel} />}
+          {machine ? (
+            <MachineRig
+              assembly={machine}
+              run={machineRun}
+              clock={clock}
+              labels={labels}
+              selected={selectedPart}
+              onSelect={selectPart}
+              gizmo={gizmo}
+              onTransform={transformPart}
+            />
+          ) : (
+            <>
+              {rig.kind === "rover" && <Rover hw={hw} m={motionData} clock={clock} tel={tel} />}
+              {rig.kind === "arm" && <Arm hw={hw} m={motionData} clock={clock} tel={tel} />}
+              {rig.kind === "balancer" && <Balancer hw={hw} m={motionData} clock={clock} tel={tel} />}
+              {rig.kind === "drone" && <Drone hw={hw} m={motionData} clock={clock} tel={tel} />}
+            </>
+          )}
           <OrbitControls makeDefault target={cam.target} enableDamping maxPolarAngle={Math.PI / 2.05} minDistance={0.08} maxDistance={6} />
         </Scene.Provider>
       </Canvas>
@@ -228,21 +279,57 @@ export default function HardwareView({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mono-label inline-flex items-center gap-2 border border-line-2 bg-void/80 px-2 py-1 text-[10px] backdrop-blur">
             <span className="size-1.5 rounded-full" style={{ background: "var(--spectrum-conic)" }} />
-            {title ?? RIGS[rig.kind].name}
+            {machine ? machine.title : (title ?? RIGS[rig.kind].name)}
           </span>
-          <span
+          {machine && (
+            <span className="meta-ring mono-label inline-flex items-center rounded-full bg-void/80 px-2 py-1 text-[10px] backdrop-blur">
+              <span className="text-spectrum font-semibold">Designed by Muse Spark</span>
+            </span>
+          )}
+          {machine && model.review && (
+            <span className={`mono-label inline-flex items-center gap-1.5 border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${VERDICT_UI[model.review.verdict].cls}`}>
+              {VERDICT_UI[model.review.verdict].label}
+              {model.review.bom.length > 0 && <span className="text-mute">· ≈ ${bomTotal(model.review).toFixed(0)}</span>}
+            </span>
+          )}
+          {!machine && <span
             className={`mono-label inline-flex items-center gap-1.5 border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${errors ? "border-bad/50 text-bad" : warns ? "border-warn/50 text-warn" : "border-ok/40 text-ok"}`}
           >
             {errors ? <XCircle className="size-3" /> : warns ? <AlertTriangle className="size-3" /> : <CheckCircle2 className="size-3" />}
             {errors ? (simple ? `${errors} thing${errors > 1 ? "s" : ""} to fix` : `${errors} blocking issue${errors > 1 ? "s" : ""}`) : warns ? `${warns} warning${warns > 1 ? "s" : ""}` : simple ? "ready to build" : "feasible"}
-          </span>
+          </span>}
         </div>
-        <p className="font-mono text-[10px] text-dim">{simple ? "Drag to look around · click a part to learn about it" : "Drag to orbit · scroll to zoom · click a part to inspect or swap it, then simulate"}</p>
+        <p className="font-mono text-[10px] text-dim">
+          {machine
+            ? `${machine.parts.length} parts · click a part to select and edit it · G move · R rotate · Simulate to test`
+            : simple
+              ? "Drag to look around · click a part to learn about it"
+              : "Drag to orbit · scroll to zoom · click a part to inspect or swap it, then simulate"}
+        </p>
       </div>
 
       {/* Top-right: live telemetry */}
       <div className="pointer-events-none absolute top-0 right-0 space-y-1.5 p-3 text-right">
         <div className="pointer-events-auto flex justify-end gap-1">
+          {machine && selectedPart && (
+            <div className="flex border border-spec-1/40 bg-void/80 backdrop-blur">
+              {(
+                [
+                  ["translate", "Move", "G"],
+                  ["rotate", "Rotate", "R"],
+                ] as const
+              ).map(([mode, label, key]) => (
+                <button
+                  key={mode}
+                  onClick={() => setGizmo(mode)}
+                  title={`${label} the selected part (${key})`}
+                  className={`mono-label px-2 py-1 text-[10px] ${gizmo === mode ? "bg-spec-1/15 text-spec-1" : "text-dim hover:text-fg"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             onClick={() => setLabels((v) => !v)}
             className={`mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${labels ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
@@ -321,6 +408,8 @@ function Hud({
 }) {
   const { t } = usePlayback(playback);
   const kind = model.rig?.kind ?? hw.build.kind;
+  // AI-designed machines have no preset electronics, so show only the signals that are real.
+  const custom = !!model.assembly;
   const idx = Math.min(run.y.length - 1, Math.max(0, Math.round(t / run.dt)));
   const value = run.y[idx] ?? 0;
   const tiltNow = mo.tilt ? mo.tilt[idx] : 0;
@@ -358,7 +447,12 @@ function Hud({
   return (
     <>
       <span className={`mono-label inline-block border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${statusCls}`}>{status}</span>
-      {simple ? (
+      {custom ? (
+        <div className="w-52 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
+          <Row k={model.output.name} v={`${fmtNum(value)} / ${fmtNum(run.r[idx] ?? model.sim.ref)} ${model.output.unit}`} />
+          <Row k={model.input.name} v={`${fmtNum(run.u[idx] ?? 0)} ${model.input.unit}`} />
+        </div>
+      ) : simple ? (
         <div className="w-44 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
           <Row k={model.output.name.replace(/ change$/, "")} v={friendly(value)} />
           <Row k="goal" v={friendly(run.r[idx] ?? model.sim.ref)} />
