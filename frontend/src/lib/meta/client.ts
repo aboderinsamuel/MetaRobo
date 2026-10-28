@@ -112,6 +112,11 @@ async function todaysSpend(): Promise<number> {
   return usd;
 }
 
+/** Today's estimated spend and the daily cap, for the lab's cost meter. */
+export async function spendToday(): Promise<{ usd: number; budgetUsd: number }> {
+  return { usd: await todaysSpend(), budgetUsd: dailyBudget() };
+}
+
 function dailyBudget(): number {
   const v = Number(process.env.META_DAILY_BUDGET_USD);
   return Number.isFinite(v) && v > 0 ? v : 1;

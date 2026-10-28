@@ -22,7 +22,7 @@ import { PROGRAMS, programRun } from "@/lib/lab/programs";
 import { presetById } from "@/lib/lab/presets";
 import { RIGS, rigFor } from "@/lib/lab/rig";
 import { tuneAsync } from "@/lib/lab/tuneClient";
-import type { Advice, ControllerSpec, Iteration, LabModel, RigKind } from "@/lib/lab/types";
+import type { Advice, CallUsage, ControllerSpec, Iteration, LabModel, RigKind } from "@/lib/lab/types";
 import { CHECK_COUNT, validateDesign } from "@/lib/lab/validate";
 import type { CheckResult } from "@/lib/lab/validate";
 import { useEngine } from "@/lib/sim/useEngine";
@@ -81,6 +81,11 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
   const [selected, setSelected] = useState<SlotId | null>(null);
   const [dockOpen, setDockOpen] = useState(true);
   const [aiOn, setAiOn] = useState<boolean | null>(null);
+  // Today's Meta spend against the daily cap; bumped locally after each live call.
+  const [spend, setSpend] = useState<{ usd: number; budgetUsd: number } | null>(null);
+  const addSpend = useCallback((u?: CallUsage) => {
+    if (u && !u.cached) setSpend((s) => (s ? { ...s, usd: s.usd + u.costUsd } : s));
+  }, []);
   const [validation, setValidation] = useState<{ results: CheckResult[]; running: boolean }>({ results: [], running: false });
   const [simKey, setSimKey] = useState(0);
   const [program, setProgram] = useState("mission");
@@ -115,7 +120,10 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
   useEffect(() => {
     fetch("/api/lab/status")
       .then((r) => r.json())
-      .then((s: { ai: boolean }) => setAiOn(s.ai))
+      .then((s: { ai: boolean; spentUsd?: number; budgetUsd?: number }) => {
+        setAiOn(s.ai);
+        if (s.budgetUsd) setSpend({ usd: s.spentUsd ?? 0, budgetUsd: s.budgetUsd });
+      })
       .catch(() => setAiOn(false));
   }, []);
 
@@ -183,7 +191,8 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
 
   // ---- Explanations --------------------------------------------------------------------------
   const explain = useCallback(
-    async (m: LabModel, c: ControllerSpec, question?: string, its: Iteration[] = iterations): Promise<Advice | null> => {
+    // `live: false` uses the free offline advisor; Muse Spark only runs when the user asks.
+    async (m: LabModel, c: ControllerSpec, question?: string, its: Iteration[] = iterations, live = true): Promise<Advice | null> => {
       const eff = applyScenario(m, scenario);
       const history = its.slice(-6).map((it) => ({
         label: `v${it.id} ${it.label}`,
@@ -194,10 +203,11 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
         const res = await fetch("/api/lab/explain", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ model: eff, controller: c, history, question }),
+          body: JSON.stringify({ model: eff, controller: c, history, question, offline: !live }),
         });
         const advice = (await res.json()) as Advice & { notice?: string; error?: string };
         if (!res.ok || advice.error) throw new Error(advice.error ?? `HTTP ${res.status}`);
+        addSpend(advice.usage);
         const previews = advice.proposals.map((p) => {
           const r = run(engine, eff, p.controller, { noiseStd: 0 });
           return { metrics: r.analysis.metrics, cost: designCost(engine, eff, p.controller) };
@@ -210,7 +220,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
         return null;
       }
     },
-    [engine, scenario, iterations],
+    [engine, scenario, iterations, addSpend],
   );
 
   // ---- Loading a design ----------------------------------------------------------------------
@@ -239,7 +249,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
       setSimKey((k) => k + 1);
       setMessages([{ kind: "event", text: `v1 · ${m.title}` }]);
       setPipeline(4);
-      await explain(m, m.controller, undefined, [first]);
+      await explain(m, m.controller, undefined, [first], false);
       setPipeline(5);
       await sleep(600);
       setPipeline(-1);
@@ -260,8 +270,9 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
       });
       await sleep(400);
       setPipeline(1);
-      const body = (await (await res).json()) as { model?: LabModel; notice?: string; error?: string };
+      const body = (await (await res).json()) as { model?: LabModel; notice?: string; error?: string; usage?: CallUsage };
       if (!body.model) throw new Error(body.error ?? "No model returned");
+      addSpend(body.usage);
       if (performance.now() - t0 < 900) await sleep(400);
       // The words pick the closest of the four rigs and size it; the parts give the physics.
       const kind = rigFor(body.model, text).kind;
@@ -275,7 +286,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     } finally {
       setBusy(null);
     }
-  }, [text, data, engine, adopt]);
+  }, [text, data, engine, adopt, addSpend]);
 
   const loadRig = useCallback(
     async (kind: RigKind, prompt?: string) => {
@@ -412,7 +423,8 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     let its = iterations;
     let triedTune = false;
     setMessages((prev) => [...prev, { kind: "event", text: "iterating until the specs are met" }]);
-    for (let round = 0; round < 5; round++) {
+    // At most 3 rounds: each one can be a live Muse Spark call.
+    for (let round = 0; round < 3; round++) {
       const advice = await explain(model, current, round === 0 ? undefined : "Continue: propose the next improvement.", its);
       const nowCost = designCost(engine, effModel, current);
       const nowChecks = checkSpecs(run(engine, effModel, current).analysis.metrics, effModel.specs, effModel.sim.ref);
@@ -498,7 +510,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
   const outputSeries = ready
     ? [
         ...(ghost ? [{ y: ghost.y, dt: ghost.dt, color: "#8b909c", label: `v${prevIteration?.id}`, width: 1.2, opacity: 0.45, dash: "3 3" }] : []),
-        { y: result!.sim.y, dt: result!.sim.dt, color: specOk ? "#4ade80" : "#3ff0ff", label: `v${iterations[iterations.length - 1]?.id ?? 1} ${model!.output.name.toLowerCase()}`, width: 1.8 },
+        { y: result!.sim.y, dt: result!.sim.dt, color: specOk ? "#4ade80" : "#2dd4ff", label: `v${iterations[iterations.length - 1]?.id ?? 1} ${model!.output.name.toLowerCase()}`, width: 1.8 },
       ]
     : [];
 
@@ -653,6 +665,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
                 busy={!!busy}
                 pipeline={pipeline}
                 aiOn={aiOn}
+                spend={spend}
               />
             )}
           </div>
@@ -734,7 +747,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
                                     ? outputSeries
                                     : [
                                         { y: prun!.r, dt: prun!.dt, color: "#8b909c", label: "setpoint", width: 1, dash: "4 3" },
-                                        { y: prun!.y, dt: prun!.dt, color: "#3ff0ff", label: model!.output.name.toLowerCase(), width: 1.6 },
+                                        { y: prun!.y, dt: prun!.dt, color: "#2dd4ff", label: model!.output.name.toLowerCase(), width: 1.6 },
                                       ]
                                 }
                               />
@@ -778,7 +791,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
                       playback={program === "mission" ? playback : undefined}
                       limit={Number.isFinite(effModel!.specs.uMax) && effModel!.specs.uMax < 1e8 ? effModel!.specs.uMax : undefined}
                       yLabel={`${effModel!.input.name} [${effModel!.input.unit}]`}
-                      series={[{ y: result!.sim.u, dt: result!.sim.dt, color: "#b06bff", label: "control u", width: 1.3 }]}
+                      series={[{ y: result!.sim.u, dt: result!.sim.dt, color: "#9b5cff", label: "control u", width: 1.3 }]}
                     />
                     <TimeChart
                       className="h-[150px]"
@@ -884,6 +897,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
               busy={busy}
               ready={!!model}
               specOk={specOk}
+              aiOn={!!aiOn}
               onAsk={(q) => void ask(q)}
               onApply={apply}
               onAuto={() => void autoIterate()}

@@ -6,29 +6,29 @@
   --font-pixel: var(--font-pixel);
 }
 
-/* Control Lab / landing palette: near-black, hairline grid, one spectrum accent. */
+/* Control Lab / landing palette: blue-black, hairline grid, one Meta-style blue-to-pink accent. */
 @theme {
-  --color-void: #040506;
-  --color-panel: #0a0b0e;
-  --color-panel-2: #101217;
+  --color-void: #04060c;
+  --color-panel: #090c15;
+  --color-panel-2: #0e1220;
   --color-line: rgb(255 255 255 / 0.08);
   --color-line-2: rgb(255 255 255 / 0.14);
   --color-fg: #eceef2;
   --color-mute: #8b909c;
   --color-dim: #50555f;
-  --color-spec-1: #3ff0ff;
-  --color-spec-2: #5a86ff;
-  --color-spec-3: #b06bff;
-  --color-spec-4: #ff5fa2;
-  --color-spec-5: #ff9a3d;
-  --color-spec-6: #ffe45c;
+  --color-spec-1: #2dd4ff;
+  --color-spec-2: #0082fb;
+  --color-spec-3: #9b5cff;
+  --color-spec-4: #d946ef;
+  --color-spec-5: #ff5ca8;
+  --color-spec-6: #ff8ac4;
   --color-ok: #4ade80;
   --color-warn: #fbbf24;
   --color-bad: #f87171;
 }
 
 @theme {
-  --color-ink-950: #070b12;
+  --color-ink-950: #04060c;
   --color-ink-900: #0c121c;
   --color-ink-850: #111926;
   --color-ink-800: #172131;
@@ -132,7 +132,7 @@ html {
 }
 
 ::selection {
-  background: rgb(176 107 255 / 0.4);
+  background: rgb(155 92 255 / 0.4);
 }
 
 .mono-label {
@@ -212,8 +212,8 @@ html {
 
 .glow-spectrum {
   box-shadow:
-    0 0 40px -10px rgb(63 240 255 / 0.35),
-    0 0 60px -20px rgb(176 107 255 / 0.35);
+    0 0 40px -10px rgb(45 212 255 / 0.35),
+    0 0 60px -20px rgb(155 92 255 / 0.35);
 }
 
 @keyframes rc-spin {
@@ -276,7 +276,46 @@ html {
   border: 1.5px solid var(--color-fg);
 }
 .lab-range:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px rgb(176 107 255 / 0.5);
+  box-shadow: 0 0 0 3px rgb(155 92 255 / 0.5);
+}
+
+/* Rotating gradient ring, used for "live" Meta badges. */
+@property --ring-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes rc-ring {
+  to {
+    --ring-angle: 360deg;
+  }
+}
+.meta-ring {
+  position: relative;
+  isolation: isolate;
+}
+.meta-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from var(--ring-angle), var(--color-spec-1), var(--color-spec-2), var(--color-spec-3), var(--color-spec-4), var(--color-spec-5), var(--color-spec-1));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: rc-ring 4s linear infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Soft blue-violet aurora behind Meta sections. */
+.meta-aurora {
+  background:
+    radial-gradient(ellipse 40% 50% at 30% 40%, rgb(0 130 251 / 0.14), transparent 70%),
+    radial-gradient(ellipse 35% 45% at 70% 60%, rgb(155 92 255 / 0.12), transparent 70%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -284,7 +323,8 @@ html {
     scroll-behavior: auto;
   }
   .flow-dash,
-  .caret::after {
+  .caret::after,
+  .meta-ring::before {
     animation: none;
   }
 }

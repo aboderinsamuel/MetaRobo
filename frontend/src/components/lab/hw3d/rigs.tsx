@@ -119,11 +119,11 @@ function Flag({ x, label, z = -0.12 }: { x: number; label: string; z?: number })
       </mesh>
       <mesh position={[0.018, 0.165, 0]}>
         <boxGeometry args={[0.036, 0.024, 0.002]} />
-        <meshBasicMaterial color="#3ff0ff" toneMapped={false} />
+        <meshBasicMaterial color="#2dd4ff" toneMapped={false} />
       </mesh>
       <mesh position={[0, 0.001, -z]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[0.004, Math.abs(z) * 3.5]} />
-        <meshBasicMaterial color="#3ff0ff" transparent opacity={0.45} toneMapped={false} />
+        <meshBasicMaterial color="#2dd4ff" transparent opacity={0.45} toneMapped={false} />
       </mesh>
       <Label text={label.toUpperCase()} position={[0, 0.205, 0]} size={0.018} />
     </group>
@@ -233,7 +233,7 @@ export function RoverRig(p: RigProps) {
     <>
       {!pose && <TrackMarks upto={Math.max(1.5, m.main[m.main.length - 1] ?? 1)} z={W / 2 + 0.07} />}
       {m.plan && <Line points={m.plan.map(([x, z]) => [x, 0.0015, z] as V3)} color="#5fe0c8" lineWidth={1.6} dashed dashSize={0.02} gapSize={0.012} transparent opacity={0.85} />}
-      {m.path && <Line points={m.path.map(([x, z]) => [x, 0.002, z] as V3)} color="#b06bff" lineWidth={1.2} transparent opacity={0.6} />}
+      {m.path && <Line points={m.path.map(([x, z]) => [x, 0.002, z] as V3)} color="#9b5cff" lineWidth={1.2} transparent opacity={0.6} />}
       {!pose && rampX < Infinity && slope > 0.001 && (
         <group position={[rampX, 0, 0]}>
           <mesh position={[0.6 * Math.cos(slope), 0.6 * Math.sin(slope) - 0.006, 0]} rotation={[0, 0, slope]} receiveShadow>
@@ -303,7 +303,7 @@ export function RoverRig(p: RigProps) {
         </group>
         <mesh ref={beam} position={[L / 2 + 0.14, deckY + 0.014, 0]} rotation={[0, 0, Math.PI / 2]}>
           <coneGeometry args={[0.06, 0.26, 32, 1, true]} />
-          <meshBasicMaterial color="#3ff0ff" transparent opacity={0.1} side={THREE.DoubleSide} depthWrite={false} />
+          <meshBasicMaterial color="#2dd4ff" transparent opacity={0.1} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
         {/* Payload */}
         {payloadS > 0 && (
@@ -315,9 +315,9 @@ export function RoverRig(p: RigProps) {
         <Wire points={wirePts([xs[0] + bd[0] / 2, top + 0.004, W * 0.12], [xs[2] - dd[0] / 2, top + 0.004, W * 0.1 + 0.01])} color="#ff4d5e" flow={curNow} />
         <Wire points={wirePts([xs[0] + bd[0] / 2, top + 0.003, W * 0.16], [xs[2] - dd[0] / 2, top + 0.003, W * 0.1 + 0.016], 0.01)} color="#2b2f36" />
         {[1, -1].map((side) => (
-          <Wire key={side} points={wirePts([xs[2], top + 0.004, W * 0.1 + (side * dd[2]) / 2], [axleX - md.len * 0.3, r + md.r, side * (W / 2 - md.len)], 0.02)} color="#b06bff" flow={curNow} width={1.4} />
+          <Wire key={side} points={wirePts([xs[2], top + 0.004, W * 0.1 + (side * dd[2]) / 2], [axleX - md.len * 0.3, r + md.r, side * (W / 2 - md.len)], 0.02)} color="#9b5cff" flow={curNow} width={1.4} />
         ))}
-        <Wire points={wirePts([xs[1] + cd[0] / 2, top + 0.005, -W * 0.12], [xs[2] - dd[0] / 2, top + 0.006, W * 0.1 - 0.01], 0.012)} color="#3ff0ff" width={1.2} />
+        <Wire points={wirePts([xs[1] + cd[0] / 2, top + 0.005, -W * 0.12], [xs[2] - dd[0] / 2, top + 0.006, W * 0.1 - 0.01], 0.012)} color="#2dd4ff" width={1.2} />
         <Dimension a={[-L / 2, deckY, -W / 2 - 0.02]} b={[L / 2, deckY, -W / 2 - 0.02]} text={`chassis ${Math.round(L * 1000)} mm`} offset={[0, 0, -0.02]} />
         <Label text={`⌀${Math.round(g.wheelD * 1000)} mm`} position={[axleX, r * 2 + 0.014, W / 2 + ww + 0.01]} size={0.011} color="#aab2bf" />
         </group>
@@ -337,7 +337,7 @@ function ArmLinks({ hw, ghost = false, glow, jaw }: { hw: DerivedHardware; ghost
   const g = hw.build.geom;
   const L1 = g.upper,
     L2 = g.fore;
-  const mat = (color: string) => (ghost ? <meshBasicMaterial color="#3ff0ff" transparent opacity={0.13} depthWrite={false} /> : <meshStandardMaterial color={color} roughness={0.45} metalness={0.25} />);
+  const mat = (color: string) => (ghost ? <meshBasicMaterial color="#2dd4ff" transparent opacity={0.13} depthWrite={false} /> : <meshStandardMaterial color={color} roughness={0.45} metalness={0.25} />);
   return (
     <group>
       <mesh position={[L1 / 2, 0, 0]} castShadow={!ghost}>
@@ -496,7 +496,7 @@ export function ArmRig(p: RigProps) {
               <cylinderGeometry args={[box * 0.7, box * 0.75, 0.004, 24]} />
               <meshStandardMaterial color="#1c2a3d" roughness={0.7} />
             </mesh>
-            <Label text={label} position={[0, h + box + 0.03, 0]} size={0.014} color={label === "PICK" ? "#aab2bf" : "#3ff0ff"} />
+            <Label text={label} position={[0, h + box + 0.03, 0]} size={0.014} color={label === "PICK" ? "#aab2bf" : "#2dd4ff"} />
           </group>
         );
       })}
@@ -530,7 +530,7 @@ export function ArmRig(p: RigProps) {
         </group>
       </PartSlot>
       <Wire points={curve([trayX - 0.06, 0.008, 0], [trayX + 0.01 - dd[0] / 2, 0.012, 0.035], 0.02)} color="#ff4d5e" flow={curNow} />
-      <Wire points={curve([trayX + 0.01 + dd[0] / 2, 0.012, 0.035], [0, H - 0.02, -0.02], 0.05)} color="#b06bff" flow={curNow} />
+      <Wire points={curve([trayX + 0.01 + dd[0] / 2, 0.012, 0.035], [0, H - 0.02, -0.02], 0.05)} color="#9b5cff" flow={curNow} />
       {/* Turret: everything above the turntable yaws together */}
       <group ref={turret}>
         <mesh position={[0, 0.019, 0]}>
@@ -633,7 +633,7 @@ export function BalancerRig(p: RigProps) {
       <group ref={base}>
         {[1, -1].map((s) => (
           <group key={s} position={[0, r, s * (bodyW / 2 + 0.004 + ww / 2)]}>
-            <Wheel r={r} w={ww} spin={s === 1 ? wl : wr} hub="#b06bff" />
+            <Wheel r={r} w={ww} spin={s === 1 ? wl : wr} hub="#9b5cff" />
           </group>
         ))}
         <group position={[0, r, 0]}>
@@ -785,7 +785,7 @@ export function DroneRig(p: RigProps) {
       {/* Landing pad */}
       <mesh position={[0, 0.0006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[arm * 1.5, arm * 1.55, 64]} />
-        <meshBasicMaterial color="#3ff0ff" transparent opacity={0.35} toneMapped={false} />
+        <meshBasicMaterial color="#2dd4ff" transparent opacity={0.35} toneMapped={false} />
       </mesh>
       {/* Altitude ruler */}
       {Array.from({ length: nTicks }).map((_, i) => (
@@ -806,7 +806,7 @@ export function DroneRig(p: RigProps) {
         <group key={v} position={[0, legH + v, 0]}>
           <mesh rotation={[Math.PI / 2, 0, 0]}>
             <torusGeometry args={[arm * 1.7, 0.003, 8, 96]} />
-            <meshBasicMaterial color="#3ff0ff" transparent opacity={0.7} toneMapped={false} />
+            <meshBasicMaterial color="#2dd4ff" transparent opacity={0.7} toneMapped={false} />
           </mesh>
           <Label text={`TARGET +${fmtNum(v)} M`} position={[arm * 2.3, 0, 0]} size={0.04} />
         </group>
@@ -816,15 +816,15 @@ export function DroneRig(p: RigProps) {
           <group key={k} position={[k * arm * 0.9, 0, arm * 0.4]}>
             <mesh position={[0, 0.04, 0]}>
               <cylinderGeometry args={[0.003, 0.003, 0.1, 6]} />
-              <meshBasicMaterial color="#ff9a3d" toneMapped={false} />
+              <meshBasicMaterial color="#ff5ca8" toneMapped={false} />
             </mesh>
             <mesh rotation={[Math.PI, 0, 0]} position={[0, -0.02, 0]}>
               <coneGeometry args={[0.012, 0.03, 12]} />
-              <meshBasicMaterial color="#ff9a3d" toneMapped={false} />
+              <meshBasicMaterial color="#ff5ca8" toneMapped={false} />
             </mesh>
           </group>
         ))}
-        <Label text={`DOWN-GUST ${Math.round(g.gust * 100)}% W`} position={[arm * 1.8, 0.05, 0]} size={0.035} color="#ff9a3d" box={false} />
+        <Label text={`DOWN-GUST ${Math.round(g.gust * 100)}% W`} position={[arm * 1.8, 0.05, 0]} size={0.035} color="#ff5ca8" box={false} />
       </group>
       <group ref={craft}>
         {/* Frame plates and arms */}
@@ -869,7 +869,7 @@ export function DroneRig(p: RigProps) {
                 </mesh>
                 <mesh position={[0, 0.019, 0]}>
                   <cylinderGeometry args={[statorR * 0.95, statorR, 0.006, 28]} />
-                  <meshStandardMaterial color={i < 2 ? "#3ff0ff" : "#ff5fa2"} metalness={0.5} roughness={0.3} />
+                  <meshStandardMaterial color={i < 2 ? "#2dd4ff" : "#d946ef"} metalness={0.5} roughness={0.3} />
                 </mesh>
               </group>
             </PartSlot>
@@ -883,12 +883,12 @@ export function DroneRig(p: RigProps) {
                 {[0, 1, ...(prop.inch <= 5 ? [2] : [])].map((b, _, all) => (
                   <mesh key={b} rotation={[0.12, (b * Math.PI * 2) / all.length, 0]} position={[0, 0, 0]}>
                     <boxGeometry args={[propR * 2 * (all.length === 3 ? 0.5 : 1), 0.0015, propR * 0.16]} />
-                    <meshStandardMaterial color={i < 2 ? "#3ff0ff" : "#ff5fa2"} emissive={i < 2 ? "#3ff0ff" : "#ff5fa2"} emissiveIntensity={0.25} transparent opacity={0.85} />
+                    <meshStandardMaterial color={i < 2 ? "#2dd4ff" : "#d946ef"} emissive={i < 2 ? "#2dd4ff" : "#d946ef"} emissiveIntensity={0.25} transparent opacity={0.85} />
                   </mesh>
                 ))}
                 <mesh rotation={[-Math.PI / 2, 0, 0]}>
                   <circleGeometry args={[propR, 48]} />
-                  <meshBasicMaterial color={i < 2 ? "#3ff0ff" : "#ff5fa2"} transparent opacity={0.06} depthWrite={false} side={THREE.DoubleSide} />
+                  <meshBasicMaterial color={i < 2 ? "#2dd4ff" : "#d946ef"} transparent opacity={0.06} depthWrite={false} side={THREE.DoubleSide} />
                 </mesh>
               </group>
             </PartSlot>
@@ -901,7 +901,7 @@ export function DroneRig(p: RigProps) {
             >
               <mesh position={[0, -0.03, 0]}>
                 <cylinderGeometry args={[0.002, 0.002, 0.06, 6]} />
-                <meshBasicMaterial color="#3ff0ff" transparent opacity={0.5} toneMapped={false} />
+                <meshBasicMaterial color="#2dd4ff" transparent opacity={0.5} toneMapped={false} />
               </mesh>
             </group>
           </group>
@@ -935,7 +935,7 @@ export function DroneRig(p: RigProps) {
         {hw.sensor.look !== "baro" && (
           <mesh ref={beam} position={[plate * 0.25, -0.1, 0]}>
             {sonar ? <cylinderGeometry args={[0.008, 0.12, 1, 24, 1, true]} /> : <cylinderGeometry args={[0.0012, 0.0012, 1, 6]} />}
-            <meshBasicMaterial color={sonar ? "#3ff0ff" : "#ff4d5e"} transparent opacity={sonar ? 0.07 : 0.7} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+            <meshBasicMaterial color={sonar ? "#2dd4ff" : "#ff4d5e"} transparent opacity={sonar ? 0.07 : 0.7} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
           </mesh>
         )}
         {g.payload > 0.01 && (

@@ -23,7 +23,7 @@ import { fmtNum, polyToString } from "@/lib/lab/analysis";
 import type { SpecCheck } from "@/lib/lab/analysis";
 import { PRESETS } from "@/lib/lab/presets";
 import { RIGS, pickRig } from "@/lib/lab/rig";
-import type { Advice, ControllerSpec, Iteration, LabModel } from "@/lib/lab/types";
+import type { Advice, CallUsage, ControllerSpec, Iteration, LabModel } from "@/lib/lab/types";
 import type { CheckResult } from "@/lib/lab/validate";
 import type { Metrics } from "@/lib/sim/core";
 import { TimeChart } from "./charts";
@@ -60,7 +60,41 @@ export function PrimaryButton({ className = "", ...props }: React.ButtonHTMLAttr
 // Describe
 // ---------------------------------------------------------------------------
 
-export const PIPELINE = ["Reading your description", "Deriving the physics", "Choosing a controller", "Simulating in the engine", "Explaining the response"];
+// Each step names who does it, so you can watch the work move between Meta's model and our engine.
+export const PIPELINE: { label: string; who: "meta" | "engine" }[] = [
+  { label: "Reading your description", who: "meta" },
+  { label: "Deriving the physics", who: "meta" },
+  { label: "Choosing a controller", who: "meta" },
+  { label: "Simulating in the engine", who: "engine" },
+  { label: "Explaining the response", who: "meta" },
+];
+
+/** Today's Meta spend against the daily cap. */
+function MetaMeter({ aiOn, spend }: { aiOn: boolean | null; spend: { usd: number; budgetUsd: number } | null }) {
+  if (aiOn === null) return <span className="mono-label text-dim">…</span>;
+  if (!aiOn) return <span className="mono-label text-warn">Offline modeler</span>;
+  const pct = spend ? Math.min(100, (spend.usd / spend.budgetUsd) * 100) : 0;
+  return (
+    <span className="mono-label flex items-center gap-2 text-[10px] text-mute" title="Estimated Meta API spend today, against the daily cap">
+      <span className="text-spectrum font-semibold">Muse Spark</span>
+      {spend && (
+        <>
+          <span className="relative h-1 w-10 overflow-hidden rounded-full bg-line-2">
+            <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.max(pct, 3)}%`, background: "var(--spectrum)" }} />
+          </span>
+          <span className="tabular-nums">
+            ${spend.usd.toFixed(3)} / ${spend.budgetUsd.toFixed(0)}
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+function usageNote(u: CallUsage | undefined): string {
+  if (!u) return "";
+  return u.cached ? " · cached, $0" : ` · ${u.tokens.toLocaleString()} tokens · $${u.costUsd.toFixed(3)}`;
+}
 
 export function DescribePanel({
   text,
@@ -72,6 +106,7 @@ export function DescribePanel({
   busy,
   pipeline,
   aiOn,
+  spend,
 }: {
   text: string;
   setText: (s: string) => void;
@@ -82,6 +117,7 @@ export function DescribePanel({
   busy: boolean;
   pipeline: number;
   aiOn: boolean | null;
+  spend: { usd: number; budgetUsd: number } | null;
 }) {
   const [interim, setInterim] = useState("");
   const baseRef = useRef("");
@@ -94,7 +130,7 @@ export function DescribePanel({
 
   return (
     <div>
-      <SectionLabel right={<span className={`mono-label ${aiOn ? "text-ok" : "text-warn"}`}>{aiOn === null ? "…" : aiOn ? "Muse Spark online" : "Offline modeler"}</span>}>
+      <SectionLabel right={<MetaMeter aiOn={aiOn} spend={spend} />}>
         01 · Describe the system
       </SectionLabel>
       <div
@@ -175,7 +211,7 @@ export function DescribePanel({
           {pipeline >= 0 && (
             <motion.ol initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mt-3 overflow-hidden">
               {PIPELINE.map((p, i) => (
-                <li key={p} className={`flex items-center gap-2.5 py-1 text-[13px] transition-colors ${i <= pipeline ? "text-fg" : "text-dim"}`}>
+                <li key={p.label} className={`flex items-center gap-2.5 py-1 text-[13px] transition-colors ${i <= pipeline ? "text-fg" : "text-dim"}`}>
                   <span className="flex size-4 items-center justify-center">
                     {i < pipeline ? (
                       <Check className="size-3.5 text-ok" />
@@ -185,7 +221,14 @@ export function DescribePanel({
                       <span className="size-1 rounded-full bg-dim" />
                     )}
                   </span>
-                  {p}
+                  <span className="flex-1">{p.label}</span>
+                  <span
+                    className={`mono-label rounded-full px-2 py-0.5 text-[9px] transition-opacity ${i === pipeline ? "meta-ring opacity-100" : "opacity-50"} ${
+                      p.who === "meta" && aiOn ? "text-spectrum" : "text-mute"
+                    }`}
+                  >
+                    {p.who === "engine" ? "PlantSim" : aiOn ? "Muse Spark" : "Library"}
+                  </span>
                 </li>
               ))}
             </motion.ol>
@@ -461,6 +504,7 @@ export function Copilot({
   onRestore,
   ready,
   specOk,
+  aiOn = false,
 }: {
   messages: ChatMsg[];
   iterations: Iteration[];
@@ -473,6 +517,8 @@ export function Copilot({
   onRestore: (it: Iteration) => void;
   ready: boolean;
   specOk: boolean;
+  /** Muse Spark is live, so Explain / questions / Iterate spend credit. */
+  aiOn?: boolean;
 }) {
   const [q, setQ] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -571,7 +617,9 @@ export function Copilot({
                       );
                     })}
                   </div>
-                  <p className="mono-label mt-2 text-[9px] text-dim">{m.advice.source === "meta" ? "Meta Muse Spark" : "Offline advisor"} · on v{m.forIteration}</p>
+                  <p className="mono-label mt-2 text-[9px] text-dim">{m.advice.source === "meta" ? "Meta Muse Spark" : "Offline advisor"} · on v{m.forIteration}
+                    {usageNote(m.advice.usage)}
+                  </p>
                 </div>
               )}
             </motion.div>
@@ -581,8 +629,13 @@ export function Copilot({
       </div>
       <div className="border-t border-line p-3">
         <div className="mb-2 grid grid-cols-3 gap-1.5">
-          <GhostButton onClick={() => onAsk()} disabled={!ready || !!busy} className="justify-center">
-            <Sparkles className="size-3" /> Explain
+          <GhostButton
+            onClick={() => onAsk()}
+            disabled={!ready || !!busy}
+            className={`justify-center ${aiOn ? "meta-ring" : ""}`}
+            title={aiOn ? "Ask Meta Muse Spark to explain this response (a live call, about 1¢)" : "Explain with the offline advisor"}
+          >
+            <Sparkles className="size-3" /> {aiOn ? <span className="text-spectrum font-semibold">Ask Muse</span> : "Explain"}
           </GhostButton>
           <GhostButton onClick={onTune} disabled={!ready || !!busy} className="justify-center">
             <Wand2 className="size-3" /> Auto-tune
@@ -622,7 +675,7 @@ export function Copilot({
 
 export function ValidatePanel({ results, running, total, onRun, refValue }: { results: CheckResult[]; running: boolean; total: number; onRun: () => void; refValue: number }) {
   const robust = results.find((r) => r.id === "robust");
-  const palette = ["#3ff0ff", "#b06bff", "#ff5fa2", "#ffe45c"];
+  const palette = ["#2dd4ff", "#9b5cff", "#d946ef", "#ff8ac4"];
   const passed = results.filter((r) => r.verdict === "pass").length;
   return (
     <div className="p-4">

@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtNum, run } from "@/lib/lab/analysis";
 import { presetById } from "@/lib/lab/presets";
 import { useEngine } from "@/lib/sim/useEngine";
-import { LaunchButton } from "./Chrome";
+import { LaunchButton, MetaBadge } from "./Chrome";
 import MiniChart from "./MiniChart";
 
 // Start downloading the 3D robot as soon as this module runs (during hydration), not after mount.
@@ -51,14 +51,14 @@ export default function Hero() {
       <div className="grid-lines pointer-events-none absolute inset-0" />
       <div
         className="pointer-events-none absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 50% 45% at 50% 42%, rgb(90 134 255 / 0.13), transparent 70%)" }}
+        style={{ background: "radial-gradient(ellipse 50% 45% at 50% 42%, rgb(0 130 251 / 0.13), transparent 70%)" }}
       />
       {/* Placeholder glow in the robot's spot until its first 3D frame is drawn. */}
       <div
         className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-700 ${robotReady ? "opacity-0" : "opacity-100"}`}
         aria-hidden
       >
-        <div className="-mt-[8vh] size-[min(46vw,420px)] animate-pulse rounded-[38%] border border-white/5 bg-[radial-gradient(circle_at_50%_45%,rgb(90_134_255/0.22),rgb(176_107_255/0.08)_45%,transparent_70%)]" />
+        <div className="-mt-[8vh] size-[min(46vw,420px)] animate-pulse rounded-[38%] border border-white/5 bg-[radial-gradient(circle_at_50%_45%,rgb(0_130_251/0.22),rgb(155_92_255/0.08)_45%,transparent_70%)]" />
       </div>
       <div className={`absolute inset-0 mx-auto max-w-[1440px] transition-[opacity,transform] duration-700 ease-out ${robotReady ? "scale-100 opacity-100" : "scale-[0.97] opacity-0"}`}>
         <HeroRobot scrollRef={scrollRef} onReady={() => setRobotReady(true)} />
@@ -88,9 +88,10 @@ export default function Hero() {
 
         <div className="grid items-end gap-8 lg:grid-cols-[1fr_auto]">
           <div>
-            <motion.p className="mono-label mb-4 text-mute" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-              ·· No experience needed
-            </motion.p>
+            <motion.div className="mb-5 flex flex-wrap items-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
+              <MetaBadge />
+              <span className="mono-label text-mute">·· No experience needed</span>
+            </motion.div>
             <h1 className="text-[clamp(2.4rem,5.6vw,5.2rem)] leading-[0.95] font-medium tracking-[-0.035em] [text-shadow:0_4px_40px_rgb(4_5_6_/_0.9)]">
               <motion.span className="block" initial={{ y: "110%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.9, ease, delay: 0.2 }}>
                 Build a robot.

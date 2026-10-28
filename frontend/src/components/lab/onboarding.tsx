@@ -230,7 +230,7 @@ export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => voi
           className="pointer-events-none absolute rounded-[6px] border-2 border-spec-1"
           animate={{ left: box.x, top: box.y, width: box.w, height: box.h }}
           transition={{ type: "spring", stiffness: 260, damping: 30 }}
-          style={{ boxShadow: "0 0 0 9999px rgb(4 5 6 / 0.72), 0 0 24px rgb(63 240 255 / 0.45)" }}
+          style={{ boxShadow: "0 0 0 9999px rgb(4 5 6 / 0.72), 0 0 24px rgb(45 212 255 / 0.45)" }}
         />
       ) : (
         <div className="absolute inset-0 bg-void/70" />

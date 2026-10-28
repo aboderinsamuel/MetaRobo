@@ -107,6 +107,17 @@ describe("meta client", () => {
     await expect(ask(m)).rejects.toMatchObject({ status: 401, message: "bad key" });
   });
 
+  it("the lab's automatic explanation never calls Meta, even when live", async () => {
+    vi.resetModules();
+    const { POST } = await import("@/app/api/lab/explain/route");
+    const model = (await import("@/data/live-trace.json")).default;
+    const req = (offline: boolean) =>
+      new Request("http://x/api/lab/explain", { method: "POST", body: JSON.stringify({ model, controller: model.controller, offline }) });
+    const auto = await (await POST(req(true))).json();
+    expect(auto.source).toBe("offline");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("treats a truncated answer as an error", async () => {
     fetchMock.mockImplementation(async () => new Response(JSON.stringify({ choices: [{ finish_reason: "length", message: { content: '{"ans' } }] }), { status: 200 }));
     const m = await load();

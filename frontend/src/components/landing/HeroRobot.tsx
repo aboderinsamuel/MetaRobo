@@ -8,7 +8,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
-const SPECTRUM = ["#3ff0ff", "#5a86ff", "#b06bff", "#ff5fa2", "#ff9a3d", "#ffe45c"].map((c) => new THREE.Color(c));
+const SPECTRUM = ["#2dd4ff", "#0082fb", "#9b5cff", "#d946ef", "#ff5ca8", "#ff8ac4"].map((c) => new THREE.Color(c));
 
 function spectrumAt(t: number): THREE.Color {
   const x = (((t % 1) + 1) % 1) * SPECTRUM.length;
@@ -174,7 +174,7 @@ function Robot({ scrollRef }: { scrollRef: React.RefObject<number> }) {
             </mesh>
             <mesh position={[0, side * 0.1, 0]}>
               <cylinderGeometry args={[0.2, 0.2, 0.06, 40]} />
-              <meshBasicMaterial color={side < 0 ? "#3ff0ff" : "#ff5fa2"} toneMapped={false} />
+              <meshBasicMaterial color={side < 0 ? "#2dd4ff" : "#d946ef"} toneMapped={false} />
             </mesh>
           </group>
         ))}
@@ -184,7 +184,7 @@ function Robot({ scrollRef }: { scrollRef: React.RefObject<number> }) {
         </mesh>
         <mesh position={[0.62, 1.46, -0.2]}>
           <sphereGeometry args={[0.07, 24, 24]} />
-          <meshBasicMaterial color="#ffe45c" toneMapped={false} />
+          <meshBasicMaterial color="#ff8ac4" toneMapped={false} />
         </mesh>
       </group>
       <mesh position={[0, -0.62, 0]}>
@@ -194,7 +194,7 @@ function Robot({ scrollRef }: { scrollRef: React.RefObject<number> }) {
       <RoundedBox args={[1.9, 1.35, 1.25]} radius={0.38} smoothness={6} position={[0, -1.45, -0.05]}>
         {metal}
       </RoundedBox>
-      {["#b06bff", "#3ff0ff", "#ff9a3d"].map((c, i) => (
+      {["#9b5cff", "#2dd4ff", "#ff5ca8"].map((c, i) => (
         <mesh key={c} position={[-0.18 + i * 0.18, -1.2, 0.58]}>
           <sphereGeometry args={[0.055, 20, 20]} />
           <meshBasicMaterial color={c} toneMapped={false} />
@@ -243,7 +243,7 @@ export default function HeroRobot({ scrollRef, onReady }: { scrollRef: React.Ref
         <Lightformer form="rect" intensity={2.5} color="#6aa8ff" position={[-5, 2, -2]} scale={[2, 8, 1]} rotation-y={Math.PI / 2} />
         <Lightformer form="rect" intensity={2.5} color="#d07bff" position={[5, 1, -2]} scale={[2, 8, 1]} rotation-y={-Math.PI / 2} />
         <Lightformer form="rect" intensity={1.2} color="#ffffff" position={[0, 6, 2]} scale={[8, 2, 1]} rotation-x={Math.PI / 2} />
-        <Lightformer form="ring" intensity={1.5} color="#ff9a3d" position={[0, -4, -4]} scale={3} />
+        <Lightformer form="ring" intensity={1.5} color="#ff5ca8" position={[0, -4, -4]} scale={3} />
       </Environment>
       <Robot scrollRef={scrollRef} />
     </Canvas>

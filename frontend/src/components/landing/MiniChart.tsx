@@ -47,10 +47,10 @@ export default function MiniChart({
     <svg viewBox={`0 0 ${w} ${height}`} className={className} preserveAspectRatio="none" aria-hidden>
       <defs>
         <linearGradient id={`s${id}`} x1="0" x2="1">
-          <stop offset="0" stopColor="#3ff0ff" />
-          <stop offset="0.4" stopColor="#b06bff" />
-          <stop offset="0.75" stopColor="#ff5fa2" />
-          <stop offset="1" stopColor="#ffe45c" />
+          <stop offset="0" stopColor="#2dd4ff" />
+          <stop offset="0.4" stopColor="#9b5cff" />
+          <stop offset="0.75" stopColor="#d946ef" />
+          <stop offset="1" stopColor="#ff8ac4" />
         </linearGradient>
       </defs>
       <line x1="0" x2={w} y1={refY} y2={refY} stroke="rgb(255 255 255 / 0.25)" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />

@@ -5,14 +5,18 @@
 // Everything it returns is checked numerically before the studio uses it, and every route
 // falls back to the offline library in presets.ts / advisor.ts when live calls are off.
 import { z } from "zod";
-import { MetaError, TEXT_MODEL, metaEnabled, metaJson } from "@/lib/meta/client";
+import { MetaError, TEXT_MODEL, metaEnabled, metaJson, type JsonResult } from "@/lib/meta/client";
 import { tsEngine } from "@/lib/sim/engine";
 import { offlineAdvice } from "./advisor";
 import { checkSpecs, fmtNum, run } from "./analysis";
 import { matchPreset, presetById } from "./presets";
-import type { Advice, Analysis, ControllerSpec, LabModel, PlantSpec } from "./types";
+import type { Advice, Analysis, CallUsage, ControllerSpec, LabModel, PlantSpec } from "./types";
 
 export const MODEL_ID = TEXT_MODEL;
+
+function callUsage(r: JsonResult<unknown>): CallUsage {
+  return { model: r.model, cached: r.cached, tokens: r.usage.inputTokens + r.usage.outputTokens, costUsd: r.usage.costUsd };
+}
 
 export function aiEnabled(): boolean {
   return metaEnabled();
@@ -132,6 +136,7 @@ export function toController(c: z.infer<typeof ControllerOut>, nStates: number):
 export interface ModelResult {
   model: LabModel;
   notice?: string;
+  usage?: CallUsage;
 }
 
 export function offlineModel(description: string, presetId?: string): ModelResult {
@@ -149,7 +154,7 @@ export function offlineModel(description: string, presetId?: string): ModelResul
 }
 
 export async function modelFromDescription(description: string, dataSummary?: string): Promise<ModelResult> {
-  const { data: out } = await metaJson({
+  const res = await metaJson({
     schema: ModelOut,
     schemaName: "plant_model",
     system: MODELER_SYSTEM,
@@ -157,6 +162,7 @@ export async function modelFromDescription(description: string, dataSummary?: st
     maxTokens: 6000,
     effort: "medium",
   });
+  const out = res.data;
 
   const plant = toPlant(out.plant);
   const nStates = plant.kind === "ss" ? plant.B.length : plant.den.length - 1;
@@ -191,7 +197,7 @@ export async function modelFromDescription(description: string, dataSummary?: st
   // Smoke-run it: a model the engine can't simulate is worse than the offline library.
   const { analysis } = run(tsEngine, model, model.controller);
   if (!analysis.poles.length) throw new Error("model has no dynamics");
-  return { model };
+  return { model, usage: callUsage(res) };
 }
 
 function analysisDigest(model: LabModel, controller: ControllerSpec, a: Analysis): string {
@@ -228,7 +234,7 @@ export async function explain(
     specs: model.specs,
     sim: model.sim,
   };
-  const { data: out } = await metaJson({
+  const res = await metaJson({
     schema: AdviceOut,
     schemaName: "controller_advice",
     system: EXPLAINER_SYSTEM,
@@ -243,6 +249,7 @@ export async function explain(
     maxTokens: 4000,
     effort: "low",
   });
+  const out = res.data;
   return {
     headline: out.headline,
     explanation: out.explanation,
@@ -250,6 +257,7 @@ export async function explain(
     proposals: out.proposals.slice(0, 3).map((p) => ({ label: p.label, rationale: p.rationale, controller: toController(p.controller, nStates) })),
     meetsSpecs: out.meetsSpecs,
     source: "meta",
+    usage: callUsage(res),
   };
 }
 

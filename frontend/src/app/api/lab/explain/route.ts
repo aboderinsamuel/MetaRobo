@@ -1,5 +1,7 @@
-// POST { model, controller, history?, question? } -> Advice
+// POST { model, controller, history?, question?, offline? } -> Advice
 // The server re-runs the simulation itself, so the explanation is always grounded in real numbers.
+// `offline: true` (used for the automatic explanation when a design loads) never spends Meta credit;
+// Muse Spark is only called when the user asks.
 import { aiEnabled, describeError, explain, offlineExplain } from "@/lib/lab/ai";
 import { autoTune } from "@/lib/lab/advisor";
 import { run } from "@/lib/lab/analysis";
@@ -14,6 +16,7 @@ export async function POST(req: Request) {
     controller?: ControllerSpec;
     history?: { label: string; controller: ControllerSpec; summary: string }[];
     question?: string;
+    offline?: boolean;
   } | null;
   if (!body?.model || !body.controller) return Response.json({ error: "model and controller are required" }, { status: 400 });
   const { model, controller } = body;
@@ -23,7 +26,7 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "Could not simulate that model." }, { status: 400 });
   }
-  if (aiEnabled()) {
+  if (aiEnabled() && !body.offline) {
     try {
       return Response.json(await explain(model, controller, analysis, (body.history ?? []).slice(-6), body.question?.slice(0, 2000)));
     } catch (err) {
