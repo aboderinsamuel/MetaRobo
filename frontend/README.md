@@ -11,7 +11,8 @@ npm run typecheck
 npm run build
 ```
 
-`BACKEND_URL` sets where `/api/*` is proxied to. It is read at build time.
+Outside Vercel, `BACKEND_URL` sets where `/api/*` (except the lab's own `/api/lab/*`) is proxied to;
+it is read at build time. On Vercel the root `vercel.json` routes `/api/*` to the backend service instead.
 
 Code map:
 

@@ -130,45 +130,37 @@ The web app proxies `/api/*` to the backend (`BACKEND_URL`, default
 `postgresql+psycopg://user:pass@host/db`) to use PostgreSQL instead of the default
 `sqlite:///./robocraft.db`.
 
-### Option C: host it on Vercel (to share with a team)
+### Option C: host it on Vercel (one project, two services)
 
-The app runs as **two Vercel projects from this one repository**: the API (FastAPI,
-`robocraft/backend`) and the web app (Next.js, `robocraft/frontend`). The API also needs a
-**Postgres database** so saved projects persist; the free Neon plan from Vercel's
-marketplace is enough.
+`vercel.json` at the repository root deploys both halves as **one Vercel project** with two
+[services](https://vercel.com/docs/services) on one domain:
 
-1. **Put the code on the production branch.** Vercel builds production from the repo's
-   default branch (`main`). Merge this branch into it, or change the production branch
-   under *Settings → Git*.
-2. **Deploy the API.**
-   - On vercel.com, choose *Add New → Project*, import this GitHub repository, and set
-     **Root Directory** to `robocraft/backend`.
-   - The framework preset should detect **FastAPI** (pick it if it doesn't), then deploy.
-   - Open the project's **Storage** tab, choose *Create Database → Neon (Postgres)*, and
-     connect it to the project. This sets `DATABASE_URL`.
-   - Redeploy (*Deployments → ⋯ → Redeploy*).
-   - Check `https://<api-project>.vercel.app/api/health`. It should return `{"status":"ok"}`.
-3. **Deploy the web app.**
-   - Import the **same repository again** as a second project, with **Root Directory** set
-     to `robocraft/frontend`.
-   - Under *Environment Variables*, add `BACKEND_URL` set to the API's production URL from
-     step 2, for example `https://robocraft-api.vercel.app`. The build stops with an
-     explanation if this is missing.
-   - Deploy.
-4. **Share the web app's production URL** (`https://<web-project>.vercel.app`) with your
-   teammates. They don't need Vercel accounts.
+| Path | Service | What it is |
+| --- | --- | --- |
+| `/api/lab/*` | `frontend` | The Control Lab's own routes (Claude modelling and explanations) |
+| `/api/*` | `backend` | FastAPI engines for the studio (`backend/`) |
+| everything else | `frontend` | Next.js web app (`frontend/`) |
+
+The browser calls `/api/...` on the same origin, so neither service calls the other server-side and
+no `BACKEND_URL` is needed on Vercel.
+
+1. On vercel.com choose *Add New → Project*, import this repository and leave the **Root
+   Directory** at the repository root. Vercel reads `vercel.json` and builds both services.
+2. Optional: under *Storage*, create a **Neon (Postgres)** database and connect it, which sets
+   `DATABASE_URL` so saved projects persist. Without it the API uses a throw-away SQLite file in
+   `/tmp`.
+3. Optional: add `ANTHROPIC_API_KEY` to turn on Claude in the Control Lab. Without it the lab uses
+   its offline modeller and advisor.
+4. Deploy, then check `https://<project>.vercel.app/api/health` (`{"status":"ok"}`) and
+   `https://<project>.vercel.app/api/lab/status`.
+
+To run both services together locally the way Vercel routes them, use `vercel dev` from the
+repository root.
 
 Notes:
 
-- **Who can open which URLs.** Vercel protects *preview* deployments (every non-production
-  branch and commit URL) so that only members of your Vercel team can open them.
-  Production URLs are public. Point `BACKEND_URL` at the API's production domain, not a
-  preview URL.
-- **Without a database** the API still works. It falls back to a throw-away SQLite file in
-  `/tmp`, so every engine runs, but saved projects disappear whenever an instance restarts.
-- **Faster builds (optional).** Under *Settings → Git* in each project, enable skipping
-  deployments when nothing changed in that project's root directory. Each half then only
-  rebuilds when its own folder changes.
+- **Who can open which URLs.** Vercel protects *preview* deployments so that only members of
+  your Vercel team can open them. Production URLs are public.
 - **Upload size.** The API bundle is about 130 MB (mostly NumPy), within Vercel's 225 MB
   function limit.
 
