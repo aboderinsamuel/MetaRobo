@@ -713,6 +713,10 @@ export const ARM_START = (25 * Math.PI) / 180; // pick pose: upper arm 25° abov
 export const ARM_GRIP = 0.03; // gripper length beyond the forearm
 export const ARM_ELBOW = (-80 * Math.PI) / 180; // forearm angle relative to the upper arm
 
+/** Rover wheel width (m) for a wheel diameter, and the track between the wheel centres. */
+export const roverWheelWidth = (wheelD: number) => Math.min(0.04, Math.max(0.012, (wheelD / 2) * 0.55));
+export const roverTrack = (g: Record<string, number>) => g.chassisW + 0.008 + roverWheelWidth(g.wheelD);
+
 /** Edge length of the payload cube (m) for a mass, packed at about 2.5 g/cm³ (a box of bolts). */
 export const payloadSize = (kg: number) => Math.max(0.018, Math.cbrt(Math.max(kg, 1e-4) / 2500));
 

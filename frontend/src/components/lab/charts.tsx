@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { fmtNum } from "@/lib/lab/analysis";
+import type { Playback } from "@/lib/lab/playback";
 import type { Complex } from "@/lib/sim/core";
 
 export function useSize<T extends HTMLElement>() {
@@ -49,7 +50,7 @@ export function TimeChart({
   yLabel,
   className,
   animateKey,
-  cursor,
+  playback,
 }: {
   series: Series[];
   refValue?: number;
@@ -58,8 +59,8 @@ export function TimeChart({
   yLabel?: string;
   className?: string;
   animateKey?: string | number;
-  /** Playback time from the 3D hardware view, drawn as a moving marker. */
-  cursor?: number;
+  /** Playback clock of the 3D view: its time is drawn as a moving marker, updated outside React. */
+  playback?: Playback;
 }) {
   const [box, { w, h }] = useSize<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
@@ -99,6 +100,34 @@ export function TimeChart({
   const xt = niceTicks(0, tEnd, Math.max(3, Math.floor(iw / 90)));
   const yt = niceTicks(lo, hi, Math.max(3, Math.floor(ih / 45)));
   const hoverT = hover !== null ? hover * tEnd : null;
+
+  // The playback cursor moves every frame, so it is written straight to the DOM; the effect
+  // re-subscribes after each render with the current scales.
+  const cursorRef = useRef<SVGGElement>(null);
+  useEffect(() => {
+    if (!playback) return;
+    const draw = () => {
+      const g = cursorRef.current;
+      if (!g) return;
+      const t = playback.t;
+      const show = t > 0 && t <= tEnd * 1.0001;
+      g.style.display = show ? "" : "none";
+      if (!show) return;
+      const x = X(Math.min(t, tEnd)).toFixed(1);
+      const line = g.querySelector("line");
+      line?.setAttribute("x1", x);
+      line?.setAttribute("x2", x);
+      const solid = series.filter((s) => !s.dash);
+      g.querySelectorAll("circle").forEach((c, k) => {
+        const s = solid[k];
+        if (!s) return;
+        c.setAttribute("cx", x);
+        c.setAttribute("cy", Y(s.y[Math.min(s.y.length - 1, Math.round(t / s.dt))]).toFixed(1));
+      });
+    };
+    draw();
+    return playback.subscribe(draw);
+  });
 
   return (
     <div
@@ -163,13 +192,13 @@ export function TimeChart({
             />
           ))}
         </g>
-        {cursor !== undefined && cursor > 0 && cursor <= tEnd && (
-          <g>
-            <line x1={X(cursor)} x2={X(cursor)} y1={PAD.t} y2={PAD.t + ih} stroke="rgb(63 240 255 / 0.45)" />
+        {playback && (
+          <g ref={cursorRef} style={{ display: "none" }}>
+            <line y1={PAD.t} y2={PAD.t + ih} stroke="rgb(63 240 255 / 0.5)" />
             {series
               .filter((s) => !s.dash)
               .map((s) => (
-                <circle key={s.label} cx={X(cursor)} cy={Y(s.y[Math.min(s.y.length - 1, Math.round(cursor / s.dt))])} r={3} fill={s.color} stroke="#040506" strokeWidth={1.5} />
+                <circle key={s.label} r={3} fill={s.color} stroke="#040506" strokeWidth={1.5} />
               ))}
           </g>
         )}

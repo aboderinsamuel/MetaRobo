@@ -17,6 +17,8 @@ import type { StepData } from "@/lib/lab/data";
 import { applyHints, defaultBuild, deriveHardware, liveChecks, sortChecks, telemetry } from "@/lib/lab/hardware/build";
 import type { HardwareBuild } from "@/lib/lab/hardware/build";
 import type { SlotId } from "@/lib/lab/hardware/parts";
+import { createPlayback } from "@/lib/lab/playback";
+import { PROGRAMS, programRun } from "@/lib/lab/programs";
 import { presetById } from "@/lib/lab/presets";
 import { RIGS, rigFor } from "@/lib/lab/rig";
 import { tuneAsync } from "@/lib/lab/tuneClient";
@@ -79,7 +81,8 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
   const [aiOn, setAiOn] = useState<boolean | null>(null);
   const [validation, setValidation] = useState<{ results: CheckResult[]; running: boolean }>({ results: [], running: false });
   const [simKey, setSimKey] = useState(0);
-  const [playT, setPlayT] = useState(0);
+  const [program, setProgram] = useState("mission");
+  const [playback] = useState(createPlayback);
   const iterSeq = useRef(0);
 
   useEffect(() => {
@@ -108,6 +111,19 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
     return Float64Array.from(engine.simulate(plant, result.ctrl, simConfig(effModel)).y);
   }, [engine, effModel, result]);
   const tel = useMemo(() => (hw && result ? telemetry(hw, result.sim.y, result.sim.u, result.sim.dt) : null), [hw, result]);
+  // What the 3D view plays: the exact mission run, or a program superposed from the same loop.
+  const prun = useMemo(
+    () => (effModel && ctrl && result ? programRun(engine, program, dataModel ? null : build, effModel, ctrl, result, tilt) : null),
+    [engine, program, dataModel, build, effModel, ctrl, result, tilt],
+  );
+  const ptel = useMemo(() => {
+    if (!hw || !prun) return null;
+    if (!prun.vL || !prun.vR || !prun.uL || !prun.uR) return telemetry(hw, prun.y, prun.u, prun.dt);
+    // Rover programs: each wheel has its own current; show the busier one.
+    const a = telemetry(hw, prun.vL, prun.uL, prun.dt),
+      b = telemetry(hw, prun.vR, prun.uR, prun.dt);
+    return { ...a, perMotor: a.perMotor.map((v, i) => Math.max(v, b.perMotor[i])), current: a.current.map((v, i) => v + b.current[i] - 0.15) };
+  }, [hw, prun]);
   const allChecks = useMemo(() => {
     if (!hw || !result || !tel) return hw?.checks ?? [];
     return sortChecks([...hw.checks, ...liveChecks(hw, tel, result.sim.u, result.analysis.wcp, result.analysis.metrics.stable === 1)]);
@@ -175,6 +191,7 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
       setCtrl(m.controller);
       setNotice(note);
       setSelected(null);
+      setProgram("mission");
       setIterations([]);
       setValidation({ results: [], running: false });
       setView((v) => (v === "wiring" || v === "code" || v === "validate" ? "hardware" : v));
@@ -428,7 +445,7 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
     { id: "validate", label: "Validate", icon: ShieldCheck },
     { id: "code", label: "Firmware", icon: Code2 },
   ];
-  const ready = !!(model && ctrl && result && effModel && hw && tel);
+  const ready = !!(model && ctrl && result && effModel && hw && tel && prun && ptel);
   const issues = allChecks.filter((c) => c.level === "error" || c.level === "warn").length;
 
   const outputSeries = ready
@@ -579,17 +596,19 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
                   className="min-h-[520px] flex-1"
                   hw={hw!}
                   model={effModel!}
-                  sim={result!.sim}
-                  tilt={tilt}
-                  tel={tel!}
+                  run={prun!}
+                  tel={ptel!}
                   checks={allChecks}
                   stable={m!.stable === 1}
                   settlingTime={m!.settlingTime}
                   resetKey={simKey}
+                  playback={playback}
+                  programs={dataModel ? PROGRAMS[hw!.build.kind].slice(0, 1) : PROGRAMS[hw!.build.kind]}
+                  program={program}
+                  onProgram={setProgram}
                   selected={selected}
                   onSelect={setSelected}
                   onBuild={onBuild}
-                  onTime={setPlayT}
                   dock={
                     <div className="border-t border-line bg-void/80 backdrop-blur">
                       <button onClick={() => setDockOpen((v) => !v)} className="mono-label flex w-full items-center justify-between px-3 py-1 text-[9.5px] text-dim hover:text-mute">
@@ -609,20 +628,27 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
                             <div className="grid grid-cols-1 gap-px px-1 pb-1 sm:grid-cols-2">
                               <TimeChart
                                 className="h-[104px]"
-                                animateKey={simKey}
-                                cursor={playT}
-                                refValue={effModel!.sim.ref}
-                                band={0.02}
+                                animateKey={`${simKey}-${program}`}
+                                playback={playback}
+                                refValue={program === "mission" ? effModel!.sim.ref : undefined}
+                                band={program === "mission" ? 0.02 : undefined}
                                 yLabel={`${model!.output.name} [${model!.output.unit}]`}
-                                series={outputSeries}
+                                series={
+                                  program === "mission"
+                                    ? outputSeries
+                                    : [
+                                        { y: prun!.r, dt: prun!.dt, color: "#8b909c", label: "setpoint", width: 1, dash: "4 3" },
+                                        { y: prun!.y, dt: prun!.dt, color: "#3ff0ff", label: model!.output.name.toLowerCase(), width: 1.6 },
+                                      ]
+                                }
                               />
                               <TimeChart
                                 className="hidden h-[104px] sm:block"
-                                animateKey={simKey}
-                                cursor={playT}
-                                limit={tel!.limitA}
-                                yLabel={`${tel!.label} [A]`}
-                                series={[{ y: tel!.perMotor, dt: result!.sim.dt, color: "#ffb020", label: "current", width: 1.3 }]}
+                                animateKey={`${simKey}-${program}`}
+                                playback={playback}
+                                limit={ptel!.limitA}
+                                yLabel={`${ptel!.label} [A]`}
+                                series={[{ y: ptel!.perMotor, dt: prun!.dt, color: "#ffb020", label: "current", width: 1.3 }]}
                               />
                             </div>
                           </motion.div>
@@ -639,7 +665,7 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
                     <TimeChart
                       className="h-[260px]"
                       animateKey={simKey}
-                      cursor={playT}
+                      playback={program === "mission" ? playback : undefined}
                       refValue={effModel!.sim.ref}
                       band={0.02}
                       limit={effModel!.sim.ref * (1 + effModel!.specs.maxOvershootPct / 100)}
@@ -652,7 +678,7 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
                     <TimeChart
                       className="h-[150px]"
                       animateKey={simKey}
-                      cursor={playT}
+                      playback={program === "mission" ? playback : undefined}
                       limit={Number.isFinite(effModel!.specs.uMax) && effModel!.specs.uMax < 1e8 ? effModel!.specs.uMax : undefined}
                       yLabel={`${effModel!.input.name} [${effModel!.input.unit}]`}
                       series={[{ y: result!.sim.u, dt: result!.sim.dt, color: "#b06bff", label: "control u", width: 1.3 }]}
@@ -660,7 +686,7 @@ export default function Lab({ initialPreset }: { initialPreset?: string }) {
                     <TimeChart
                       className="h-[150px]"
                       animateKey={simKey}
-                      cursor={playT}
+                      playback={program === "mission" ? playback : undefined}
                       limit={tel!.limitA}
                       yLabel={`${tel!.label} [A]`}
                       series={[{ y: tel!.perMotor, dt: result!.sim.dt, color: "#ffb020", label: "current", width: 1.3 }]}
