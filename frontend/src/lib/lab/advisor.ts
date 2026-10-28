@@ -1,6 +1,6 @@
 // Offline control engineer: explains a response from its poles and margins, proposes fixes,
 // and auto-tunes gains against the specs with the simulation engine in the loop.
-// Claude's explanations (api/lab/explain) use the same numbers; this runs when there is no key.
+// Muse Spark's explanations (api/lab/explain) use the same numbers; this runs when there is no key.
 import { nelderMead } from "@/lib/sim/core";
 import type { Complex } from "@/lib/sim/core";
 import type { Engine } from "@/lib/sim/engine";

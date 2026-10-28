@@ -12,6 +12,6 @@ export async function POST(req: Request) {
     return Response.json(await modelFromDescription(description, body.dataSummary?.slice(0, 4000)));
   } catch (err) {
     const fallback = offlineModel(description);
-    return Response.json({ ...fallback, notice: `Claude modeling failed (${describeError(err)}). Loaded the closest model from the offline physics library instead.` });
+    return Response.json({ ...fallback, notice: `Muse Spark modeling failed (${describeError(err)}). Loaded the closest model from the offline physics library instead.` });
   }
 }
