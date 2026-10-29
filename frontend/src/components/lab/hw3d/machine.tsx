@@ -57,6 +57,8 @@ interface TreeCtx {
   /** Motion groups (moved by the simulation) and transform groups (moved by the gizmo), by part id. */
   motion: Refs;
   nodes: Refs;
+  /** Each part's own meshes, without what's mounted on it (for a tight selection box). */
+  bodies: Refs;
   /** Stroke of each arm kit, set every frame from the simulation. */
   strokes: Map<string, number>;
   /** What each part is doing right now in the behaviour simulation (lit, running, wet, text). */
@@ -102,6 +104,10 @@ function PartNode({ part, ctx, depth, anchored = false }: { part: PartSpec; ctx:
         }}
       >
         <group
+          ref={(g) => {
+            if (g) ctx.bodies.set(part.id, g);
+            else ctx.bodies.delete(part.id);
+          }}
           onClick={(e) => {
             e.stopPropagation();
             ctx.onSelect(part.id);
@@ -132,7 +138,7 @@ function PartNode({ part, ctx, depth, anchored = false }: { part: PartSpec; ctx:
   );
 }
 
-/** A cyan box around the selected part (and everything attached to it), tracking it as it moves. */
+/** A cyan box tight around the selected part's own body, tracking it as it moves. */
 function SelectionBox({ target }: { target: THREE.Object3D | undefined }) {
   const ref = useRef<THREE.Box3Helper>(null);
   const box = useMemo(() => new THREE.Box3(), []);
@@ -241,6 +247,7 @@ export default function MachineRig({
 }) {
   const kids = useMemo(() => childrenOf(assembly), [assembly]);
   const motion = useMemo<Refs>(() => new Map(), []);
+  const bodies = useMemo<Refs>(() => new Map(), []);
   const nodes = useMemo<Refs>(() => new Map(), []);
   const strokes = useMemo(() => new Map<string, number>(), []);
   const root = useRef<THREE.Group>(null);
@@ -263,7 +270,7 @@ export default function MachineRig({
     [sim, clock],
   );
   useBuzzerAudio(assembly, sim?.behaviour ?? null, clock, sound);
-  const ctx: TreeCtx = { kids, motion, nodes, strokes, labels, selected, onSelect, live };
+  const ctx: TreeCtx = { kids, motion, nodes, bodies, strokes, labels, selected, onSelect, live };
   const [target, setTarget] = useState<THREE.Group | undefined>(undefined);
   // The selected part's group only exists after commit, so it can't be read during render.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -288,7 +295,7 @@ export default function MachineRig({
         ))}
       </group>
       <Wires assembly={assembly} nodes={nodes} behaviour={sim?.behaviour ?? null} clock={clock} />
-      <SelectionBox target={target} />
+      <SelectionBox target={selected && target ? bodies.get(selected) : undefined} />
       {target && selected && (
         <TransformControls
           object={target}

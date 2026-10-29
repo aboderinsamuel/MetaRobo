@@ -112,7 +112,7 @@ export function PartsPanel({
                   const o = s.options.find((x) => x.id === e.target.value)!;
                   onBuild({ ...hw.build, parts: { ...hw.build.parts, [s.slot]: o.id } }, `swapped ${s.label.toLowerCase()} → ${o.name}`);
                 }}
-                className={`w-full appearance-none border bg-panel py-1.5 pr-7 pl-2 text-[12.5px] text-fg outline-none focus:border-spec-1/60 ${worst === "error" ? "border-bad/50" : worst === "warn" ? "border-warn/50" : "border-line-2"}`}
+                className={`rounded-xl w-full appearance-none border bg-panel py-1.5 pr-7 pl-2 text-[12.5px] text-fg outline-none focus:border-spec-1/60 ${worst === "error" ? "border-bad/50" : worst === "warn" ? "border-warn/50" : "border-line-2"}`}
               >
                 {s.options.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -211,14 +211,14 @@ export function ChecksPanel({
   };
   return (
     <div className="space-y-3 p-3">
-      <motion.div key={verdict.title} initial={{ opacity: 0.4, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} className={`border px-3 py-2.5 ${verdict.cls}`}>
+      <motion.div key={verdict.title} initial={{ opacity: 0.4, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} className={`border px-3 py-2.5 ${verdict.cls} rounded-xl`}>
         <p className="flex items-center gap-2 text-[13.5px] font-medium">
           {verdict.icon} {verdict.title}
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5 pl-6">
-          <span className="mono-label rounded-[2px] bg-ok/10 px-1.5 py-0.5 text-[10px] text-ok">{passed} passed</span>
+          <span className="mono-label rounded-full bg-ok/10 px-1.5 py-0.5 text-[10px] text-ok">{passed} passed</span>
           {autos > 0 && (
-            <span className="mono-label inline-flex items-center gap-1 rounded-[2px] bg-spec-1/10 px-1.5 py-0.5 text-[10px] text-spec-1">
+            <span className="mono-label inline-flex items-center gap-1 rounded-full bg-spec-1/10 px-1.5 py-0.5 text-[10px] text-spec-1">
               <Wand2 className="size-3" /> {autos} safety fix{autos > 1 ? "es" : ""} applied
             </span>
           )}
@@ -226,7 +226,7 @@ export function ChecksPanel({
       </motion.div>
       <div className="grid grid-cols-2 gap-2">
         {hw.stats.map((s) => (
-          <div key={s.label} className="border border-line bg-panel px-3 py-2">
+          <div key={s.label} className="border border-line bg-panel px-3 py-2 rounded-xl">
             <p className="text-[11px] text-dim">{s.label}</p>
             <motion.p
               key={s.value}
@@ -244,7 +244,7 @@ export function ChecksPanel({
       <div>
         <div className="flex items-center justify-between pb-2">
           <p className="mono-label text-[10px] text-mute">Design checks</p>
-          <div className="flex gap-0.5 border border-line p-0.5">
+          <div className="flex gap-0.5 border border-line p-0.5 rounded-xl">
             {(
               [
                 ["all", `All ${checks.length}`],
@@ -264,7 +264,7 @@ export function ChecksPanel({
               const Icon = LEVEL_ICON[c.level];
               const isOpen = open === c.id;
               return (
-                <motion.li key={c.id} layout initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="border border-line bg-panel/60">
+                <motion.li key={c.id} layout initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="border border-line bg-panel/60 rounded-xl">
                   <button
                     onClick={() => {
                       setOpen(isOpen ? null : c.id);
@@ -275,7 +275,7 @@ export function ChecksPanel({
                     <Icon className={`mt-0.5 size-3.5 shrink-0 ${LEVEL_CLS[c.level]}`} />
                     <span className="flex-1 text-[12px] leading-snug">{c.title}</span>
                     {c.auto && (
-                      <span className="mono-label inline-flex shrink-0 items-center gap-1 rounded-[2px] bg-spec-1/10 px-1 py-0.5 text-[9px] text-spec-1">
+                      <span className="mono-label inline-flex shrink-0 items-center gap-1 rounded-full bg-spec-1/10 px-1 py-0.5 text-[9px] text-spec-1">
                         <Wand2 className="size-2.5" /> auto
                       </span>
                     )}
@@ -288,7 +288,7 @@ export function ChecksPanel({
                         {c.fix && (
                           <button
                             onClick={() => onBuild({ ...hw.build, parts: { ...hw.build.parts, ...c.fix!.parts }, geom: { ...hw.build.geom, ...c.fix!.geom } }, `fix: ${c.fix!.label}`)}
-                            className="mono-label mb-2 ml-8 inline-flex items-center gap-1 border border-spec-1/40 px-1.5 py-1 text-[10px] text-spec-1 hover:bg-spec-1/10"
+                            className="mono-label mb-2 ml-8 inline-flex items-center gap-1 border border-spec-1/40 px-1.5 py-1 text-[10px] text-spec-1 hover:bg-spec-1/10 rounded-xl"
                           >
                             <Wand2 className="size-3" /> Apply fix · {c.fix.label}
                           </button>
@@ -303,7 +303,7 @@ export function ChecksPanel({
         </ul>
       </div>
 
-      <div className="border border-line">
+      <div className="border border-line rounded-xl">
         <button onClick={() => setBomOpen((v) => !v)} className="flex w-full items-center justify-between px-3 py-2">
           <span className="mono-label text-[10px] text-mute">Bill of materials · {hw.bom.length} lines</span>
           <span className="flex items-center gap-2 font-mono text-[12px]">
@@ -420,7 +420,7 @@ export function WiringDiagram({ wiring }: { wiring: { nodes: NetNode[]; edges: N
             </span>
           ))}
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-4 border border-dashed border-spec-1" /> added by RoboCraft
+            <span className="inline-block h-2.5 w-4 border border-dashed border-spec-1 rounded-xl" /> added by RoboCraft
           </span>
         </div>
         <svg viewBox={`0 0 ${layout.width} ${layout.height}`} style={{ minWidth: layout.width * 0.7 }} className="w-full">

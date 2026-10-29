@@ -1,21 +1,25 @@
 @import "tailwindcss";
 
+/* dark: follows the theme toggle (<html data-theme>), not only the OS setting. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-pixel: var(--font-pixel);
 }
 
-/* Control Lab / landing palette: blue-black, hairline grid, one Meta-style blue-to-pink accent. */
+/* Official dark palette: neutral charcoal (#161616 page, #222222 / #2B2B2A surfaces), hairline
+   grid, violet accent #8B7FFF and the Meta-style blue-to-pink spectrum for highlights. */
 @theme {
-  --color-void: #04060c;
-  --color-panel: #090c15;
-  --color-panel-2: #0e1220;
+  --color-void: #161616;
+  --color-panel: #222222;
+  --color-panel-2: #2b2b2a;
   --color-line: rgb(255 255 255 / 0.08);
   --color-line-2: rgb(255 255 255 / 0.14);
-  --color-fg: #eceef2;
-  --color-mute: #8b909c;
-  --color-dim: #50555f;
+  --color-fg: #ededed;
+  --color-mute: #a3a3a3;
+  --color-dim: #6b6b6b;
   --color-spec-1: #2dd4ff;
   --color-spec-2: #0082fb;
   --color-spec-3: #9b5cff;
@@ -25,18 +29,26 @@
   --color-ok: #4ade80;
   --color-warn: #fbbf24;
   --color-bad: #f87171;
+  /* Workspace accent (selection, primary actions) and its soft tint. */
+  --color-accent: #8b7fff;
+  --color-accent-soft: rgb(139 127 255 / 0.16);
+  --color-accent-fg: #ffffff;
+  /* Floating surfaces in the workspace. */
+  --color-surface: #222222;
+  --color-surface-2: #2b2b2a;
+  --color-canvas: #161616;
 }
 
 @theme {
-  --color-ink-950: #04060c;
-  --color-ink-900: #0c121c;
-  --color-ink-850: #111926;
-  --color-ink-800: #172131;
-  --color-ink-700: #243044;
-  --color-ink-600: #34425a;
-  --color-ink-400: #7d8ba3;
-  --color-ink-300: #a8b3c7;
-  --color-ink-100: #e6ebf3;
+  --color-ink-950: #161616;
+  --color-ink-900: #1c1c1c;
+  --color-ink-850: #222222;
+  --color-ink-800: #2b2b2a;
+  --color-ink-700: #3a3a39;
+  --color-ink-600: #4d4d4c;
+  --color-ink-400: #8a8a8a;
+  --color-ink-300: #b4b4b4;
+  --color-ink-100: #ededed;
   --color-brand-300: #7ee8f5;
   --color-brand-400: #3dd6ec;
   --color-brand-500: #16b8d2;
@@ -45,6 +57,37 @@
 
 :root {
   color-scheme: dark;
+}
+
+/* Light theme: its own palette (warm-neutral greys, ink text, deeper accent), not an inversion.
+   Set on <html data-theme="light"> before first paint; see the theme script in the layout. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-void: #f4f5f7;
+  --color-panel: #ffffff;
+  --color-panel-2: #eef0f3;
+  --color-line: rgb(20 24 33 / 0.08);
+  --color-line-2: rgb(20 24 33 / 0.15);
+  --color-fg: #15171c;
+  --color-mute: #5b616d;
+  --color-dim: #979dab;
+  --color-ok: #15803d;
+  --color-warn: #b45309;
+  --color-bad: #dc2626;
+  --color-accent: #6247f5;
+  --color-accent-soft: rgb(98 71 245 / 0.1);
+  --color-surface: #ffffff;
+  --color-surface-2: #f2f3f6;
+  --color-canvas: #eceef2;
+  --color-ink-950: #f4f5f7;
+  --color-ink-900: #ffffff;
+  --color-ink-850: #f3f4f7;
+  --color-ink-800: #e8eaef;
+  --color-ink-700: #d4d8e0;
+  --color-ink-600: #b6bcc8;
+  --color-ink-400: #6b7280;
+  --color-ink-300: #4a5060;
+  --color-ink-100: #15171c;
 }
 
 body {
@@ -329,15 +372,19 @@ html {
   }
 }
 
-/* Native-script fallbacks for the Japanese and Chinese landing page. */
-html:lang(ja) body {
-  font-family: var(--font-geist-sans), "Hiragino Sans", "Yu Gothic UI", "Meiryo", "Noto Sans JP", sans-serif;
-}
-html:lang(zh-Hans) body {
-  font-family: var(--font-geist-sans), "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-}
-html:lang(ja) .mono-label,
-html:lang(zh-Hans) .mono-label {
-  letter-spacing: 0.02em;
+/* App surfaces (Control Lab, studios) share the workspace's design system: labels are calm sans
+   text instead of tiny mono capitals, and controls get soft corners. The landing page keeps its
+   mono labels as part of its look. */
+.app-ui .mono-label {
+  font-family: var(--font-sans);
   text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: 12px;
+}
+.app-ui select,
+.app-ui input[type="text"],
+.app-ui input[type="number"],
+.app-ui textarea {
+  border-radius: 0.6rem;
 }

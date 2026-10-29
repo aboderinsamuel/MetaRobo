@@ -60,9 +60,6 @@ export default function EmptyStage({
               <p className="mt-3 text-[18px] leading-snug font-semibold tracking-tight">Describe a machine and Muse Spark will engineer it here.</p>
               <p className="mt-2 text-[13px] text-mute">Every part is real and editable. Simulate it, change it, test it again.</p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
-                <button onClick={onDescribe} className="meta-ring inline-flex h-9 items-center gap-2 rounded-md bg-void px-4 text-[13px] font-semibold">
-                  <Sparkles className="size-3.5 text-spec-2" /> Describe a machine
-                </button>
                 <button onClick={onDemos} className="inline-flex h-9 items-center gap-2 rounded-md border border-line-2 px-4 text-[13px] text-mute hover:text-fg">
                   <Bot className="size-3.5" /> Demo robots
                 </button>

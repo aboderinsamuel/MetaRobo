@@ -10,7 +10,7 @@ const TIERS = [
     note: "forever",
     blurb: "Everything you need to build and simulate your first robot.",
     features: ["4 robot rigs with real-part physics", "C++ → WebAssembly simulator", "Offline modeler and advisor", "Firmware export"],
-    cta: { label: "Start building", href: "/lab?onboard=1" },
+    cta: { label: "Start building", href: "/create" },
     highlight: false,
   },
   {
@@ -45,7 +45,7 @@ export default function Pricing() {
         </p>
         <div className="mt-12 grid gap-4 lg:grid-cols-3">
           {TIERS.map((t) => (
-            <div key={t.name} className={`flex flex-col rounded-xl bg-panel p-6 sm:p-8 ${t.highlight ? "meta-ring" : "border border-line"}`}>
+            <div key={t.name} className={`flex flex-col rounded-3xl bg-panel p-6 shadow-[0_24px_60px_-40px_rgb(0_0_0/0.35)] sm:p-8 ${t.highlight ? "meta-ring" : "border border-line"}`}>
               <div className="flex items-center justify-between">
                 <p className="text-lg font-semibold">{t.name}</p>
                 {t.highlight && <span className="mono-label text-spectrum text-[10px]">Meta-powered</span>}
@@ -63,11 +63,11 @@ export default function Pricing() {
                 ))}
               </ul>
               {t.cta.href ? (
-                <Link href={t.cta.href} className="mt-8 inline-flex h-10 items-center justify-center rounded-md bg-fg text-sm font-semibold text-void transition-opacity hover:opacity-90">
+                <Link href={t.cta.href} className="mt-8 inline-flex h-11 items-center justify-center rounded-xl bg-fg text-sm font-semibold text-void transition-opacity hover:opacity-90">
                   {t.cta.label}
                 </Link>
               ) : (
-                <span className="mt-8 inline-flex h-10 items-center justify-center rounded-md border border-line-2 text-sm text-mute">{t.cta.label}</span>
+                <span className="mt-8 inline-flex h-11 items-center justify-center rounded-xl border border-line-2 text-sm text-mute">{t.cta.label}</span>
               )}
             </div>
           ))}

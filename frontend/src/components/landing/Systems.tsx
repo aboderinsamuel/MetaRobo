@@ -42,7 +42,7 @@ export default function Systems() {
               <button
                 key={i}
                 onClick={() => scroll(i ? 1 : -1)}
-                className="flex size-10 items-center justify-center border border-line text-mute transition-colors hover:border-line-2 hover:text-fg"
+                className="flex size-10 items-center justify-center rounded-full border border-line text-mute transition-colors hover:border-line-2 hover:bg-panel hover:text-fg"
                 aria-label={i ? "Next" : "Previous"}
               >
                 <Icon className="size-4" />
@@ -51,11 +51,11 @@ export default function Systems() {
           </div>
         </div>
       </div>
-      <div ref={strip} className="flex snap-x snap-mandatory gap-px overflow-x-auto border-y border-line bg-line [scrollbar-width:none]">
+      <div ref={strip} className="mx-auto flex max-w-[1440px] snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-6 [scrollbar-width:none] sm:px-6">
         {cards.map(({ p, model, y, stable, os }, i) => (
           <motion.article
             key={p.id}
-            className="group flex w-[86vw] max-w-[380px] shrink-0 snap-start flex-col bg-void sm:w-[380px]"
+            className="group flex w-[86vw] max-w-[380px] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border border-line bg-panel transition-shadow hover:shadow-[0_24px_60px_-30px_rgb(0_0_0/0.35)] sm:w-[380px]"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -63,7 +63,7 @@ export default function Systems() {
           >
             <div className="flex items-center justify-between border-b border-line px-5 py-3">
               <span className="mono-label text-dim">▸ SYS {String(i + 1).padStart(2, "0")}</span>
-              <span className={`mono-label rounded-[2px] border px-2 py-0.5 ${stable ? "border-line-2 text-mute" : "border-bad/40 text-bad"}`}>
+              <span className={`mono-label rounded-full border px-2 py-0.5 ${stable ? "border-line-2 text-mute" : "border-bad/40 text-bad"}`}>
                 {stable ? `${os.toFixed(0)}% OS · untuned` : "unstable · untuned"}
               </span>
             </div>

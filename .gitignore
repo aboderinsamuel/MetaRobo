@@ -13,3 +13,6 @@ engine/tests/*.exe
 
 # Meta API response cache and usage log
 .meta-cache/
+
+# Local SQLite database for the backend
+*.db

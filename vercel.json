@@ -13,15 +13,27 @@
   "rewrites": [
     {
       "source": "/api/lab/(.*)",
-      "destination": { "service": "frontend" }
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/create(.*)",
+      "destination": {
+        "service": "frontend"
+      }
     },
     {
       "source": "/api/(.*)",
-      "destination": { "service": "backend" }
+      "destination": {
+        "service": "backend"
+      }
     },
     {
       "source": "/(.*)",
-      "destination": { "service": "frontend" }
+      "destination": {
+        "service": "frontend"
+      }
     }
   ]
 }

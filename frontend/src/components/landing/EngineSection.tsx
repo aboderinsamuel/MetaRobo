@@ -65,8 +65,8 @@ export default function EngineSection() {
                 PlantSim is a dependency-free C++17 engine. The same source compiles natively for the test suite and to WebAssembly for the
                 browser, so what you tune is what was tested.
               </p>
-              <div className="mt-8 inline-flex items-center gap-4 border border-line bg-panel/70 px-4 py-3 backdrop-blur">
-                <span className={`mono-label rounded-[2px] px-1.5 py-0.5 ${engine.backend === "wasm" ? "bg-ok/15 text-ok" : "bg-warn/15 text-warn"}`}>
+              <div className="rounded-2xl mt-8 inline-flex items-center gap-4 border border-line bg-panel/70 px-4 py-3 backdrop-blur">
+                <span className={`mono-label rounded-full px-1.5 py-0.5 ${engine.backend === "wasm" ? "bg-ok/15 text-ok" : "bg-warn/15 text-warn"}`}>
                   {engine.backend === "wasm" ? "C++ / WASM" : "TS fallback"}
                 </span>
                 <span className="font-mono text-sm tabular-nums">
@@ -121,7 +121,7 @@ export default function EngineSection() {
               <button
                 onClick={() => void runSuite()}
                 disabled={running}
-                className="spectrum-border inline-flex h-9 items-center gap-2 rounded-[3px] bg-void px-4 font-mono text-[11px] tracking-[0.08em] uppercase transition-colors hover:bg-panel-2 disabled:opacity-50"
+                className="spectrum-border inline-flex h-9 items-center gap-2 rounded-xl bg-void px-4 font-mono text-[11px] tracking-[0.08em] uppercase transition-colors hover:bg-panel-2 disabled:opacity-50"
               >
                 {running ? <RotateCcw className="size-3.5 animate-spin" /> : <Play className="size-3.5" />} Run again
               </button>
@@ -130,7 +130,7 @@ export default function EngineSection() {
               </span>
             </div>
           </div>
-          <div ref={box} className="border border-line bg-panel">
+          <div ref={box} className="rounded-2xl border border-line bg-panel">
             <div className="grid grid-cols-[1fr_auto] border-b border-line px-4 py-2.5 sm:grid-cols-[1.1fr_1fr_1fr_auto]">
               <span className="mono-label text-dim">Test</span>
               <span className="mono-label hidden text-dim sm:block">Expected</span>

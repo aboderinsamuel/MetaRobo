@@ -42,13 +42,13 @@ export function MachineCoach({ assembly, sim, onSelect }: { assembly: Assembly; 
   const mass = totalMassG(assembly);
   return (
     <div className="space-y-4 p-4">
-      <div className={`border px-3 py-2.5 ${errors.length ? "border-bad/40 bg-bad/5" : warns.length ? "border-warn/40 bg-warn/5" : "border-ok/40 bg-ok/5"}`}>
+      <div className={`rounded-xl border px-3 py-2.5 ${errors.length ? "border-bad/40 bg-bad/5" : warns.length ? "border-warn/40 bg-warn/5" : "border-ok/40 bg-ok/5"}`}>
         <p className="text-[13px] font-medium">
           {errors.length ? `${errors.length} thing${errors.length > 1 ? "s" : ""} to fix before you build it` : warns.length ? `Buildable, with ${warns.length} thing${warns.length > 1 ? "s" : ""} to watch` : "Ready to build: every part checks out"}
         </p>
         <p className="mt-1 text-[11.5px] text-mute">Checked against each part&apos;s real ratings while the motion program runs.</p>
       </div>
-      <div className="grid grid-cols-2 gap-px border border-line bg-line">
+      <div className="grid grid-cols-2 gap-px border border-line bg-line rounded-xl">
         {[
           ["Parts cost", `$${totalPriceUsd(assembly).toFixed(2)}`],
           ["Total mass", mass >= 1000 ? `${(mass / 1000).toFixed(2)} kg` : `${Math.round(mass)} g`],

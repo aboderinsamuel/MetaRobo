@@ -26,7 +26,7 @@ export default function HackathonLog() {
             href="https://github.com/aboderinsamuel/MetaRobo/commits/main"
             target="_blank"
             rel="noreferrer"
-            className="mono-label mt-6 inline-flex h-9 items-center rounded-md border border-line-2 px-4 text-mute transition-colors hover:text-fg"
+            className="mono-label mt-6 inline-flex h-9 items-center rounded-xl border border-line-2 px-4 text-mute transition-colors hover:text-fg"
           >
             View the commits ↗
           </a>

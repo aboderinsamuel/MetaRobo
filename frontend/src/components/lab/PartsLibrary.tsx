@@ -37,7 +37,7 @@ export default function PartsLibrary({ parts, onChange }: { parts: CatalogPart[]
   const ref = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
   return (
-    <div className="mt-4 border border-line p-3">
+    <div className="mt-4 border border-line p-3 rounded-xl">
       <p className="mono-label flex items-center gap-1.5 text-[10px] text-dim">
         <Library className="size-3.5" /> Parts library
       </p>
@@ -52,10 +52,10 @@ export default function PartsLibrary({ parts, onChange }: { parts: CatalogPart[]
         . Missing parts are looked up online.
       </p>
       <div className="mt-2 grid grid-cols-2 gap-1.5">
-        <button onClick={() => download("robocraft_parts_catalogue.csv", catalogToCsv([...CATALOG, ...parts]))} className="mono-label inline-flex h-8 items-center justify-center gap-1.5 border border-line-2 text-[10px] text-mute hover:text-fg">
+        <button onClick={() => download("robocraft_parts_catalogue.csv", catalogToCsv([...CATALOG, ...parts]))} className="mono-label inline-flex h-8 items-center justify-center gap-1.5 border border-line-2 text-[10px] text-mute hover:text-fg rounded-xl">
           <Download className="size-3" /> Catalogue CSV
         </button>
-        <button onClick={() => ref.current?.click()} className="mono-label inline-flex h-8 items-center justify-center gap-1.5 border border-line-2 text-[10px] text-mute hover:text-fg">
+        <button onClick={() => ref.current?.click()} className="mono-label inline-flex h-8 items-center justify-center gap-1.5 border border-line-2 text-[10px] text-mute hover:text-fg rounded-xl">
           <Upload className="size-3" /> Upload parts
         </button>
       </div>

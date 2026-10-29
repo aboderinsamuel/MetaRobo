@@ -26,7 +26,7 @@ import {
   type JointSpec,
   type PartSpec,
 } from "@/lib/lab/assembly";
-import { CATALOG, CATALOG_BY_ID, type Category } from "@/lib/lab/catalog/parts";
+import { CATALOG, CATALOG_BY_ID, type CatalogPart, type Category } from "@/lib/lab/catalog/parts";
 import { supplierLinks } from "@/lib/lab/catalog/suppliers";
 import type { Review } from "@/lib/lab/review";
 import BomPanel from "./BomPanel";
@@ -156,6 +156,87 @@ function PartPicker({ value, onPick }: { value: string; onPick: (ref: string) =>
   );
 }
 
+/** Slots by role, in the order the demos list them: what drives it, then what powers and senses it. */
+const ROLE_ORDER: { cat: Category; label: string; help: string }[] = [
+  { cat: "servo", label: "Servos", help: "Move joints to an angle. Stronger servos hold heavier loads further out." },
+  { cat: "motor", label: "Motors", help: "Spin wheels, pumps, fans and belts. Faster or stronger ones change what it can do." },
+  { cat: "stepper", label: "Steppers", help: "Precise positioning for axes and turntables." },
+  { cat: "kit", label: "Kits", help: "Ready-made mechanisms (arms, grippers, pan-tilt) with their own servos." },
+  { cat: "driver", label: "Drivers & switches", help: "The power switches between the brain and the motors, pumps and lights." },
+  { cat: "controller", label: "Controller board", help: "The brain: it runs the code that makes decisions." },
+  { cat: "power", label: "Power", help: "Batteries, supplies and regulators. Volts must suit every part." },
+  { cat: "sensor", label: "Sensors", help: "How it knows what's happening: distance, moisture, light, motion." },
+  { cat: "electronics", label: "Outputs & electronics", help: "Lights, buzzers, displays and wiring." },
+  { cat: "wheel", label: "Wheels & drive", help: "What it rolls on." },
+];
+
+/**
+ * The machine's real parts as slots, like the demos: each role with its quantity, the part's spec,
+ * a status dot from the checks, "locate" to find it in 3D, and a swap list of alternatives from
+ * the same category (swapping changes every part using that ref and re-runs every check).
+ */
+function RoleSlots({ assembly, checks, selected, onSelect, onChange }: { assembly: Assembly; checks: MachineCheck[]; selected: string | null; onSelect: (id: string | null) => void; onChange: (a: Assembly, note: string) => void }) {
+  const rows = useMemo(() => {
+    const byRef = new Map<string, { ids: string[]; qty: number; cat: CatalogPart }>();
+    for (const p of assembly.parts) {
+      const c = catalogOf(p);
+      if (!c || p.kind !== "catalog") continue;
+      const r = byRef.get(c.id) ?? { ids: [], qty: 0, cat: c };
+      r.ids.push(p.id);
+      r.qty += p.repeat;
+      byRef.set(c.id, r);
+    }
+    return ROLE_ORDER.flatMap((role) => [...byRef.values()].filter((r) => r.cat.category === role.cat).map((r) => ({ ...r, role })));
+  }, [assembly]);
+  if (!rows.length) return null;
+  return (
+    <div className="border-b border-line">
+      <p className="px-4 pt-4 pb-1 text-[12px] font-semibold tracking-wide text-mute uppercase">Parts · what it&apos;s made of</p>
+      <div className="divide-y divide-line">
+        {rows.map((r) => {
+          const worst = checks.filter((c) => c.part && r.ids.includes(c.part)).reduce<"error" | "warn" | null>((w, c) => (c.level === "error" ? "error" : c.level === "warn" && w !== "error" ? "warn" : w), null);
+          const on = !!selected && r.ids.includes(selected);
+          const options = CATALOG.filter((c) => c.category === r.cat.category);
+          return (
+            <div key={r.cat.id} className={`px-4 py-2.5 transition-colors ${on ? "bg-spec-1/[0.06]" : ""}`}>
+              <button onClick={() => onSelect(on ? null : r.ids[0])} className="mono-label flex w-full items-center justify-between text-[10px] text-dim hover:text-mute">
+                <span className="flex items-center gap-1.5">
+                  <span className={`size-1.5 rounded-full ${worst === "error" ? "bg-bad" : worst === "warn" ? "bg-warn" : "bg-ok"}`} />
+                  {r.role.label}
+                  {r.qty > 1 && <span className="text-dim">× {r.qty}</span>}
+                </span>
+                <span className={on ? "text-spec-1" : ""}>{on ? "in view" : "locate"}</span>
+              </button>
+              <div className="relative mt-1.5">
+                <select
+                  value={r.cat.id}
+                  onChange={(e) => {
+                    let next = assembly;
+                    for (const id of r.ids) next = setPartRef(next, id, e.target.value);
+                    onChange(next, `swapped ${r.cat.name} for ${CATALOG_BY_ID.get(e.target.value)?.name ?? e.target.value}`);
+                  }}
+                  className={`w-full appearance-none rounded-xl border bg-panel py-1.5 pr-7 pl-2 text-[12.5px] text-fg outline-none focus:border-spec-1/60 ${worst === "error" ? "border-bad/50" : worst === "warn" ? "border-warn/50" : "border-line-2"}`}
+                >
+                  {options.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name} · ${o.priceUsd}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-dim" />
+              </div>
+              <p className="mt-1 truncate font-mono text-[10px] text-dim" title={r.cat.spec}>
+                {r.cat.spec}
+              </p>
+              {on && <p className="mt-1 text-[11.5px] leading-snug text-dim">{r.role.help}</p>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const CHECK_ICON = { pass: CheckCircle2, info: Info, warn: AlertTriangle, error: XCircle };
 const CHECK_CLS = { pass: "text-ok", info: "text-spec-1", warn: "text-warn", error: "text-bad" };
 
@@ -280,7 +361,7 @@ function ProgramEditor({ assembly, onChange }: { assembly: Assembly; onChange: (
       {open && (
         <div className="space-y-2 px-4 pb-3">
           {steps.map((s, i) => (
-            <div key={i} className="border border-line p-2">
+            <div key={i} className="border border-line p-2 rounded-xl">
               <div className="grid grid-cols-[1fr_64px_24px] gap-1">
                 <TextField value={s.label} onCommit={(v) => setSteps(steps.map((x, k) => (k === i ? { ...x, label: v } : x)), "renamed a step")} />
                 <NumField value={s.duration} step={0.1} title="seconds" onCommit={(v) => setSteps(steps.map((x, k) => (k === i ? { ...x, duration: Math.max(0.1, v) } : x)), "changed a step's time")} />
@@ -311,7 +392,7 @@ function ProgramEditor({ assembly, onChange }: { assembly: Assembly; onChange: (
           ))}
           <button
             onClick={() => setSteps([...steps, { label: `Step ${steps.length + 1}`, duration: 1, targets: [] }], "added a step")}
-            className="mono-label inline-flex h-8 w-full items-center justify-center gap-1.5 border border-line-2 text-[10px] text-mute hover:text-fg"
+            className="mono-label inline-flex h-8 w-full items-center justify-center gap-1.5 border border-line-2 text-[10px] text-mute hover:text-fg rounded-xl"
           >
             <Plus className="size-3" /> Add step
           </button>
@@ -375,6 +456,7 @@ export default function MachinePanel({
   return (
     <div className="pb-4">
       {review && <ReviewCard review={review} />}
+      <RoleSlots assembly={assembly} checks={sim.checks} selected={selected} onSelect={onSelect} onChange={onChange} />
       <Checks checks={sim.checks} onSelect={(id) => onSelect(id)} />
       <BomPanel assembly={assembly} />
       <ProgramEditor assembly={assembly} onChange={onChange} />
@@ -387,7 +469,7 @@ export default function MachinePanel({
           </p>
         </div>
         <div className="flex shrink-0 gap-1">
-          <button onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="flex size-7 items-center justify-center border border-line-2 text-mute hover:text-fg disabled:opacity-30">
+          <button onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="flex size-7 items-center justify-center border border-line-2 text-mute hover:text-fg disabled:opacity-30 rounded-xl">
             <Undo2 className="size-3.5" />
           </button>
           <button
@@ -397,7 +479,7 @@ export default function MachinePanel({
               onSelect(r.id);
             }}
             title={selected ? "Add a part attached to the selected one" : "Add a part"}
-            className="flex size-7 items-center justify-center border border-line-2 text-mute hover:text-fg"
+            className="flex size-7 items-center justify-center border border-line-2 text-mute hover:text-fg rounded-xl"
           >
             <Plus className="size-3.5" />
           </button>
@@ -420,7 +502,7 @@ export default function MachinePanel({
                   onSelect(r.id);
                 }}
                 title="Duplicate"
-                className="flex size-7 items-center justify-center border border-line-2 text-mute hover:text-fg"
+                className="flex size-7 items-center justify-center border border-line-2 text-mute hover:text-fg rounded-xl"
               >
                 <Copy className="size-3.5" />
               </button>
@@ -431,7 +513,7 @@ export default function MachinePanel({
                 }}
                 disabled={assembly.parts.length <= 1}
                 title="Delete (with everything attached to it)"
-                className="flex size-7 items-center justify-center border border-line-2 text-mute hover:border-bad/50 hover:text-bad disabled:opacity-30"
+                className="flex size-7 items-center justify-center border border-line-2 text-mute hover:border-bad/50 hover:text-bad disabled:opacity-30 rounded-xl"
               >
                 <Trash2 className="size-3.5" />
               </button>
@@ -448,7 +530,7 @@ export default function MachinePanel({
           </div>
 
           {part.kind === "catalog" && cat && (
-            <div className="border border-line px-2.5 py-2">
+            <div className="border border-line px-2.5 py-2 rounded-xl">
               <p className="text-[11.5px] leading-snug">{cat.spec}</p>
               <p className="mt-1 font-mono text-[10px] text-dim">
                 {cat.dims.join(" × ")} mm · {cat.massG} g · ≈ ${cat.priceUsd}
@@ -464,7 +546,7 @@ export default function MachinePanel({
           )}
 
           {part.kind === "fab" && part.fab && (
-            <div className="space-y-2 border border-line px-2.5 py-2">
+            <div className="space-y-2 border border-line px-2.5 py-2 rounded-xl">
               <p className="text-[11px] text-dim">{part.spec}</p>
               <div className="grid grid-cols-2 gap-1">
                 <div>
@@ -479,7 +561,7 @@ export default function MachinePanel({
                 </div>
                 <div>
                   <p className={label}>Colour</p>
-                  <input type="color" className="h-[26px] w-full cursor-pointer border border-line-2 bg-void" value={part.color || "#f0f0ee"} onChange={(e) => edit({ color: e.target.value }, `${part.name} colour changed`)} />
+                  <input type="color" className="h-[26px] w-full cursor-pointer border border-line-2 bg-void rounded-xl" value={part.color || "#f0f0ee"} onChange={(e) => edit({ color: e.target.value }, `${part.name} colour changed`)} />
                 </div>
               </div>
               <Vec
@@ -495,7 +577,7 @@ export default function MachinePanel({
           )}
 
           {part.kind === "need" && (
-            <p className="border border-warn/40 bg-warn/5 px-2.5 py-2 text-[11.5px] text-warn">Not in the catalogue yet. Pick a catalogue part above, or rebuild to look it up online.</p>
+            <p className="border border-warn/40 bg-warn/5 px-2.5 py-2 text-[11.5px] text-warn rounded-xl">Not in the catalogue yet. Pick a catalogue part above, or rebuild to look it up online.</p>
           )}
 
           <Vec name="Position" unit="mm, from parent" value={part.position} scale={1000} step={1} onCommit={(v) => edit({ position: v }, `${part.name} moved`)} />

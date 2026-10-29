@@ -6,9 +6,9 @@
 import { Activity, Box, Cable, ChevronDown, CircleHelp, Code2, Cpu, Download, MessageSquare, ShieldCheck, SlidersHorizontal, Sparkles, Waves } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import RoboMark from "@/components/brand/RoboMark";
+import AppNav from "@/components/AppNav";
+import { ThemeToggle } from "@/components/create/ui";
 import { designCost } from "@/lib/lab/advisor";
 import { checkSpecs, fmtNum, run, simConfig, specToPlant, toCtrl } from "@/lib/lab/analysis";
 import { arduinoCode, suggestSampleTime } from "@/lib/lab/codegen";
@@ -23,7 +23,8 @@ import { presetById } from "@/lib/lab/presets";
 import { rigFor } from "@/lib/lab/rig";
 import { tuneAsync } from "@/lib/lab/tuneClient";
 import type { Advice, CallUsage, ControllerSpec, Iteration, LabModel, RigKind } from "@/lib/lab/types";
-import { totalMassG, updatePart, type Assembly } from "@/lib/lab/assembly";
+import { catalogOf, totalMassG, updatePart, type Assembly } from "@/lib/lab/assembly";
+import { machineFirmware } from "@/lib/lab/machineFirmware";
 import { estimateFps, tracksToStepCsv } from "@/lib/lab/video";
 import type { SamBox } from "@/lib/meta/sam";
 import { CHECK_COUNT, validateDesign } from "@/lib/lab/validate";
@@ -70,6 +71,12 @@ function applyScenario(m: LabModel, s: Scenario): LabModel {
       noiseStd: s.noise ? (m.sim.noiseStd ?? Math.abs(m.sim.ref) * 0.01) : 0,
     },
   };
+}
+
+/** An AI machine's model with the physics its drivetrain parts imply (as the demos derive theirs). */
+function withHardwarePhysics(m: LabModel, b: HardwareBuild): LabModel {
+  const derived = deriveHardware(b).model;
+  return { ...derived, title: m.title, summary: m.summary, source: m.source, review: m.review, assembly: m.assembly ? { ...m.assembly, hardware: b } : undefined };
 }
 
 export default function Lab({ initialPreset, onboard = false }: { initialPreset?: string; onboard?: boolean }) {
@@ -157,6 +164,9 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
 
   // ---- AI-designed machine: selection, edits, undo ---------------------------------------------
   const machine = model?.assembly ?? null;
+  // An AI machine with a drivetrain build runs on the same hardware engine as the demos: part slots,
+  // geometry, electrical checks with auto-fixes, wiring, controller and firmware.
+  const aiRig = !!machine?.hardware;
   const machineSim = useMemo(() => (machine ? simulateMachine(machine) : null), [machine]);
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
   const dataModelTitle = useRef<string | undefined>(undefined);
@@ -175,6 +185,16 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     setDataModel({ ...dataModel, assembly: undoStack[undoStack.length - 1] });
     setUndoStack((s) => s.slice(0, -1));
   }, [dataModel, undoStack]);
+  const locateSlot = useCallback(
+    (slot: SlotId | null) => {
+      setSelected(slot);
+      if (!slot || !machine) return;
+      const cats: Record<SlotId, string[]> = { board: ["controller"], driver: ["driver"], motor: ["motor", "servo", "stepper"], battery: ["power"], sensor: ["sensor"], prop: ["motor"] };
+      const hit = machine.parts.find((p) => cats[slot].includes(catalogOf(p)?.category ?? ""));
+      if (hit) setSelectedPart(hit.id);
+    },
+    [machine],
+  );
   const transformPart = useCallback(
     (id: string, position: [number, number, number], rotation: [number, number, number]) => machine && editAssembly(updatePart(machine, id, { position, rotation })),
     [machine, editAssembly],
@@ -224,10 +244,10 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
   }, [hw, prun]);
   const allChecks = useMemo(() => {
     // The preset rigs' part checks (wheel slip, driver current…) don't apply to AI-designed machines.
-    if (machine) return [];
+    if (machine && !aiRig) return [];
     if (!hw || !result || !tel) return hw?.checks ?? [];
     return sortChecks([...hw.checks, ...liveChecks(hw, tel, result.sim.u, result.analysis.wcp, result.analysis.metrics.stable === 1)]);
-  }, [machine, hw, result, tel]);
+  }, [machine, aiRig, hw, result, tel]);
   const checks = useMemo(() => (result && effModel ? checkSpecs(result.analysis.metrics, effModel.specs, effModel.sim.ref) : []), [result, effModel]);
   const specOk = checks.length > 0 && checks.every((c) => c.pass);
   const reportItems = useMemo(() => (effModel && result ? report(effModel, result.analysis.metrics, checks, allChecks) : []), [effModel, result, checks, allChecks]);
@@ -348,7 +368,8 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
       addSpend(body.usage);
       if (performance.now() - t0 < 900) await sleep(400);
       // The 3D view builds the AI design; the hidden hardware scaffold only feeds the simulator.
-      const b = applyHints(defaultBuild(rigFor(body.model, text).kind), text);
+      const asm = body.model.assembly;
+      const b = asm.hardware ?? applyHints(defaultBuild(rigFor(body.model, text).kind), text);
       await adopt(
         b,
         [
@@ -358,7 +379,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
         ]
           .filter(Boolean)
           .join(" "),
-        body.model,
+        asm.hardware ? withHardwarePhysics(body.model, asm.hardware) : body.model,
       );
       setLeftTab("hardware");
     } catch (err) {
@@ -419,6 +440,10 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
   // Muse Spark re-derives the physics from the engineer's edited design (masses, sizes, specs).
   const rederivePhysics = useCallback(async () => {
     if (!machine || !build) return;
+    if (machine.hardware && model) {
+      await adopt(build, `Re-derived the physics from the drivetrain parts (${machine.parts.length} parts, ${Math.round(totalMassG(machine))} g).`, withHardwarePhysics(model, build));
+      return;
+    }
     setBusy("model");
     setPipeline(1);
     try {
@@ -445,7 +470,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     } finally {
       setBusy(null);
     }
-  }, [machine, build, text, addSpend, adopt, selectedPart, model?.review, userParts]);
+  }, [machine, build, text, addSpend, adopt, selectedPart, model, userParts]);
 
   // "Film it": SAM 3.1 tracks the robot in a clip; its motion becomes step data and is fitted.
   const trackVideo = useCallback(
@@ -497,7 +522,9 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     (b: HardwareBuild, note: string | null) => {
       setBuild(b);
       setValidation({ results: [], running: false });
-      if (dataModel) {
+      if (dataModel?.assembly?.hardware) {
+        setDataModel(withHardwarePhysics(dataModel, b));
+      } else if (dataModel) {
         setDataModel(null);
         setNotice("Switched back to the physics model from the parts.");
       }
@@ -616,10 +643,16 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
   }, [engine, effModel, ctrl]);
 
   const code = useMemo(() => {
-    if (!model || !ctrl || !result || view !== "code") return null;
+    if (view !== "code") return null;
+    // A machine without a drivetrain gets firmware generated from its own wiring, motion and rules.
+    if (machine && !aiRig) {
+      const fw = machineFirmware(machine);
+      return { ts: 0.02, text: fw.text, filename: fw.filename };
+    }
+    if (!model || !ctrl || !result) return null;
     const ts = suggestSampleTime(result.analysis.wcp);
-    return { ts, text: arduinoCode(model, ctrl, result.ctrl.K, result.ctrl.Nbar, ts) };
-  }, [model, ctrl, result, view]);
+    return { ts, text: arduinoCode(model, ctrl, result.ctrl.K, result.ctrl.Nbar, ts), filename: `${(model.presetId ?? "controller").replace(/\W+/g, "_")}.ino` };
+  }, [model, ctrl, result, view, machine, aiRig]);
 
   const exportJson = () => {
     if (!model || !ctrl) return;
@@ -651,7 +684,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     { id: "scope", label: "Scope", icon: Activity },
     { id: "analysis", label: "Poles & Bode", icon: Waves },
     // Wiring is generated for the preset rigs only.
-    ...(machine ? [] : [{ id: "wiring" as const, label: "Wiring", icon: Cable }]),
+    ...(machine && !aiRig ? [] : [{ id: "wiring" as const, label: "Wiring", icon: Cable }]),
     { id: "validate", label: "Validate", icon: ShieldCheck },
     { id: "code", label: "Firmware", icon: Code2 },
   ];
@@ -666,25 +699,22 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     : [];
 
   return (
-    <div className="flex min-h-dvh flex-col bg-void text-fg lg:h-dvh">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-line px-3 sm:px-4">
+    <div className="app-ui flex min-h-dvh flex-col bg-void text-fg lg:h-dvh">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-3 px-3 sm:px-4">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href="/" className="flex items-center gap-2">
-            <RoboMark className="size-6" />
-            <span className="hidden text-[14px] font-medium sm:inline">RoboCraft</span>
-          </Link>
-          <span className="text-dim">/</span>
-          <span className="truncate text-[13px] font-medium">{machine ? machine.title : simple && hw ? `Your ${FRIENDLY[hw.build.kind].name.toLowerCase()}` : model ? model.title : "Control lab"}</span>
+          <AppNav />
+          <span className="hidden text-dim lg:inline">/</span>
+          <span className="hidden truncate text-[13px] font-medium lg:inline">{machine ? machine.title : simple && hw ? `Your ${FRIENDLY[hw.build.kind].name.toLowerCase()}` : model ? model.title : "Control lab"}</span>
           {hw && !machine && (
             <span
-              className={`mono-label hidden rounded-[2px] px-1.5 py-0.5 text-[10px] md:inline ${allChecks.some((c) => c.level === "error") ? "bg-bad/10 text-bad" : issues ? "bg-warn/10 text-warn" : "bg-ok/10 text-ok"}`}
+              className={`mono-label hidden rounded-full px-1.5 py-0.5 text-[10px] md:inline ${allChecks.some((c) => c.level === "error") ? "bg-bad/10 text-bad" : issues ? "bg-warn/10 text-warn" : "bg-ok/10 text-ok"}`}
             >
               {allChecks.some((c) => c.level === "error") ? (simple ? "needs fixing" : "not feasible") : issues ? `${issues} warning${issues > 1 ? "s" : ""}` : simple ? "ready to build" : "feasible"}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div data-tour="mode" className="flex items-center gap-0.5 border border-line-2 p-0.5" role="radiogroup" aria-label="Mode">
+          <div data-tour="mode" className="flex items-center gap-0.5 rounded-xl bg-surface-2 p-1" role="radiogroup" aria-label="Mode">
             {(
               [
                 ["simple", "Simple"],
@@ -699,18 +729,18 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
                   setMode(id);
                   if (id === "simple") setView("hardware");
                 }}
-                className={`mono-label px-2.5 py-1 text-[10px] transition-colors ${mode === id ? "bg-fg text-void" : "text-dim hover:text-mute"}`}
+                className={`h-7 rounded-[9px] px-3 text-[12.5px] font-medium transition-all ${mode === id ? "bg-surface text-fg shadow-[0_1px_2px_rgb(0_0_0/0.08),0_0_0_1px_var(--color-line)]" : "text-mute hover:text-fg"}`}
               >
                 {label}
               </button>
             ))}
           </div>
-          <button onClick={() => setTouring(true)} className="flex size-8 items-center justify-center border border-line-2 text-mute hover:text-fg" aria-label="Show me around" title="Show me around">
+          <button onClick={() => setTouring(true)} className="flex size-8 items-center justify-center rounded-xl text-mute hover:bg-surface-2 hover:text-fg" aria-label="Show me around" title="Show me around">
             <CircleHelp className="size-4" />
           </button>
           {!simple && (
             <>
-              <span className={`mono-label hidden rounded-[2px] px-1.5 py-0.5 text-[10px] xl:inline ${engine.backend === "wasm" ? "bg-ok/10 text-ok" : "bg-warn/10 text-warn"}`}>
+              <span className={`mono-label hidden rounded-full px-1.5 py-0.5 text-[10px] xl:inline ${engine.backend === "wasm" ? "bg-ok/10 text-ok" : "bg-warn/10 text-warn"}`}>
                 {engine.backend === "wasm" ? "C++/WASM engine" : "TS engine"}
               </span>
               <GhostButton onClick={exportJson} disabled={!model}>
@@ -718,12 +748,13 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
               </GhostButton>
             </>
           )}
+          <ThemeToggle />
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[300px_minmax(0,1fr)_340px]">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3 px-3 pb-3 lg:grid-cols-[310px_minmax(0,1fr)_350px]">
         {/* Left: hardware / control / describe */}
-        <aside data-tour="parts" className="flex max-h-[85vh] min-h-0 flex-col border-b border-line lg:max-h-none lg:border-r lg:border-b-0">
+        <aside data-tour="parts" className="flex max-h-[85vh] min-h-0 flex-col overflow-hidden rounded-3xl bg-surface shadow-[0_0_0_1px_var(--color-line)] lg:max-h-none">
           <Tabs
             value={simple && leftTab === "control" ? "hardware" : leftTab}
             onChange={setLeftTab}
@@ -745,6 +776,14 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
             {(leftTab === "hardware" || (simple && leftTab === "control")) && machine && (
               <>
                 {notice && <p className="border-b border-line bg-panel/60 px-4 py-2.5 text-[11.5px] leading-relaxed text-mute">{notice}</p>}
+                {aiRig && hw && (
+                  <>
+                    <SectionLabel>{simple ? "Drivetrain · what makes it move" : "Drivetrain · chosen by Muse Spark"}</SectionLabel>
+                    <PartsPanel hw={hw} checks={allChecks} selected={selected} onSelect={locateSlot} onBuild={onBuild} help={simple ? SLOT_HELP : undefined} />
+                    <GeometryPanel hw={hw} onBuild={onBuild} groups={simple ? ["Mission", "Mass & payload"] : undefined} />
+                    <SectionLabel>Every part</SectionLabel>
+                  </>
+                )}
                 <MachinePanel
                   assembly={machine}
                   selected={selectedPart}
@@ -852,7 +891,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
         </aside>
 
         {/* Centre: the machine */}
-        <main className="order-first flex min-h-[78vh] flex-col border-b border-line lg:order-none lg:min-h-0 lg:border-b-0">
+        <main className="order-first flex min-h-[78vh] flex-col overflow-hidden rounded-3xl bg-canvas shadow-[0_0_0_1px_var(--color-line)] lg:order-none lg:min-h-0">
           <div className={`flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-2 [scrollbar-width:none] ${simple ? "hidden" : ""}`}>
             {views.map(({ id, label, icon: Icon }) => (
               <button
@@ -977,7 +1016,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
                       yLabel={`${effModel!.output.name} [${effModel!.output.unit}]`}
                       series={outputSeries}
                     />
-                    {!m?.stable && <div className="mono-label absolute top-6 left-16 border border-bad/50 bg-bad/10 px-2 py-1 text-bad">Unstable</div>}
+                    {!m?.stable && <div className="mono-label absolute top-6 left-16 border border-bad/50 bg-bad/10 px-2 py-1 text-bad rounded-xl">Unstable</div>}
                   </div>
                   <div className="grid gap-px px-2 md:grid-cols-2">
                     <TimeChart
@@ -1043,7 +1082,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
               )}
               {!simple && view === "code" && code && (
                 <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
-                  <CodePanel code={code.text} ts={code.ts} filename={`${(model!.presetId ?? "controller").replace(/\W+/g, "_")}.ino`} />
+                  <CodePanel code={code.text} ts={code.ts} filename={code.filename} machine={!!machine && !aiRig} />
                 </div>
               )}
             </>
@@ -1051,12 +1090,13 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
         </main>
 
         {/* Right: checks / copilot */}
-        <aside data-tour="coach" className="flex min-h-[560px] flex-col border-t border-line lg:min-h-0 lg:border-t-0 lg:border-l">
+        <aside data-tour="coach" className="flex min-h-[560px] flex-col overflow-hidden rounded-3xl bg-surface shadow-[0_0_0_1px_var(--color-line)] lg:min-h-0">
           {simple ? (
             <>
               <SectionLabel>Robo · your coach</SectionLabel>
               <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
                 {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} />}
+                {hw && aiRig && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={locateSlot} />}
                 {hw && !machine && (
                   <CoachPanel
                     hw={hw}
@@ -1084,7 +1124,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
           />
           <div className={`min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] ${rightTab === "checks" ? "" : "hidden"}`}>
             {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} />}
-            {hw && !machine && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={(s) => { setSelected(s); setView("hardware"); }} />}
+            {hw && (!machine || aiRig) && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={(s) => { setSelected(s); setView("hardware"); }} />}
           </div>
           <div className={`flex min-h-0 flex-1 flex-col ${rightTab === "copilot" ? "" : "hidden"}`}>
             <Copilot
