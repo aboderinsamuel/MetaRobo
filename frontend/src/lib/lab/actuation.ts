@@ -197,6 +197,21 @@ function machineChecks(a: Assembly, traces: JointTrace[], peakA: number, avgA: n
     if (tr.late) out.push({ id: `late-${j.id}`, level: "warn", part: j.actuator, title: `${name(j.part)} is too slow for "${tr.late.label}"`, detail: `${actName} can't reach its target in the step's time at its real speed. Give the step more time.` });
   }
 
+  // Limbs: a moving printed or laser-cut bar is not how real robots are built.
+  for (const tr of traces) {
+    const moving = a.parts.filter((p) => p.id === tr.joint.part || p.parent === tr.joint.part);
+    const bar = moving.find((p) => p.kind === "fab" && (p.fab === "printed" || p.fab === "plate") && Math.max(...p.size) > 0.06);
+    if (bar) {
+      out.push({
+        id: `limb-${tr.joint.id}`,
+        level: "warn",
+        part: bar.id,
+        title: `${bar.name} is a ${bar.fab === "printed" ? "3D-printed" : "laser-cut"} bar used as a moving limb`,
+        detail: `Real builds use aluminium servo brackets between servos (bracket-multi-servo / bracket-u-servo), which are stiffer and bolt straight onto the horns. Swap it in the Parts panel.`,
+      });
+    }
+  }
+
   // Power: does a supply exist, does its voltage suit the actuators, can it deliver the peak?
   const supplies = a.parts.filter((p) => cat(p)?.category === "power");
   const batteries = supplies.filter((p) => cat(p)?.electrical?.mAh);

@@ -33,22 +33,33 @@ const FIXTURE: AiAssembly = {
     P({ id: "body", name: "Body shell", ref: "fab:printed", parent: "base", size: [0.09, 0.12, 0.07], material: "pla", color: "#e9edf2", position: [0, 0.003, 0] }),
     P({ id: "head", name: "Head shell", ref: "fab:printed", parent: "body", size: [0.07, 0.055, 0.06], material: "petg", color: "#2d6cdf", position: [0, 0.12, 0] }),
     P({ id: "eyes", name: "Eyes (ultrasonic)", ref: "hc-sr04", parent: "head", position: [0, 0.028, 0.032] }),
-    P({ id: "shoulder", name: "Shoulder servo", ref: "mg996r", parent: "body", position: [0.065, 0.118, 0] }),
-    P({ id: "horn", name: "Shoulder horn", ref: "horn-metal-25t", parent: "shoulder" }),
-    P({ id: "arm", name: "Arm", ref: "fab:printed", parent: "horn", size: [0.11, 0.008, 0.02], material: "pla", color: "#ff7a1a", position: [0.05, 0.004, 0] }),
+    // The arm, built like a real servo kit: servo → horn → bracket → servo → horn → bracket → claw.
+    P({ id: "shoulder", name: "Shoulder servo", ref: "mg996r", parent: "body", position: [0.049, 0.1, 0], rotation: [0, 0, -90] }),
+    P({ id: "shoulder_horn", name: "Shoulder horn", ref: "horn-metal-25t", parent: "shoulder" }),
+    P({ id: "upper_arm", name: "Upper arm bracket", ref: "bracket-multi-servo", parent: "shoulder_horn", position: [0, 0.004, 0], rotation: [0, 0, 90] }),
+    P({ id: "elbow", name: "Elbow servo", ref: "mg996r", parent: "upper_arm", position: [0, 0.045, 0], rotation: [0, 0, -90] }),
+    P({ id: "elbow_horn", name: "Elbow horn", ref: "horn-metal-25t", parent: "elbow" }),
+    P({ id: "forearm", name: "Forearm bracket", ref: "bracket-u-servo", parent: "elbow_horn", position: [0, 0.004, 0], rotation: [0, 0, 90] }),
+    P({ id: "hand", name: "Gripper claw", ref: "gripper-claw-mg996", parent: "forearm", position: [0, 0.045, 0], rotation: [0, 0, 90] }),
     P({ id: "uno", name: "Controller", ref: "arduino-uno", parent: "base", position: [0, 0.003, 0.07] }),
     P({ id: "pwm", name: "Servo driver", ref: "pca9685", parent: "base", position: [-0.075, 0.003, 0] }),
     P({ id: "battery", name: "Battery", ref: "batt-18650x2", parent: "base", position: [0, 0.003, -0.07] }),
     P({ id: "ubec", name: "5 V UBEC", ref: "ubec-5a", parent: "base", position: [0.08, 0.003, -0.04] }),
     P({ id: "feet", name: "Standoff feet", ref: "standoff-m3-20", parent: "", position: [-0.1, -0.02, -0.09], repeat: 2, repeatMode: "linear", repeatAxis: "x", repeatStep: 0.2 }),
   ],
-  joints: [{ id: "wave", part: "horn", actuator: "shoulder", kind: "rotate", axis: "y", min: -60, max: 60, loadG: 40, leverMm: 60 }],
+  joints: [
+    // Shoulder carries the elbow servo, both brackets, horns and the claw: ~200 g at ~70 mm.
+    { id: "shoulder", part: "shoulder_horn", actuator: "shoulder", kind: "rotate", axis: "y", min: -60, max: 120, loadG: 200, leverMm: 70 },
+    // Elbow carries the forearm bracket and claw: ~135 g at ~45 mm.
+    { id: "elbow", part: "elbow_horn", actuator: "elbow", kind: "rotate", axis: "y", min: -90, max: 90, loadG: 135, leverMm: 45 },
+  ],
   program: [
-    { label: "Wave out", duration: 0.6, targets: [{ joint: "wave", value: 50 }] },
-    { label: "Wave in", duration: 0.6, targets: [{ joint: "wave", value: -30 }] },
-    { label: "Wave out", duration: 0.6, targets: [{ joint: "wave", value: 50 }] },
-    { label: "Wave in", duration: 0.6, targets: [{ joint: "wave", value: -30 }] },
-    { label: "Rest", duration: 0.6, targets: [{ joint: "wave", value: 0 }] },
+    { label: "Raise arm", duration: 0.9, targets: [{ joint: "shoulder", value: 100 }, { joint: "elbow", value: 0 }] },
+    { label: "Wave", duration: 0.4, targets: [{ joint: "elbow", value: 40 }] },
+    { label: "Wave", duration: 0.4, targets: [{ joint: "elbow", value: -40 }] },
+    { label: "Wave", duration: 0.4, targets: [{ joint: "elbow", value: 40 }] },
+    { label: "Wave", duration: 0.4, targets: [{ joint: "elbow", value: -40 }] },
+    { label: "Lower arm", duration: 0.9, targets: [{ joint: "shoulder", value: 0 }, { joint: "elbow", value: 0 }] },
   ],
 };
 

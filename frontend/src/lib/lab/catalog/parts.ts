@@ -246,7 +246,7 @@ export const FAB_MATERIALS: Record<FabKind, string[]> = {
 };
 
 /** g/cm³ */
-const DENSITY: Record<string, number> = { acrylic: 1.19, plywood: 0.6, aluminium: 2.7, carbon_fiber: 1.6, pla: 1.24 * 0.35, petg: 1.27 * 0.35, tpu: 1.21 * 0.5, steel: 7.85 };
+const DENSITY: Record<string, number> = { acrylic: 1.19, plywood: 0.6, aluminium: 2.7, carbon_fiber: 1.6, pla: 1.24, petg: 1.27, tpu: 1.21, steel: 7.85 };
 
 export interface FabSpec {
   kind: FabKind;
@@ -273,12 +273,21 @@ export function fabricate(f: FabSpec): { size: [number, number, number]; materia
       priceUsd = 3 + vol * (material === "aluminium" ? 0.06 : 0.02);
       break;
     }
-    case "printed":
+    case "printed": {
       size = [c(f.size[0], 0.005, 0.25), c(f.size[1], 0.005, 0.25), c(f.size[2], 0.005, 0.25)];
-      vol = size[0] * size[1] * size[2] * 1e6;
-      process = "FDM 3D print, 30 % infill";
-      priceUsd = 2 + vol * 0.03;
+      const [x, y, z] = size;
+      if (Math.min(x, y, z) > 0.012) {
+        // An enclosure is printed as a thin-walled shell (2.5 mm walls incl. ribs), not a solid block.
+        vol = 2 * (x * y + y * z + x * z) * 0.0025 * 1e6;
+        process = "FDM 3D print, 2.5 mm walls (shell)";
+      } else {
+        // Links, brackets and small fittings: 4 perimeters + 40 % infill ≈ 55 % solid.
+        vol = x * y * z * 1e6 * 0.55;
+        process = "FDM 3D print, 40 % infill";
+      }
+      priceUsd = 2 + vol * 0.08;
       break;
+    }
     case "extrusion":
       size = [0.02, c(f.size[1], 0.05, 1.5), 0.02];
       vol = size[1] * 100 * 1.6; // 2020 profile ≈ 1.6 cm² of aluminium

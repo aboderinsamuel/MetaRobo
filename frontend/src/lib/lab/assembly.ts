@@ -335,6 +335,10 @@ Part origins: servos at the output shaft on top of the case (the case hangs belo
 To make a link move with a servo: make the link a child of the servo, positioned at the servo's origin (the shaft), and add a joint on the link.
 For any robot arm, prefer an arm kit (xarm-6dof, mearm, mycobot-280) as ONE part, with an articulate joint; two arms = two kits facing each other (second one rotated [0, 180, 0]).
 
+LIMBS (arms, legs, necks, waving arms, fingers): build them exactly like a real servo kit (Hiwonder, LewanSoul, Robotis): servo → its horn (horn-metal-25t) → a servo bracket (bracket-multi-servo or bracket-u-servo) → the next servo held in that bracket → its horn → bracket → … ending in a gripper-claw-mg996, a sensor, or a pan-tilt-sg90. Use bracket-l-servo for 90° turns. NEVER use a fab:printed or fab:plate part as a moving limb segment, and nothing printed or cut that moves may be longer than 60 mm.
+Recipe for a joint that swings in a vertical plane: give the servo rotation [0, 0, -90] so its shaft points +x; put the horn at the servo's origin (position [0, 0, 0]) and the joint on the horn (axis y); put the bracket on the horn with rotation [0, 0, 90] so it reaches upward ([0, 0, -90] reaches downward); mount the next servo at the bracket's far end (position [0, 0.045, 0]) with rotation [0, 0, -90] again, and repeat.
+Bodies and enclosures are fab:printed shells (anything over 12 mm in every direction is printed as a 2.5 mm-wall shell) or boxes made of several fab:plate panels.
+
 JOINTS: one per moving part, each driven by the actuator part that really drives it (the servo or motor it's mounted on, or the arm kit itself). Give the real load in grams and its lever arm in mm so torque can be checked. Limits within the actuator's range.
 
 PROGRAM: a realistic routine for the machine's task, 3-12 steps, e.g. for a waving robot: raise the arm to 120°, wave the forearm 60° ↔ 120° three times, lower. Durations long enough for the actuators' real speeds. spin values are rpm, slide/lift mm, rotate degrees, articulate 0 (rest) to 1 (full stroke; use opposite strokes on two arms to alternate).

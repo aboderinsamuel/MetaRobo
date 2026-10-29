@@ -88,3 +88,26 @@ describe("simulateMachine", () => {
     expect(sim.checks.some((c) => c.id === "current" && c.level === "pass")).toBe(true);
   });
 });
+
+describe("limb check", () => {
+  it("flags a printed bar used as a moving limb, and passes a bracket-built one", () => {
+    const bar = simulateMachine(rig());
+    expect(bar.checks.find((c) => c.id === "limb-lift")).toMatchObject({ level: "warn", part: "arm" });
+
+    const proper = sanitizeAssembly({
+      title: "Bracket arm",
+      parts: [
+        raw({ id: "base", ref: "fab:plate", size: [0.2, 0.003, 0.15] }),
+        raw({ id: "servo", ref: "mg996r", parent: "base", rotation: [0, 0, -90] }),
+        raw({ id: "horn", ref: "horn-metal-25t", parent: "servo" }),
+        raw({ id: "link", ref: "bracket-u-servo", parent: "horn", rotation: [0, 0, 90] }),
+        raw({ id: "uno", ref: "arduino-uno", parent: "base" }),
+        raw({ id: "power", ref: "batt-18650x2", parent: "base" }),
+        raw({ id: "bec", ref: "ubec-5a", parent: "base" }),
+      ],
+      joints: [{ id: "lift", part: "horn", actuator: "servo", kind: "rotate", axis: "y", min: 0, max: 90, loadG: 30, leverMm: 40 }],
+      program: [{ label: "Lift", duration: 1, targets: [{ joint: "lift", value: 90 }] }],
+    });
+    expect(simulateMachine(proper).checks.some((c) => c.id.startsWith("limb-"))).toBe(false);
+  });
+});

@@ -192,3 +192,28 @@ describe("arm kits", () => {
     expect(armPose(10)).toEqual(armPose(1.5));
   });
 });
+
+describe("fabricated parts look and weigh like the real thing", () => {
+  it("classifies prints as links, thin-walled shells or small fittings", async () => {
+    const { printedForm } = await import("@/components/lab/hw3d/catalogMeshes");
+    expect(printedForm([0.11, 0.008, 0.02])).toBe("link");
+    expect(printedForm([0.09, 0.12, 0.07])).toBe("shell");
+    expect(printedForm([0.02, 0.01, 0.015])).toBe("fitting");
+  });
+
+  it("weighs a printed enclosure as a 2.5 mm shell, far lighter than a solid block", () => {
+    const a = sanitizeAssembly(asm([raw({ id: "body", ref: "fab:printed", size: [0.09, 0.12, 0.07], material: "pla" })]));
+    // Solid PLA would be ~940 g; a 2.5 mm-wall shell is ~100 g.
+    expect(a.parts[0].massG).toBeGreaterThan(60);
+    expect(a.parts[0].massG).toBeLessThan(160);
+    expect(a.parts[0].spec).toMatch(/2\.5 mm walls/);
+  });
+
+  it("tells Muse Spark to build limbs from servos and brackets, never printed bars", () => {
+    const g = assemblyGuide();
+    expect(g).toMatch(/LIMBS/);
+    expect(g).toMatch(/bracket-multi-servo/);
+    expect(g).toMatch(/NEVER use a fab:printed or fab:plate part as a moving limb segment/);
+    expect(g).toMatch(/rotation \[0, 0, -90\] so its shaft points \+x/);
+  });
+});
