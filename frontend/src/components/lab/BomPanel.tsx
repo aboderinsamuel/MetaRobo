@@ -16,7 +16,7 @@ export function bomCsv(a: Assembly): string {
   const rows = billOfMaterials(a);
   const lines = [["Qty", "Part", "Spec", "Type", "Unit USD", "Total USD", "Where", "Search term"].join(",")];
   for (const r of rows) {
-    const where = r.kind === "fab" ? FAB_SERVICES[0] : r.kind === "need" ? "Not in catalogue: look up" : supplierLinks(r.suppliers, r.search).map((l) => l.name).join(" / ");
+    const where = r.kind === "fab" || r.kind === "shell" ? FAB_SERVICES[0] : r.kind === "need" ? "Not in catalogue: look up" : supplierLinks(r.suppliers, r.search).map((l) => l.name).join(" / ");
     lines.push([r.qty, r.name, r.spec, r.kind, r.unitUsd.toFixed(2), (r.qty * r.unitUsd).toFixed(2), where, r.search].map(csvCell).join(","));
   }
   lines.push(["", "Total", "", "", "", totalPriceUsd(a).toFixed(2), "", ""].map(csvCell).join(","));
@@ -60,7 +60,7 @@ export default function BomPanel({ assembly }: { assembly: Assembly }) {
                   {r.spec}
                 </p>
                 <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
-                  {r.kind === "fab" ? (
+                  {r.kind === "fab" || r.kind === "shell" ? (
                     <span className="font-mono text-[10px] text-spec-1">Make: {FAB_SERVICES.slice(0, 2).join(" · ")}</span>
                   ) : r.kind === "need" ? (
                     <span className="font-mono text-[10px] text-warn">Not in the catalogue yet</span>

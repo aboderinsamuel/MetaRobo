@@ -25,6 +25,9 @@ import { tuneAsync } from "@/lib/lab/tuneClient";
 import type { Advice, CallUsage, ControllerSpec, Iteration, LabModel, RigKind } from "@/lib/lab/types";
 import { catalogOf, totalMassG, updatePart, type Assembly } from "@/lib/lab/assembly";
 import { machineFirmware } from "@/lib/lab/machineFirmware";
+import { takeHandoff } from "@/lib/create/handoff";
+import { sanitizeDesign, type Design } from "@/lib/create/design";
+import { designToAssembly } from "@/lib/lab/fromDesign";
 import { estimateFps, tracksToStepCsv } from "@/lib/lab/video";
 import type { SamBox } from "@/lib/meta/sam";
 import { CHECK_COUNT, validateDesign } from "@/lib/lab/validate";
@@ -79,7 +82,7 @@ function withHardwarePhysics(m: LabModel, b: HardwareBuild): LabModel {
   return { ...derived, title: m.title, summary: m.summary, source: m.source, review: m.review, assembly: m.assembly ? { ...m.assembly, hardware: b } : undefined };
 }
 
-export default function Lab({ initialPreset, onboard = false }: { initialPreset?: string; onboard?: boolean }) {
+export default function Lab({ initialPreset, onboard = false, fromCreate = false }: { initialPreset?: string; onboard?: boolean; fromCreate?: boolean }) {
   const engine = useEngine();
   const [text, setText] = useState("");
   const [build, setBuild] = useState<HardwareBuild | null>(null);
@@ -143,10 +146,10 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     } catch {}
     const id = requestAnimationFrame(() => {
       if (saved === "pro" || saved === "simple") setModeState(saved);
-      if (onboard || !seen) setWelcome(true);
+      if ((onboard || !seen) && !fromCreate) setWelcome(true);
     });
     return () => cancelAnimationFrame(id);
-  }, [onboard]);
+  }, [onboard, fromCreate]);
   const iterSeq = useRef(0);
 
   useEffect(() => {
@@ -348,6 +351,23 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     [engine, scenario, explain],
   );
 
+  /**
+   * A realistic design (from the designer) becomes this lab's machine: every shell as designed, real
+   * actuators on every joint, controller, power, drivers, sensors and wiring inside, and the physics
+   * of its drivetrain (from its hardware build, else the closest rig).
+   */
+  const adoptDesign = useCallback(
+    async (d: Design, note: string) => {
+      const { assembly } = designToAssembly(d, d.hardware && d.hardware.kind !== "none" ? d.hardware : undefined);
+      const kind: RigKind = assembly.hardware?.kind ?? (d.robot.mobility === "flying" ? "drone" : d.robot.mobility === "wheels" || d.robot.mobility === "tracks" ? "rover" : "arm");
+      const b = assembly.hardware ?? defaultBuild(kind);
+      const physics = deriveHardware(b).model;
+      await adopt(b, note, { ...physics, title: d.title, summary: d.summary, source: "meta", assembly });
+      setLeftTab("hardware");
+    },
+    [adopt],
+  );
+
   const buildFromText = useCallback(async () => {
     if (!text.trim()) return;
     setBuildError(null);
@@ -355,6 +375,20 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     setPipeline(0);
     try {
       const t0 = performance.now();
+      // A description becomes the realistic design (shells, proportions, joints) with real hardware
+      // inside, the same as Create. Measured step data still goes through the model-fitting path.
+      if (!data) {
+        const req = fetch("/api/create", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: text }) });
+        await sleep(400);
+        setPipeline(1);
+        const res = await req;
+        const out = (await res.json()) as { design?: Design; usage?: CallUsage; error?: string };
+        if (!res.ok || !out.design) throw new Error(out.error ?? "Muse Spark didn't return a design. Try again.");
+        addSpend(out.usage);
+        if (performance.now() - t0 < 900) await sleep(400);
+        await adoptDesign(sanitizeDesign(out.design, 1), `Muse Spark designed "${out.design.title}": the body as designed, with a real actuator on every joint and its controller, power and wiring inside (X-ray to see them). Click any part to edit or swap it, or press Simulate.`);
+        return;
+      }
       const res = fetch("/api/lab/model", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -389,7 +423,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     } finally {
       setBusy(null);
     }
-  }, [text, data, engine, adopt, addSpend, refreshSpend, userParts]);
+  }, [text, data, engine, adopt, adoptDesign, addSpend, refreshSpend, userParts]);
 
   const loadRig = useCallback(
     async (kind: RigKind, prompt?: string) => {
@@ -512,10 +546,20 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
   useEffect(() => {
     if (booted.current) return;
     booted.current = true;
+    // A robot sent from Create: Muse Spark engineers it here from real parts (one build, on the
+    // user's click in Create).
+    if (fromCreate) {
+      const h = takeHandoff();
+      if (h) {
+        setText(h.prompts.join("\n"));
+        void adoptDesign(sanitizeDesign(h.design, h.design.version ?? 1), `"${h.title}" from your Create project: the body exactly as designed, with real hardware inside (X-ray to see it).`);
+        return;
+      }
+    }
     // The lab opens on an empty workspace; a demo robot loads only when one is asked for.
     const p = initialPreset ? presetById(initialPreset) : undefined;
     if (p) void loadRig(p.rig, p.prompt);
-  }, [initialPreset, loadRig]);
+  }, [initialPreset, loadRig, fromCreate, adoptDesign]);
 
   // ---- Hardware changes ----------------------------------------------------------------------
   const onBuild = useCallback(

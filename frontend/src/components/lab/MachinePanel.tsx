@@ -27,6 +27,7 @@ import {
   type PartSpec,
 } from "@/lib/lab/assembly";
 import { CATALOG, CATALOG_BY_ID, type CatalogPart, type Category } from "@/lib/lab/catalog/parts";
+import { MATERIALS as SHELL_MATERIALS } from "@/lib/create/design";
 import { supplierLinks } from "@/lib/lab/catalog/suppliers";
 import type { Review } from "@/lib/lab/review";
 import BomPanel from "./BomPanel";
@@ -196,7 +197,8 @@ function RoleSlots({ assembly, checks, selected, onSelect, onChange }: { assembl
         {rows.map((r) => {
           const worst = checks.filter((c) => c.part && r.ids.includes(c.part)).reduce<"error" | "warn" | null>((w, c) => (c.level === "error" ? "error" : c.level === "warn" && w !== "error" ? "warn" : w), null);
           const on = !!selected && r.ids.includes(selected);
-          const options = CATALOG.filter((c) => c.category === r.cat.category);
+          // Parts that travel with the design (real actuators, named modules) stay selectable too.
+          const options = [...(CATALOG_BY_ID.has(r.cat.id) ? [] : [r.cat]), ...CATALOG.filter((c) => c.category === r.cat.category)];
           return (
             <div key={r.cat.id} className={`px-4 py-2.5 transition-colors ${on ? "bg-spec-1/[0.06]" : ""}`}>
               <button onClick={() => onSelect(on ? null : r.ids[0])} className="mono-label flex w-full items-center justify-between text-[10px] text-dim hover:text-mute">
@@ -524,10 +526,42 @@ export default function MachinePanel({
             <p className={label}>Name</p>
             <TextField value={part.name} onCommit={(v) => edit({ name: v }, `renamed to ${v}`)} />
           </div>
-          <div>
-            <p className={label}>Part</p>
-            <PartPicker value={part.ref} onPick={(ref) => onChange(setPartRef(assembly, part.id, ref), `${part.name} → ${CATALOG_BY_ID.get(ref)?.name ?? ref}`)} />
-          </div>
+          {part.kind === "shell" && part.shell ? (
+            <div className="space-y-2 rounded-xl border border-line px-2.5 py-2">
+              <p className="text-[11.5px] leading-snug">Body shell · {part.spec}</p>
+              <p className="font-mono text-[10px] text-dim">
+                {part.massG} g · ≈${part.priceUsd} · made to order
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  <span className={label}>Material</span>
+                  <select
+                    className={field}
+                    value={part.shell.material}
+                    onChange={(e) => {
+                      const material = e.target.value as typeof part.shell.material;
+                      onChange(updatePart(assembly, part.id, { shell: { ...part.shell!, material }, material }), `${part.name} → ${material.replace(/_/g, " ")}`);
+                    }}
+                  >
+                    {SHELL_MATERIALS.map((m) => (
+                      <option key={m} value={m}>
+                        {m.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className={label}>Colour</span>
+                  <input type="color" className="h-[26px] w-full cursor-pointer rounded-lg border border-line-2 bg-void" value={part.shell.color} onChange={(e) => onChange(updatePart(assembly, part.id, { shell: { ...part.shell!, color: e.target.value }, color: e.target.value }), `${part.name} recoloured`)} />
+                </label>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className={label}>Part</p>
+              <PartPicker value={part.ref} onPick={(ref) => onChange(setPartRef(assembly, part.id, ref), `${part.name} → ${CATALOG_BY_ID.get(ref)?.name ?? ref}`)} />
+            </div>
+          )}
 
           {part.kind === "catalog" && cat && (
             <div className="border border-line px-2.5 py-2 rounded-xl">

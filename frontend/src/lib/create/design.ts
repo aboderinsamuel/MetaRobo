@@ -134,6 +134,18 @@ export const DesignOut = z.object({
   scene: z.array(ObjectOut).describe("The environment for the task; [] if the robot needs none"),
   task: z.array(StepOut).describe("The task as executable steps (8-40)"),
   notes: z.array(z.string()).describe("Honest engineering caveats: what would be hard to build or isn't simulated"),
+  hardware: z
+    .object({
+      kind: z.enum(["none", "rover", "arm", "balancer", "drone"]),
+      board: z.string(),
+      driver: z.string(),
+      motor: z.string(),
+      battery: z.string(),
+      sensor: z.string(),
+      prop: z.string(),
+      geom: z.array(z.object({ key: z.string(), value: z.number() })),
+    })
+    .describe("Drivetrain electronics from the HARDWARE ENGINE list when the robot is a wheeled car, a single powered arm joint, a two-wheel balancer or a multirotor; kind 'none' otherwise"),
 });
 
 export type DesignAi = z.infer<typeof DesignOut>;
@@ -370,6 +382,7 @@ export function sanitizeDesign(raw: DesignAi, version = 1): Design {
     scene,
     task,
     notes: (raw.notes ?? []).slice(0, 12).map((n) => n.slice(0, 300)),
+    hardware: raw.hardware ?? { kind: "none", board: "", driver: "", motor: "", battery: "", sensor: "", prop: "", geom: [] },
   };
 }
 
@@ -379,7 +392,8 @@ export function sanitizeDesign(raw: DesignAi, version = 1): Design {
 export const DENSITY: Record<MaterialKind, number> = {
   brushed_aluminium: 2700,
   anodized_aluminium: 2700,
-  painted_metal: 7850,
+  // Painted robot housings are almost always aluminium; bare steel is "steel".
+  painted_metal: 2700,
   chrome: 7850,
   steel: 7850,
   matte_plastic: 1050,
@@ -398,7 +412,10 @@ export const DENSITY: Record<MaterialKind, number> = {
 };
 
 /** Shells: bodies thicker than this are treated as hollow (a real cover or casting is). */
-const SHELL = 0.003;
+/** Wall thickness of housings and covers: sheet metal / machined walls, and printed or moulded shells. */
+const METAL_WALL = 0.002;
+const PLASTIC_WALL = 0.0025;
+const METALS = ["brushed_aluminium", "anodized_aluminium", "painted_metal", "chrome", "steel"];
 
 /** Approximate solid volume of a shape, m³ (hollow shells for big covers). */
 export function shapeVolume(s: Pick<NodeSpec, "shape" | "dims" | "bevel" | "points" | "role" | "material">): number {
@@ -482,7 +499,8 @@ export function shapeVolume(s: Pick<NodeSpec, "shape" | "dims" | "bevel" | "poin
     ext = [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), s.dims[2]];
   }
   const min = Math.min(...ext.filter((d) => d > 0));
-  if (min > 0.03 && !["foam", "fabric", "wood"].includes(s.material) && s.shape !== "tube") return Math.min(v, area * SHELL);
+  // Anything thicker than 12 mm is a housing or cover in a real robot, not a solid block.
+  if (min > 0.012 && !["foam", "fabric", "wood"].includes(s.material) && s.shape !== "tube") return Math.min(v, area * (METALS.includes(s.material) ? METAL_WALL : PLASTIC_WALL));
   return v;
 }
 

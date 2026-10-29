@@ -16,6 +16,7 @@ import type { SupplierKey } from "./catalog/suppliers";
 import { GEOMETRY, SLOTS, defaultBuild, type HardwareBuild } from "./hardware/build";
 import type { SlotId } from "./hardware/parts";
 import type { RigKind } from "./types";
+import { MATERIALS as SHELL_MATERIALS, SHAPES as SHELL_SHAPES, nodeMassKg, type MaterialKind, type ShapeKind } from "../create/design";
 
 export const JOINT_KINDS = ["rotate", "spin", "slide", "lift", "articulate"] as const;
 export type JointKind = (typeof JOINT_KINDS)[number];
@@ -136,12 +137,31 @@ export type RuleSpec = z.infer<typeof RuleOut>;
 
 // ---------------------------------------------------------------- the resolved design
 
+/**
+ * A designed body shell: the robot's real exterior (head, torso, limb covers, housings) exactly as
+ * the designer drew it, made by 3D printing or moulding, over the real parts inside.
+ */
+export interface ShellSpec {
+  shape: ShapeKind;
+  dims: [number, number, number];
+  bevel: number;
+  points: number[][];
+  offset: [number, number, number];
+  orient: [number, number, number];
+  material: MaterialKind;
+  color: string;
+}
+
 export interface PartSpec {
   id: string;
   name: string;
   parent: string;
   ref: string;
-  kind: "catalog" | "fab" | "need";
+  kind: "catalog" | "fab" | "need" | "shell";
+  /** body shells: the designed geometry */
+  shell?: ShellSpec;
+  /** Inside the body (actuators, electronics): drawn in X-ray view or when selected, not over the shells. */
+  internal?: boolean;
   /** catalogue parts */
   catalogId?: string;
   model?: ModelKind;
@@ -185,7 +205,7 @@ export interface Assembly {
   hardware?: HardwareBuild;
 }
 
-export const MAX_PARTS = 80;
+export const MAX_PARTS = 240;
 const MAX_REPEAT = 36;
 const MAX_INSTANCES = 400;
 
@@ -261,10 +281,46 @@ export function sanitizeAssembly(raw: AssemblyInput | Assembly, extra: CatalogPa
       repeatAxis: p.repeatAxis === "x" || p.repeatAxis === "z" ? p.repeatAxis : ("y" as const),
       repeatStep: finite(p.repeatStep, 0),
       material: "",
+      ...(p.internal ? { internal: true } : {}),
     };
     const ref = base.ref.toLowerCase();
-    const cat = byId.get(ref) ?? byId.get(base.ref);
-    if (cat) {
+    // Parts that travel with their own catalogue entry (uploads, web finds, real actuators from a
+    // design) keep it through every edit.
+    const cat = byId.get(ref) ?? byId.get(base.ref) ?? (p.catalog && p.catalog.id === base.ref ? p.catalog : undefined);
+    if (ref === "shell" && p.shell) {
+      // A designed body shell: keep its geometry, weigh it from its real volume and material.
+      const sh = p.shell;
+      const shape = (SHELL_SHAPES as readonly string[]).includes(sh.shape) ? sh.shape : "box";
+      const material = (SHELL_MATERIALS as readonly string[]).includes(sh.material) ? sh.material : "matte_plastic";
+      const dims = vec(sh.dims, 0.05, 0.001, 5);
+      const shell: ShellSpec = {
+        shape,
+        dims,
+        bevel: Math.max(0, finite(sh.bevel, 0)),
+        points: Array.isArray(sh.points) ? sh.points.slice(0, 64).map((q) => q.map((v) => finite(v, 0))) : [],
+        offset: vec(sh.offset, 0, -5, 5),
+        orient: vec(sh.orient, 0, -720, 720),
+        material,
+        color: /^#[0-9a-f]{6}$/i.test(sh.color) ? sh.color : "#c8ccd4",
+      };
+      const massG = Math.round(nodeMassKg({ ...shell, role: "cover" }) * 1000 * 10) / 10;
+      const metal = /aluminium|steel|chrome|painted_metal/.test(material);
+      parts.push({
+        ...base,
+        ref: "shell",
+        kind: "shell",
+        shell,
+        color: shell.color,
+        material,
+        size: dims,
+        spec: `${metal ? "CNC / sheet-metal" : material === "rubber" || material === "silicone_skin" ? "Cast" : "3D-printed"} ${material.replace(/_/g, " ")} ${shape}`,
+        massG,
+        // A print / machining service quote, roughly by mass.
+        priceUsd: Math.round(Math.max(1.5, (massG * (metal ? 0.12 : 0.06)) + 1) * 10) / 10,
+        suppliers: ["pcbway"],
+        search: metal ? "CNC machining service" : "3D printing service",
+      });
+    } else if (cat) {
       parts.push({ ...base, ref: cat.id, ...fromCatalog(cat) });
     } else if (ref.startsWith("fab:") && (FAB_KINDS as readonly string[]).includes(ref.slice(4))) {
       const kind = ref.slice(4) as FabKind;
@@ -314,7 +370,7 @@ export function sanitizeAssembly(raw: AssemblyInput | Assembly, extra: CatalogPa
   };
   const jointIds = new Set<string>();
   const joints: JointSpec[] = [];
-  for (const j of (raw.joints ?? []).slice(0, 24)) {
+  for (const j of (raw.joints ?? []).slice(0, 64)) {
     if (!partById.has(j.part) || !isActuator(j.actuator)) continue;
     let id = (j.id || j.part).slice(0, 40);
     while (jointIds.has(id)) id += "_";
@@ -345,7 +401,7 @@ export function sanitizeAssembly(raw: AssemblyInput | Assembly, extra: CatalogPa
   // Wires and tubes must join two real parts.
   const seenWire = new Set<string>();
   const connections: Connection[] = [];
-  for (const c of (raw.connections ?? []).slice(0, 80)) {
+  for (const c of (raw.connections ?? []).slice(0, 240)) {
     if (!partById.has(c.from) || !partById.has(c.to) || c.from === c.to) continue;
     const kind = (WIRE_KINDS as readonly string[]).includes(c.kind) ? c.kind : "signal";
     const key = `${c.from}.${c.fromPin}>${c.to}.${c.toPin}`;

@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 export default async function LabPage(props: PageProps<"/lab">) {
   const sp = await props.searchParams;
   const preset = typeof sp.preset === "string" ? sp.preset : undefined;
-  return <Lab initialPreset={preset} onboard={sp.onboard === "1"} />;
+  return <Lab initialPreset={preset} onboard={sp.onboard === "1"} fromCreate={sp.from === "create"} />;
 }

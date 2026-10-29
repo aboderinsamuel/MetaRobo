@@ -336,7 +336,7 @@ export default function Viewport(props: ViewportProps) {
     <Canvas
       shadows="soft"
       dpr={[1, 2]}
-      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: props.theme === "light" ? 1.05 : 1 }}
+      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: props.theme === "light" ? 0.92 : 1 }}
       camera={{ position: [2, 1.4, 2.6], fov: 35 }}
       onPointerMissed={() => props.onSelect(null)}
     >

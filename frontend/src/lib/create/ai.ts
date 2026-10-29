@@ -6,6 +6,7 @@
 // compare), and reading a scene from video keyframes with Muse Spark vision.
 import { z } from "zod";
 import { metaJson, type JsonResult } from "@/lib/meta/client";
+import { hardwareGuide } from "@/lib/lab/assembly";
 import { CATALOG } from "@/lib/lab/catalog/parts";
 import type { CallUsage } from "@/lib/lab/types";
 import { DesignOut, MATERIALS, sanitizeDesign, type Design } from "./design";
@@ -48,7 +49,12 @@ SCENE: build the environment the task needs, at real sizes and laid out like a r
 
 TASK: an executable plan, 8-40 steps, using only these actions with ids from your design: move_to (always with the target object you're going to; the robot stands in front of it, facing it), reach, grasp, lift, place, release, fold, open, close, pose, wait. Pick and place is reach → grasp → lift → place → release. Move to a station before working there. Open a door before putting things through it. Handle each item explicitly (no "repeat"). Labels describe the action in plain words. Durations realistic (1-4 s per motion).
 
-NOTES: honest engineering caveats: what would be hard to build, what the simulation can't show. No marketing.`;
+NOTES: honest engineering caveats: what would be hard to build, what the simulation can't show. No marketing.
+
+REAL HARDWARE: everything you design is built with real, buyable parts inside it, so name real actuators (with their real ratings) on every joint and a real controller, power source and sensors. The body you design is the robot's real exterior (printed, moulded or machined shells over the real parts), so keep it as realistic as the product would be.
+
+HARDWARE ENGINE (hardware): if the robot is a wheeled car / rover, a single powered arm joint, a two-wheel self-balancer or a multirotor, also pick its drivetrain electronics from this list (kind, then one part id per slot, matched to each other, plus geometry / mass / mission values in SI units within the ranges). Any other robot: kind "none".
+${hardwareGuide()}`;
 
 const DESIGN_ATTEMPTS = [
   { maxTokens: 40000, effort: "medium" as const },

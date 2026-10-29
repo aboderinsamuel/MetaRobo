@@ -4,7 +4,7 @@
 // part to inspect or swap it; parts that fail a design check glow and show what's wrong.
 import { Grid, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { AlertTriangle, CheckCircle2, Info, Pause, Play, RotateCcw, Tag, Volume2, VolumeX, Wand2, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Pause, Play, RotateCcw, ScanEye, Tag, Volume2, VolumeX, Wand2, X, XCircle } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtNum } from "@/lib/lab/analysis";
@@ -128,6 +128,7 @@ export default function HardwareView({
   const baseRate = machineSim ? 1 : tEnd / Math.min(30, Math.max(4, tEnd));
   const [mult, setMult] = useState(1);
   const [labels, setLabels] = useState(false);
+  const [xray, setXray] = useState(false);
   const [camKey, setCamKey] = useState(0);
   const clock = useMemo(() => ({ current: playback }), [playback]);
   const load = useRef<Partial<Record<SlotId, number>>>({});
@@ -266,6 +267,7 @@ export default function HardwareView({
               sound={sound}
               clock={clock}
               labels={labels}
+              xray={xray}
               selected={selectedPart}
               onSelect={selectPart}
               gizmo={gizmo}
@@ -346,6 +348,15 @@ export default function HardwareView({
               className={`rounded-xl mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${sound ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
             >
               {sound ? <Volume2 className="size-3" /> : <VolumeX className="size-3" />} Sound
+            </button>
+          )}
+          {machine?.parts.some((p) => p.internal) && (
+            <button
+              onClick={() => setXray((v) => !v)}
+              title={xray ? "Hide the hardware inside the body" : "See the real hardware inside the body: actuators, electronics, wiring"}
+              className={`rounded-xl mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${xray ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
+            >
+              <ScanEye className="size-3" /> X-ray
             </button>
           )}
           <button
