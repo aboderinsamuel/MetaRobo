@@ -1,149 +1,194 @@
-// AI-designed machines: the validator must turn any answer into something that renders.
+// AI-designed machines built from real parts: resolving, validating and editing designs.
 import { describe, expect, it } from "vitest";
-import { AssemblyOut, addPart, childrenOf, deletePart, describeAssembly, duplicatePart, MAX_PARTS, sanitizeAssembly, setMotion, totalMassG, updatePart, type Assembly, type PartSpec } from "@/lib/lab/assembly";
+import {
+  AssemblyOut,
+  addPart,
+  assemblyGuide,
+  billOfMaterials,
+  childrenOf,
+  deletePart,
+  describeAssembly,
+  duplicatePart,
+  MAX_PARTS,
+  sanitizeAssembly,
+  setFab,
+  setJoint,
+  setPartRef,
+  totalMassG,
+  updatePart,
+  type AiAssembly,
+} from "@/lib/lab/assembly";
+import { CATALOG, CATALOG_BY_ID } from "@/lib/lab/catalog/parts";
+import { armPose } from "@/components/lab/hw3d/robotArm";
 import { jsonSchemaFor } from "@/lib/meta/client";
 
-const part = (over: Partial<PartSpec>): PartSpec => ({
-  id: "p",
-  name: "Part",
-  spec: "",
-  massG: 10,
+type Raw = AiAssembly["parts"][number];
+const raw = (p: Partial<Raw> & Pick<Raw, "id" | "ref">): Raw => ({
+  name: p.id,
   parent: "",
-  shape: "box",
-  material: "aluminium",
-  color: "#c0c0c0",
-  size: [0.1, 0.1, 0.1],
+  size: [0, 0, 0],
+  material: "",
+  color: "",
   position: [0, 0, 0],
   rotation: [0, 0, 0],
   repeat: 1,
   repeatMode: "radial",
   repeatAxis: "y",
   repeatStep: 0,
-  ...over,
+  ...p,
+});
+const asm = (parts: Raw[], joints: AiAssembly["joints"] = [], program: AiAssembly["program"] = []): AiAssembly => ({ title: "Test", parts, joints, program });
+
+/** A small waving robot: base, servo, horn, arm. */
+const waver = () =>
+  sanitizeAssembly(
+    asm(
+      [
+        raw({ id: "base", ref: "fab:plate", size: [0.2, 0.003, 0.15], material: "acrylic" }),
+        raw({ id: "servo", ref: "mg996r", parent: "base" }),
+        raw({ id: "horn", ref: "horn-metal-25t", parent: "servo" }),
+        raw({ id: "arm", ref: "fab:printed", parent: "horn", size: [0.1, 0.008, 0.02], material: "pla" }),
+        raw({ id: "uno", ref: "arduino-uno", parent: "base" }),
+      ],
+      [{ id: "wave", part: "horn", actuator: "servo", kind: "rotate", axis: "y", min: -60, max: 60, loadG: 40, leverMm: 60 }],
+      [{ label: "Wave", duration: 1, targets: [{ joint: "wave", value: 45 }] }],
+    ),
+  );
+
+describe("catalogue", () => {
+  it("has real, complete entries", () => {
+    expect(CATALOG.length).toBeGreaterThan(80);
+    const ids = new Set<string>();
+    for (const p of CATALOG) {
+      expect(ids.has(p.id)).toBe(false);
+      ids.add(p.id);
+      expect(p.dims.every((d) => d > 0)).toBe(true);
+      expect(p.massG).toBeGreaterThan(0);
+      expect(p.suppliers.length).toBeGreaterThan(0);
+      if (p.category === "servo" || p.category === "motor" || p.category === "stepper") expect(p.actuator).toBeDefined();
+    }
+  });
+
+  it("uses conservative datasheet values", () => {
+    const mg = CATALOG_BY_ID.get("mg996r")!;
+    expect(mg.actuator!.stallKgcm).toBe(11);
+    expect(mg.dims).toEqual([40.7, 42.9, 19.7]);
+  });
 });
 
-const asm = (parts: PartSpec[], motions: Assembly["motions"] = []): Assembly => ({ title: "Test", parts, motions });
-
-describe("assembly schema", () => {
+describe("design format", () => {
   it("is valid for Meta's strict structured output", () => {
-    const s = jsonSchemaFor(AssemblyOut) as { additionalProperties: boolean; required: string[]; properties: Record<string, { items?: { additionalProperties: boolean; required: string[] } }> };
+    const s = jsonSchemaFor(AssemblyOut) as { additionalProperties: boolean; required: string[] };
     expect(s.additionalProperties).toBe(false);
-    expect(s.required).toEqual(["title", "parts", "motions"]);
-    const p = s.properties.parts.items!;
-    expect(p.additionalProperties).toBe(false);
-    expect(p.required).toContain("repeatStep");
+    expect(s.required).toEqual(["title", "parts", "joints", "program"]);
+  });
+
+  it("teaches Muse Spark to build only from real parts", () => {
+    const g = assemblyGuide();
+    expect(g).toMatch(/every part MUST be one of/);
+    expect(g).toMatch(/mg996r \| MG996R/);
+    expect(g).toMatch(/fab:plate: laser-cut sheet/);
+    expect(g).toMatch(/Never use solid blocks/);
   });
 });
 
 describe("sanitizeAssembly", () => {
-  it("re-attaches parts with missing parents to the world", () => {
-    const a = sanitizeAssembly(asm([part({ id: "base" }), part({ id: "arm", parent: "ghost" })]));
-    expect(a.parts.find((p) => p.id === "arm")!.parent).toBe("");
+  it("takes catalogue parts' real size, mass and price, ignoring what the model said", () => {
+    const a = sanitizeAssembly(asm([raw({ id: "s", ref: "MG996R", size: [9, 9, 9] })]));
+    expect(a.parts[0]).toMatchObject({ kind: "catalog", catalogId: "mg996r", massG: 55, priceUsd: 8 });
+    expect(a.parts[0].size.map((v) => Math.round(v * 1000 * 10) / 10)).toEqual([40.7, 42.9, 19.7]);
   });
 
-  it("breaks parent loops", () => {
-    const a = sanitizeAssembly(asm([part({ id: "a", parent: "b" }), part({ id: "b", parent: "a" })]));
-    const roots = childrenOf(a).get("") ?? [];
-    expect(roots.length).toBeGreaterThan(0);
-    // Walking up from every part must reach the world.
-    const byId = new Map(a.parts.map((p) => [p.id, p]));
-    for (const p of a.parts) {
-      let cur = p.parent;
-      for (let i = 0; cur && i < 10; i++) cur = byId.get(cur)!.parent;
-      expect(cur).toBe("");
-    }
-  });
-
-  it("makes ids unique, clamps sizes and positions, fixes bad colours", () => {
+  it("clamps fabricated parts to what the process makes: stock sheet thickness, print volume", () => {
     const a = sanitizeAssembly(
-      asm([
-        part({ id: "x", size: [-1, Number.NaN, 999], position: [1e6, 0, 0], color: "red" }),
-        part({ id: "x", size: [0.2, 0.2, 0.2] }),
-      ]),
+      asm([raw({ id: "plate", ref: "fab:plate", size: [0.3, 0.0037, 0.2], material: "unobtainium" }), raw({ id: "print", ref: "fab:printed", size: [1, 0.05, 0.05], material: "pla" })]),
     );
-    expect(new Set(a.parts.map((p) => p.id)).size).toBe(2);
-    expect(a.parts[0].size).toEqual([0.0005, 0.05, 20]);
-    expect(a.parts[0].position[0]).toBe(30);
-    expect(a.parts[0].color).toBe("");
+    expect(a.parts[0].size[1]).toBe(0.004);
+    expect(a.parts[0].material).toBe("acrylic");
+    expect(a.parts[0].massG).toBeGreaterThan(0);
+    expect(a.parts[1].size[0]).toBe(0.25);
   });
 
-  it("caps part count and repeats", () => {
-    const many = Array.from({ length: MAX_PARTS + 20 }, (_, i) => part({ id: `p${i}` }));
-    expect(sanitizeAssembly(asm(many)).parts.length).toBe(MAX_PARTS);
-    expect(sanitizeAssembly(asm([part({ repeat: 500 })])).parts[0].repeat).toBe(36);
+  it("flags anything that isn't a real part instead of drawing it", () => {
+    const a = sanitizeAssembly(asm([raw({ id: "x", ref: "mystery_block" }), raw({ id: "y", ref: "need:Hiwonder Raspberry Pi expansion board" })]));
+    expect(a.parts.map((p) => p.kind)).toEqual(["need", "need"]);
+    expect(a.unresolved).toEqual(["mystery_block", "Hiwonder Raspberry Pi expansion board"]);
   });
 
-  it("drops motions on parts that don't exist and defaults a zero gain", () => {
+  it("only keeps joints driven by a real actuator in the design", () => {
     const a = sanitizeAssembly(
       asm(
-        [part({ id: "hub" })],
+        [raw({ id: "plate", ref: "fab:plate", size: [0.1, 0.003, 0.1] }), raw({ id: "servo", ref: "sg90", parent: "plate" }), raw({ id: "arm", ref: "fab:printed", parent: "servo", size: [0.05, 0.005, 0.01] })],
         [
-          { part: "hub", kind: "spin", axis: "y", gain: 0 },
-          { part: "nope", kind: "slide", axis: "x", gain: 1 },
+          { id: "ok", part: "arm", actuator: "servo", kind: "rotate", axis: "z", min: 0, max: 90, loadG: 10, leverMm: 30 },
+          { id: "bad", part: "arm", actuator: "plate", kind: "rotate", axis: "z", min: 0, max: 90, loadG: 10, leverMm: 30 },
         ],
+        [{ label: "Go", duration: 1, targets: [{ joint: "ok", value: 90 }, { joint: "bad", value: 10 }, { joint: "ghost", value: 1 }] }],
       ),
     );
-    expect(a.motions).toEqual([{ part: "hub", kind: "spin", axis: "y", gain: 1 }]);
+    expect(a.joints.map((j) => j.id)).toEqual(["ok"]);
+    expect(a.program[0].targets).toEqual([{ joint: "ok", value: 90 }]);
   });
 
-  it("refuses an empty design", () => {
+  it("repairs the tree and caps size", () => {
+    const loop = sanitizeAssembly(asm([raw({ id: "a", ref: "sg90", parent: "b" }), raw({ id: "b", ref: "sg90", parent: "a" })]));
+    expect((childrenOf(loop).get("") ?? []).length).toBeGreaterThan(0);
+    const many = Array.from({ length: MAX_PARTS + 10 }, (_, i) => raw({ id: `p${i}`, ref: "sg90" }));
+    expect(sanitizeAssembly(asm(many)).parts.length).toBe(MAX_PARTS);
     expect(() => sanitizeAssembly(asm([]))).toThrow(/no parts/);
   });
 });
 
-describe("editing an assembly", () => {
-  // A fan: base → motor → hub (spins) → 5 blades.
-  const fan = (): Assembly =>
-    asm(
-      [
-        part({ id: "base", massG: 300 }),
-        part({ id: "motor", parent: "base", massG: 120 }),
-        part({ id: "hub", parent: "motor", massG: 20 }),
-        part({ id: "blade", parent: "hub", shape: "blade", repeat: 5, massG: 8 }),
-      ],
-      [{ part: "hub", kind: "spin", axis: "y", gain: 0.10472 }],
-    );
-
-  it("updates one part and nothing else", () => {
-    const a = updatePart(fan(), "hub", { massG: 25, id: "hacked" });
-    expect(a.parts.find((p) => p.id === "hub")!.massG).toBe(25);
-    expect(a.parts.map((p) => p.id)).toEqual(["base", "motor", "hub", "blade"]);
+describe("editing", () => {
+  it("swaps a part for another real part and refills its data", () => {
+    const a = setPartRef(waver(), "servo", "ds3218");
+    expect(a.parts.find((p) => p.id === "servo")).toMatchObject({ catalogId: "ds3218", massG: 60, parent: "base" });
   });
 
-  it("adds a part with a fresh id under the chosen parent", () => {
-    const { assembly, id } = addPart(addPart(fan(), "base").assembly, "base");
-    expect(id).toBe("box_2");
-    expect(assembly.parts.find((p) => p.id === id)!.parent).toBe("base");
+  it("resizes a fabricated part and recomputes its mass", () => {
+    const before = waver().parts.find((p) => p.id === "arm")!.massG;
+    const a = setFab(waver(), "arm", [0.2, 0.008, 0.02], "pla");
+    expect(a.parts.find((p) => p.id === "arm")!.massG).toBeGreaterThan(before);
   });
 
-  it("duplicates a part with everything attached and its motion", () => {
-    const { assembly, id } = duplicatePart(fan(), "hub");
-    expect(assembly.parts).toHaveLength(6);
-    const copyBlade = assembly.parts.find((p) => p.parent === id)!;
-    expect(copyBlade.shape).toBe("blade");
-    expect(assembly.motions.map((m) => m.part)).toEqual(["hub", id]);
-    expect(totalMassG(assembly)).toBe(totalMassG(fan()) + 20 + 40);
+  it("adds, updates, duplicates and deletes with joints kept consistent", () => {
+    let a = waver();
+    const added = addPart(a, "base", "hc-sr04");
+    expect(added.assembly.parts.find((p) => p.id === added.id)).toMatchObject({ catalogId: "hc-sr04", parent: "base" });
+    a = updatePart(a, "arm", { name: "Waving arm", id: "hacked" });
+    expect(a.parts.find((p) => p.id === "arm")!.name).toBe("Waving arm");
+    const dup = duplicatePart(a, "servo");
+    expect(dup.assembly.joints).toHaveLength(2);
+    expect(totalMassG(dup.assembly)).toBeGreaterThan(totalMassG(a));
+    const del = deletePart(a, "servo");
+    expect(del.joints).toEqual([]);
+    expect(del.program[0].targets).toEqual([]);
   });
 
-  it("deletes a part with everything attached and drops its motion", () => {
-    const a = deletePart(fan(), "motor");
-    expect(a.parts.map((p) => p.id)).toEqual(["base"]);
-    expect(a.motions).toEqual([]);
+  it("sets and clears joints", () => {
+    let a = setJoint(waver(), "arm", { actuator: "servo", kind: "rotate", axis: "z", min: 0, max: 30, loadG: 5, leverMm: 20 });
+    expect(a.joints).toHaveLength(2);
+    a = setJoint(a, "horn", null);
+    expect(a.joints.map((j) => j.part)).toEqual(["arm"]);
   });
+});
 
-  it("sets, changes and clears a motion", () => {
-    let a = setMotion(fan(), "base", { kind: "rotate", axis: "y", gain: 1 });
-    expect(a.motions).toHaveLength(2);
-    a = setMotion(a, "hub", { kind: "spin", axis: "z", gain: 2 });
-    expect(a.motions.find((m) => m.part === "hub")).toMatchObject({ axis: "z", gain: 2 });
-    a = setMotion(a, "hub", null);
-    expect(a.motions.map((m) => m.part)).toEqual(["base"]);
+describe("bill of materials", () => {
+  it("groups parts, prices them and knows where to buy or make each", () => {
+    const bom = billOfMaterials(waver());
+    const servo = bom.find((r) => r.key === "mg996r")!;
+    expect(servo).toMatchObject({ qty: 1, unitUsd: 8, kind: "catalog" });
+    expect(servo.suppliers.length).toBeGreaterThan(0);
+    expect(bom.find((r) => r.kind === "fab")!.suppliers).toEqual(["pcbway"]);
+    expect(describeAssembly(waver())).toMatch(/JOINT wave \(rotate, load 40 g at 60 mm\)/);
   });
+});
 
-  it("summarises the design as a parts list for re-deriving the physics", () => {
-    const s = describeAssembly(fan());
-    expect(s).toContain("total mass 480 g");
-    expect(s).toMatch(/×5: blade/);
-    expect(s).toMatch(/MOVES \(spin/);
+describe("arm kits", () => {
+  it("pose the joints smoothly, mirrored for negative strokes", () => {
+    const rest = armPose(0);
+    expect(rest.shoulder + rest.elbow + rest.wrist).toBe(90);
+    expect(armPose(-1).yaw).toBe(-armPose(1).yaw);
+    expect(armPose(10)).toEqual(armPose(1.5));
   });
 });

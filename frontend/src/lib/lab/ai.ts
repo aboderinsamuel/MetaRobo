@@ -5,11 +5,13 @@
 // Everything it returns is checked numerically before the studio uses it, and every route
 // falls back to the offline library in presets.ts / advisor.ts when live calls are off.
 import { z } from "zod";
-import { MetaError, TEXT_MODEL, metaEnabled, metaJson, type JsonResult } from "@/lib/meta/client";
+import { MetaError, TEXT_MODEL, metaEnabled, metaJson, metaSearchJson, type JsonResult } from "@/lib/meta/client";
+import { toCatalogPart } from "./catalog/io";
 import { tsEngine } from "@/lib/sim/engine";
 import { offlineAdvice } from "./advisor";
 import { checkSpecs, fmtNum, run } from "./analysis";
-import { ASSEMBLY_GUIDE, AssemblyOut, sanitizeAssembly, type Assembly } from "./assembly";
+import { AssemblyOut, assemblyGuide, sanitizeAssembly, type Assembly } from "./assembly";
+import { CATALOG, catalogForPrompt, type CatalogPart } from "./catalog/parts";
 import { REVIEW_SYSTEM, ReviewOut, reviewBrief, sanitizeReview, type Review } from "./review";
 import { matchPreset, presetById } from "./presets";
 import type { Advice, Analysis, CallUsage, ControllerSpec, LabModel, PlantSpec } from "./types";
@@ -24,20 +26,72 @@ const ATTEMPTS = [
 ];
 export const MAX_ATTEMPTS = ATTEMPTS.length;
 
-const ASSEMBLY_SYSTEM = `You are a mechanical design engineer inside RoboCraft Control Lab. A control engineer has already modelled the machine below.
-Now engineer the physical device itself, part by part, so it can be built in 3D, simulated and edited by an engineer.
-${ASSEMBLY_GUIDE}`;
+const assemblySystem = (extra: CatalogPart[]) => `You are a mechanical design engineer inside RoboCraft Control Lab. A control engineer has already modelled the machine below.
+Now engineer the physical device itself from real parts, so it can be built, simulated and edited by an engineer.
+${assemblyGuide(extra)}`;
 
 /** Muse Spark checks whether the idea can be built from buyable parts, and rethinks it if so. */
-export async function reviewIdea(description: string, attempt = 0): Promise<{ review: Review; usage: CallUsage }> {
+export async function reviewIdea(description: string, attempt = 0, extra: CatalogPart[] = []): Promise<{ review: Review; usage: CallUsage }> {
   const res = await metaJson({
     schema: ReviewOut,
     schemaName: "feasibility_review",
-    system: REVIEW_SYSTEM,
+    system: `${REVIEW_SYSTEM}\n\nPrefer parts from RoboCraft's catalogue of buyable parts (id | name | size mm | mass | price | ratings), and name them as in the catalogue:\n${catalogForPrompt([...CATALOG, ...extra])}`,
     user: description,
     ...ATTEMPTS[Math.min(attempt, ATTEMPTS.length - 1)],
   });
   return { review: sanitizeReview(res.data), usage: callUsage(res) };
+}
+
+const FoundPart = z.object({
+  found: z.boolean().describe("true only if you found a real, currently sold part"),
+  name: z.string(),
+  category: z.enum(["servo", "motor", "stepper", "controller", "driver", "sensor", "power", "structure", "wheel", "kit", "electronics"]),
+  length_mm: z.number(),
+  height_mm: z.number(),
+  width_mm: z.number(),
+  mass_g: z.number(),
+  price_usd: z.number(),
+  spec: z.string().describe("Key ratings in one line"),
+  search: z.string().describe("What to type into a store's search box to find it"),
+  source_url: z.string().describe("A product or datasheet page you found it on"),
+  actuator_kind: z.string().describe("servo | continuous_servo | dc | stepper, or '' if not an actuator"),
+  rated_v: z.number(),
+  stall_kgcm: z.number(),
+  speed: z.number().describe("servo °/s, motor rpm; 0 if not an actuator"),
+  stall_a: z.number(),
+});
+
+/**
+ * Looks a real part up on the web (Muse Spark + web search) when a design needs something the
+ * catalogue doesn't have. Returns it as a catalogue entry with its source, or null if not found.
+ */
+export async function findPartOnline(name: string, context: string): Promise<{ part: CatalogPart | null; usage: CallUsage }> {
+  const res = await metaSearchJson({
+    schema: FoundPart,
+    schemaName: "find_part",
+    system:
+      "You find real, currently sold hobby / education electronics and robot parts online (SparkFun, Adafruit, RobotShop, Pololu, DFRobot, LCSC, PCBWay, Hiwonder, Seeed, Waveshare, AliExpress, Amazon). Use web search. Give datasheet or listing dimensions, mass and price. Never invent a part: set found=false if you can't find one.",
+    user: `Find this part: ${name}\nIt's for: ${context.slice(0, 300)}`,
+    maxTokens: 3000,
+  });
+  const d = res.data;
+  const part = d.found
+    ? toCatalogPart({ ...d, source: /^https?:\/\//.test(d.source_url) ? d.source_url : res.sources[0], actuator_kind: d.actuator_kind, model: guessModel(d.category, d.actuator_kind, d.name) }, "web")
+    : null;
+  return { part, usage: callUsage(res) };
+}
+
+/** Picks the closest 3D model for a part found online. */
+function guessModel(category: string, actuator: string, name: string): string {
+  const n = name.toLowerCase();
+  if (category === "servo") return /micro|9g|sg90|mg90/.test(n) ? "servo_micro" : /bus|serial|dynamixel|sts|lx-/.test(n) ? "servo_bus" : "servo_standard";
+  if (category === "motor") return /n20|micro metal/.test(n) ? "motor_n20" : /tt\b|yellow/.test(n) ? "motor_tt" : /37/.test(n) ? "motor_37d" : "motor_jga25";
+  if (category === "stepper") return /28byj/.test(n) ? "stepper_28byj" : "stepper_nema17";
+  if (category === "wheel") return /mecanum/.test(n) ? "wheel_mecanum" : /omni/.test(n) ? "wheel_omni" : /caster/.test(n) ? "caster_ball" : "wheel";
+  if (category === "controller") return /pi\b|raspberry/.test(n) ? "board_pi" : /esp32/.test(n) ? "board_esp32" : /mega/.test(n) ? "board_mega" : "board_uno";
+  if (category === "sensor") return /camera|cam\b/.test(n) ? "sensor_camera" : /ultrason|sonar/.test(n) ? "sensor_sonar" : /imu|gyro|accel/.test(n) ? "sensor_imu" : "module_pcb";
+  if (category === "power") return /lipo/.test(n) ? "battery_lipo" : /18650/.test(n) ? "battery_18650x2" : /buck|bec|regulator/.test(n) ? "buck" : "module_pcb";
+  return actuator ? "servo_standard" : "module_pcb";
 }
 
 /** How the 3D step should treat the review: build the practical variant, or render the idea as imagined. */
@@ -46,15 +100,15 @@ function designBrief(review?: Review): string {
   if (review.verdict === "not_buildable") {
     return `Feasibility review: NOT buildable with hobbyist hardware (${review.headline}). Render the concept exactly as the user imagined it, in full: ${review.concept}`;
   }
-  return `Feasibility review: ${review.verdict.replace("_", " ")}. Design THIS practical build, using these real parts as the actual components (use library shapes such as servo, dc_motor, wheel, controller_board, motor_driver, battery, sensor, extrusion wherever the parts are those things):\n${reviewBrief(review)}`;
+  return `Feasibility review: ${review.verdict.replace("_", " ")}. Design THIS practical build from these real parts (use their catalogue ids):\n${reviewBrief(review)}`;
 }
 
-/** Muse Spark designs the machine's 3D assembly from the description, its physics model and the review. */
-export async function designAssembly(description: string, model: LabModel, attempt = 0, review?: Review): Promise<{ assembly: Assembly; usage: CallUsage }> {
+/** Muse Spark designs the machine from catalogue parts, using the description, its physics and the review. */
+export async function designAssembly(description: string, model: LabModel, attempt = 0, review?: Review, extra: CatalogPart[] = []): Promise<{ assembly: Assembly; usage: CallUsage }> {
   const res = await metaJson({
     schema: AssemblyOut,
     schemaName: "machine_assembly",
-    system: ASSEMBLY_SYSTEM,
+    system: assemblySystem(extra),
     user: [
       `Description: ${description}`,
       designBrief(review),
@@ -67,7 +121,7 @@ export async function designAssembly(description: string, model: LabModel, attem
       .join("\n"),
     ...ATTEMPTS[Math.min(attempt, ATTEMPTS.length - 1)],
   });
-  return { assembly: sanitizeAssembly(res.data), usage: callUsage(res) };
+  return { assembly: sanitizeAssembly(res.data, extra), usage: callUsage(res) };
 }
 
 function callUsage(r: JsonResult<unknown>): CallUsage {

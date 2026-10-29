@@ -12,6 +12,9 @@ const post = async (body: unknown) => {
   return { status: res.status, json: (await res.json()) as { model?: { source: string; presetId?: string; assembly?: unknown }; error?: string } };
 };
 
+// Each test imports the route fresh; under a full parallel run that first import can exceed 5 s.
+vi.setConfig({ testTimeout: 30_000 });
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {

@@ -30,6 +30,8 @@ import type { Metrics } from "@/lib/sim/core";
 import { TimeChart } from "./charts";
 import { useSpeech } from "./useSpeech";
 import VideoTrack, { normaliseClip, type VideoTrackOptions } from "./VideoTrack";
+import PartsLibrary from "./PartsLibrary";
+import type { CatalogPart } from "@/lib/lab/catalog/parts";
 
 export function SectionLabel({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
@@ -111,6 +113,8 @@ export function DescribePanel({
   spend,
   onVideo,
   error,
+  userParts,
+  onUserParts,
 }: {
   text: string;
   setText: (s: string) => void;
@@ -125,6 +129,8 @@ export function DescribePanel({
   onVideo: (file: File, opts: VideoTrackOptions, durationS: number) => Promise<void>;
   /** Why the last description couldn't be built. */
   error?: string | null;
+  userParts: CatalogPart[];
+  onUserParts: (p: CatalogPart[]) => void;
 }) {
   const [clip, setClip] = useState<File | null>(null);
   const [clipError, setClipError] = useState<string | null>(null);
@@ -245,6 +251,8 @@ export function DescribePanel({
         <PrimaryButton className="mt-3 w-full" onClick={onBuild} disabled={busy || !text.trim()}>
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} Build model & controller
         </PrimaryButton>
+
+        <PartsLibrary parts={userParts} onChange={onUserParts} />
 
         <AnimatePresence>
           {pipeline >= 0 && (

@@ -37,6 +37,8 @@ import type { ChatMsg } from "./panels";
 import type { VideoTrackOptions } from "./VideoTrack";
 import { CodePanel, Copilot, DescribePanel, GhostButton, ModelCard, PIPELINE, SectionLabel, SpecStrip, TunerPanel, ValidatePanel, describeCtrl, diffCtrl } from "./panels";
 import EmptyStage from "./EmptyStage";
+import { loadUserParts } from "./PartsLibrary";
+import type { CatalogPart } from "@/lib/lab/catalog/parts";
 import MachinePanel from "./MachinePanel";
 
 const HardwareView = dynamic(() => import("./HardwareView"), {
@@ -101,6 +103,12 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
   }, []);
   // Why the last description couldn't be built (shown with a retry, never replaced by a demo).
   const [buildError, setBuildError] = useState<string | null>(null);
+  // The user's uploaded parts (kept in this browser), sent with every build.
+  const [userParts, setUserParts] = useState<CatalogPart[]>([]);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setUserParts(loadUserParts()));
+    return () => cancelAnimationFrame(id);
+  }, []);
   const [validation, setValidation] = useState<{ results: CheckResult[]; running: boolean }>({ results: [], running: false });
   const [simKey, setSimKey] = useState(0);
   const [program, setProgram] = useState("mission");
@@ -327,7 +335,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
       const res = fetch("/api/lab/model", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ description: text, dataSummary: data ? fitSummary(engine.fit(data.t, data.y, data.uStep, 0), data) : undefined }),
+        body: JSON.stringify({ description: text, dataSummary: data ? fitSummary(engine.fit(data.t, data.y, data.uStep, 0), data) : undefined, customParts: userParts }),
       });
       await sleep(400);
       setPipeline(1);
@@ -351,7 +359,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     } finally {
       setBusy(null);
     }
-  }, [text, data, engine, adopt, addSpend, refreshSpend]);
+  }, [text, data, engine, adopt, addSpend, refreshSpend, userParts]);
 
   const loadRig = useCallback(
     async (kind: RigKind, prompt?: string) => {
@@ -408,7 +416,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
       const res = await fetch("/api/lab/model", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ description: text.trim() || machine.title, assembly: machine }),
+        body: JSON.stringify({ description: text.trim() || machine.title, assembly: machine, customParts: userParts }),
       });
       const body = (await res.json()) as { model?: LabModel; error?: string; usage?: CallUsage };
       addSpend(body.usage);
@@ -428,7 +436,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
     } finally {
       setBusy(null);
     }
-  }, [machine, build, text, addSpend, adopt, selectedPart, model?.review]);
+  }, [machine, build, text, addSpend, adopt, selectedPart, model?.review, userParts]);
 
   // "Film it": SAM 3.1 tracks the robot in a clip; its motion becomes step data and is fitted.
   const trackVideo = useCallback(
@@ -827,6 +835,8 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
                 spend={spend}
                 onVideo={trackVideo}
                 error={buildError}
+                userParts={userParts}
+                onUserParts={setUserParts}
               />
             )}
           </div>
