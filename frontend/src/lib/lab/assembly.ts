@@ -13,6 +13,9 @@
 import { z } from "zod";
 import { CATALOG, CATALOG_BY_ID, FAB_KINDS, FAB_MATERIALS, catalogForPrompt, fabricate, type CatalogPart, type FabKind, type ModelKind } from "./catalog/parts";
 import type { SupplierKey } from "./catalog/suppliers";
+import { GEOMETRY, SLOTS, defaultBuild, type HardwareBuild } from "./hardware/build";
+import type { SlotId } from "./hardware/parts";
+import type { RigKind } from "./types";
 
 export const JOINT_KINDS = ["rotate", "spin", "slide", "lift", "articulate"] as const;
 export type JointKind = (typeof JOINT_KINDS)[number];
@@ -106,12 +109,25 @@ export const AssemblyOut = z.object({
   rules: z.array(RuleOut).describe("The controller's logic: if a signal crosses a threshold, switch outputs"),
   timeScale: z.number().describe("Simulated seconds per real second of playback: 1 for fast mechanisms, 30-600 for slow processes like soil drying"),
   simSeconds: z.number().describe("How many simulated seconds to run the behaviour for (e.g. 1800 for a plant drying and being watered)"),
+  hardware: z
+    .object({
+      kind: z.enum(["none", "rover", "arm", "balancer", "drone"]).describe("The drivetrain engine this machine runs on (see HARDWARE ENGINE); 'none' if it isn't one of these"),
+      board: z.string().describe("Part id from the list for this kind, or ''"),
+      driver: z.string(),
+      motor: z.string(),
+      battery: z.string(),
+      sensor: z.string(),
+      prop: z.string().describe("Drones only, else ''"),
+      geom: z.array(z.object({ key: z.string(), value: z.number().describe("SI units: m, kg, m/s, rad") })).describe("Geometry, mass and mission values for this kind"),
+    })
+    .describe("The machine's drivetrain / actuator electronics, chosen from the hardware engine's parts, so it gets the full engineering lab (part slots, geometry, design checks with auto-fixes, wiring, controller, firmware)"),
 });
 
 export type AiAssembly = z.infer<typeof AssemblyOut>;
+export type HardwareOutput = AiAssembly["hardware"];
 /** What the validator accepts: a full AI design, or an older / partial one without behaviour or wiring. */
-export type AssemblyInput = Omit<AiAssembly, "connections" | "signals" | "rules" | "timeScale" | "simSeconds"> &
-  Partial<Pick<AiAssembly, "connections" | "signals" | "rules" | "timeScale" | "simSeconds">>;
+export type AssemblyInput = Omit<AiAssembly, "connections" | "signals" | "rules" | "timeScale" | "simSeconds" | "hardware"> &
+  Partial<Pick<AiAssembly, "connections" | "signals" | "rules" | "timeScale" | "simSeconds" | "hardware">>;
 export type JointSpec = z.infer<typeof JointOut>;
 export type ProgramStep = z.infer<typeof StepOut>;
 export type Connection = z.infer<typeof ConnectionOut>;
@@ -165,6 +181,8 @@ export interface Assembly {
   simSeconds: number;
   /** Parts the design needs that aren't in the catalogue yet ("need:" refs not yet resolved). */
   unresolved?: string[];
+  /** The drivetrain hardware build Muse Spark chose, when the machine is a rover / arm / balancer / drone. */
+  hardware?: HardwareBuild;
 }
 
 export const MAX_PARTS = 80;
@@ -383,7 +401,48 @@ export function sanitizeAssembly(raw: AssemblyInput | Assembly, extra: CatalogPa
     timeScale: clamp(finite(raw.timeScale, 1), 1, 3600),
     simSeconds: clamp(finite(raw.simSeconds, 0), 0, 86400),
     unresolved: [...unresolved],
+    hardware: sanitizeHardware((raw as { hardware?: HardwareOutput | HardwareBuild }).hardware),
   };
+}
+
+/**
+ * The hardware build from the model's answer: only real part ids for that kind's slots, geometry
+ * clamped to the engine's ranges, and the kind's defaults for anything missing. Also accepts an
+ * already-sanitised build (edited designs).
+ */
+export function sanitizeHardware(h: HardwareOutput | HardwareBuild | undefined): HardwareBuild | undefined {
+  if (!h || !("kind" in h) || !["rover", "arm", "balancer", "drone"].includes(h.kind)) return undefined;
+  const kind = h.kind as RigKind;
+  const out = defaultBuild(kind);
+  const picks: Partial<Record<SlotId, string>> = "parts" in h ? h.parts : { board: h.board, driver: h.driver, motor: h.motor, battery: h.battery, sensor: h.sensor, prop: h.prop };
+  for (const slot of SLOTS[kind]) {
+    const id = picks[slot.slot];
+    if (id && slot.options.some((o) => o.id === id)) out.parts[slot.slot] = id;
+  }
+  const geom: Record<string, number> = "parts" in h ? h.geom : Object.fromEntries((h.geom ?? []).map((g) => [g.key, g.value]));
+  for (const g of GEOMETRY[kind]) {
+    const v = geom[g.key];
+    if (typeof v === "number" && Number.isFinite(v)) out.geom[g.key] = Math.min(g.max, Math.max(g.min, v));
+  }
+  return out;
+}
+
+/** The HARDWARE ENGINE section of the design guide: every kind's slots, part ids and ranges. */
+export function hardwareGuide(): string {
+  const kinds: RigKind[] = ["rover", "arm", "balancer", "drone"];
+  const what: Record<RigKind, string> = {
+    rover: "wheeled robots that drive (cars, rovers, line followers, delivery bots, robot vacuums)",
+    arm: "a powered arm joint / manipulator lifting a load (robot arms, cranes, lifting mechanisms)",
+    balancer: "two-wheeled self-balancing robots (Segway-style)",
+    drone: "multirotors (quadcopters, hexacopters)",
+  };
+  return kinds
+    .map((k) => {
+      const slots = SLOTS[k].map((sl) => `  ${sl.slot} (${sl.label} ×${sl.qty}): ${sl.options.map((o) => `${o.id} = ${o.name} [${o.spec}]`).join("; ")}`).join("\n");
+      const geom = GEOMETRY[k].map((g) => `${g.key} ${g.label} ${g.min}-${g.max}`).join("; ");
+      return `${k}: ${what[k]}\n${slots}\n  geom (SI): ${geom}`;
+    })
+    .join("\n");
 }
 
 /** Children of each part id ("" = roots), in input order. */
@@ -479,6 +538,9 @@ PLAYBOOKS: follow the one that matches the machine.
 - Animatronic / waving / humanoid / desk companion: fab:printed shell body and head, servo-chain limbs (see LIMBS), pan-tilt-sg90 for a head, pir-hcsr501 or hc-sr04 to notice people, oled-128x64 face; a program for the gesture, rules for what the sensor triggers (LED / display / buzzer).
 - Linear axis / conveyor / plotter / camera slider: fab:extrusion frame, nema17 + a4988 + lead-screw-t8-300 (or gt2-pulley-20t), limit-switch end stops, psu-12v-5a; slide joints.
 - Monitor / weather station / smart home: esp32-devkitc, dht22 / bme280 / ldr-module, lcd1602-i2c or oled-128x64, fan-5v-40 or led-rgb as outputs via mosfet-module; signals with slow drift; rules for the outputs.
+
+HARDWARE ENGINE (hardware): if the machine is a ground robot that drives, a powered arm joint, a self-balancing robot or a multirotor, ALSO specify its drivetrain electronics so it gets the full engineering lab (the same one the built-in demos have: part slots with alternatives, geometry and mass sliders, electrical design checks with auto-fixes, wiring diagram, PID controller, scope, Bode, firmware). Pick the kind, then one part id per slot from that kind's list, matched to the machine you designed (the motors you placed, the controller board, the battery), and real geometry / mass / mission values in SI units within the ranges. Choose parts that work together: driver voltage and current ≥ the motors', battery voltage within the driver's and motors' range, enough torque for the mass and speed. For any other machine (sensing, watering, lighting, conveyors with no drive, desk gadgets) set kind "none" and leave the rest empty.
+${hardwareGuide()}
 
 SCOPE: only the device itself; no tables, benches, rooms, people or props.`;
 }

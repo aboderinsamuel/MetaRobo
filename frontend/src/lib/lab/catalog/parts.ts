@@ -94,7 +94,10 @@ export type ModelKind =
   | "lcd"
   | "pot_plant"
   | "reservoir"
-  | "tube_coil";
+  | "tube_coil"
+  | "led_string"
+  | "xmas_tree"
+  | "board_fpga";
 
 export interface Actuator {
   kind: "servo" | "continuous_servo" | "dc" | "stepper";
@@ -127,6 +130,8 @@ export interface CatalogPart {
   electrical?: { vMin: number; vMax: number; maxA?: number; mAh?: number; channels?: number };
   /** Pumps and valves: flow at rated voltage (L/min) and max head (m). */
   fluid?: { flowLpm: number; headM: number };
+  /** LED strings and strips: how many LEDs, and whether each is individually addressable (WS2812). */
+  leds?: { count: number; addressable: boolean };
   /** Arm kits: reach (mm), joints, end effector. */
   kit?: { reachMm: number; dof: number; effector: "gripper" | "hand" | "suction" };
   /** Source when added by web search or an upload. */
@@ -167,6 +172,7 @@ export const CATALOG: CatalogPart[] = [
   { id: "arduino-mega", name: "Arduino Mega 2560 Rev3", category: "controller", model: "board_mega", dims: [101.5, 15, 53.3], massG: 37, priceUsd: 48, spec: "ATmega2560 · 54 digital I/O · 15 PWM · 4 UARTs", suppliers: ["arduino", "sparkfun", "adafruit", "digikey"], search: "Arduino Mega 2560 Rev3", electrical: { vMin: 7, vMax: 12 } },
   { id: "arduino-nano", name: "Arduino Nano", category: "controller", model: "board_nano", dims: [45, 8, 18], massG: 7, priceUsd: 22, spec: "ATmega328P · 22 I/O · breadboard-friendly", suppliers: ["arduino", "sparkfun", "digikey"], search: "Arduino Nano", electrical: { vMin: 7, vMax: 12 } },
   { id: "esp32-devkitc", name: "ESP32 DevKitC", category: "controller", model: "board_esp32", dims: [55, 8, 28], massG: 10, priceUsd: 10, spec: "Dual-core 240 MHz · Wi-Fi + Bluetooth · 3.3 V logic", suppliers: ["adafruit", "sparkfun", "digikey", "lcsc"], search: "ESP32 DevKitC", electrical: { vMin: 5, vMax: 5 } },
+  { id: "tang-nano-9k", name: "Sipeed Tang Nano 9K FPGA board", category: "controller", model: "board_fpga", dims: [69, 6, 23], massG: 8, priceUsd: 18, spec: "Gowin GW1NR-9 FPGA · 27 MHz clock · 3.3 V IO · runs Verilog / VHDL", suppliers: ["aliexpress", "amazon", "seeed"], search: "Sipeed Tang Nano 9K", electrical: { vMin: 5, vMax: 5 } },
   { id: "rpi-pico", name: "Raspberry Pi Pico", category: "controller", model: "board_pico", dims: [51, 4, 21], massG: 3, priceUsd: 4, spec: "RP2040 · 26 GPIO · 3.3 V logic", suppliers: ["raspberrypi", "adafruit", "sparkfun", "digikey"], search: "Raspberry Pi Pico", electrical: { vMin: 1.8, vMax: 5.5 } },
   { id: "rpi-4b", name: "Raspberry Pi 4 Model B (4 GB)", category: "controller", model: "board_pi", dims: [85, 17, 56], massG: 46, priceUsd: 55, spec: "Quad-core 1.5 GHz · camera/USB/Wi-Fi · Linux · 5 V 3 A", suppliers: ["raspberrypi", "adafruit", "sparkfun", "digikey"], search: "Raspberry Pi 4 Model B 4GB", electrical: { vMin: 5, vMax: 5, maxA: 3 } },
   { id: "rpi-5", name: "Raspberry Pi 5 (4 GB)", category: "controller", model: "board_pi", dims: [85, 19, 56], massG: 48, priceUsd: 60, spec: "Quad-core 2.4 GHz · 2 camera ports · 5 V 5 A", suppliers: ["raspberrypi", "adafruit", "digikey"], search: "Raspberry Pi 5 4GB", electrical: { vMin: 5, vMax: 5, maxA: 5 } },
@@ -272,6 +278,11 @@ export const CATALOG: CatalogPart[] = [
   { id: "usb-5v-2a", name: "USB 5 V 2 A wall adapter + cable", category: "power", model: "module_pcb", dims: [45, 25, 40], massG: 60, priceUsd: 6, spec: "5 V · 2 A · mains powered", suppliers: ["adafruit", "amazon"], search: "5V 2A USB power adapter", electrical: { vMin: 5, vMax: 5, maxA: 2 } },
   { id: "jumper-kit", name: "Jumper wire kit (M-M / M-F / F-F)", category: "electronics", model: "module_pcb", dims: [60, 10, 40], massG: 40, priceUsd: 6, spec: "120 × 20 cm Dupont wires", suppliers: ["adafruit", "sparkfun", ...hobby], search: "jumper wire kit dupont" },
   { id: "pot-12cm", name: "Plant pot 12 cm with drainage", category: "structure", model: "pot_plant", dims: [125, 110, 125], massG: 90, priceUsd: 3, spec: "Plastic · holds ~0.9 L of soil", suppliers: ["amazon"], search: "12cm plastic plant pot" },
+  // ---------------------------------------------------------------- festive lighting
+  { id: "ws2812b-string-50", name: "WS2812B 12 mm pixel string, 50 LEDs", category: "electronics", model: "led_string", dims: [70, 30, 70], massG: 180, priceUsd: 15, spec: "5 V · individually addressable RGB · 10 cm spacing · up to 3 A full white", suppliers: ["adafruit", "aliexpress", "amazon"], search: "WS2812B 12mm pixel string 50", electrical: { vMin: 5, vMax: 5, maxA: 3 }, leds: { count: 50, addressable: true } },
+  { id: "ws2812b-strip-1m-60", name: "WS2812B LED strip 1 m, 60 LEDs", category: "electronics", model: "led_string", dims: [1000, 3, 10], massG: 40, priceUsd: 10, spec: "5 V · individually addressable RGB · up to 3.6 A full white", suppliers: ["adafruit", "sparkfun", "aliexpress"], search: "WS2812B strip 60 LED 1m", electrical: { vMin: 5, vMax: 5, maxA: 3.6 }, leds: { count: 60, addressable: true } },
+  { id: "fairy-string-5v-100", name: "5 V fairy lights, 100 warm-white LEDs", category: "electronics", model: "led_string", dims: [60, 25, 60], massG: 60, priceUsd: 8, spec: "5 V · single channel · 0.25 A · switch with a MOSFET (one per strand)", suppliers: ["amazon", "aliexpress"], search: "5V USB fairy lights 100 LED", electrical: { vMin: 5, vMax: 5, maxA: 0.25 }, leds: { count: 100, addressable: false } },
+  { id: "xmas-tree-60cm", name: "Artificial tabletop Christmas tree, 60 cm", category: "structure", model: "xmas_tree", dims: [380, 600, 380], massG: 900, priceUsd: 20, spec: "PVC branches · weighted stand · lights wrap round it", suppliers: ["amazon"], search: "60cm tabletop artificial christmas tree" },
   { id: "reservoir-1l", name: "Water reservoir 1 L (food-safe box)", category: "structure", model: "reservoir", dims: [130, 90, 130], massG: 80, priceUsd: 4, spec: "1 L · lid with tube hole", suppliers: ["amazon"], search: "1 liter food container" },
 ];
 

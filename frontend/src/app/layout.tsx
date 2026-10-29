@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Figtree, Geist_Mono, Silkscreen } from "next/font/google";
 import "./globals.css";
+import { THEME_SCRIPT } from "@/lib/themeScript";
 
 const sans = Figtree({
   variable: "--font-geist-sans",
@@ -26,7 +27,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${sans.variable} ${geistMono.variable} ${pixel.variable} h-full antialiased`}>
+    <html lang="en" className={`${sans.variable} ${geistMono.variable} ${pixel.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="flex min-h-full flex-col font-sans">{children}</body>
     </html>
   );

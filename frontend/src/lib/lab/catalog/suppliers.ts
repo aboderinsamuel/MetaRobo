@@ -27,5 +27,6 @@ export type SupplierKey = keyof typeof SUPPLIERS;
 export const FAB_SERVICES = ["PCBWay (CNC, 3D printing, laser cutting)", "JLCPCB 3D printing", "SendCutSend (laser/CNC, US)", "Ponoko (laser cutting)", "Your school makerspace"];
 
 export function supplierLinks(keys: readonly SupplierKey[], query: string): { name: string; url: string }[] {
-  return keys.map((k) => ({ name: SUPPLIERS[k].name, url: SUPPLIERS[k].search(query) }));
+  // Parts sometimes list a supplier twice (a shared list plus their own): show each once.
+  return [...new Set(keys)].map((k) => ({ name: SUPPLIERS[k].name, url: SUPPLIERS[k].search(query) }));
 }

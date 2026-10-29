@@ -95,7 +95,7 @@ export default function VideoTrack({
             <button
               key={m}
               onClick={() => setOpts({ ...opts, measure: m })}
-              className={`flex-1 border px-2 py-1.5 capitalize ${opts.measure === m ? "border-fg/40 text-fg" : "border-line-2 text-mute"}`}
+              className={`rounded-xl flex-1 border px-2 py-1.5 capitalize ${opts.measure === m ? "border-fg/40 text-fg" : "border-line-2 text-mute"}`}
             >
               Measure {m}
             </button>

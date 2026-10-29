@@ -35,8 +35,8 @@ import type { CatalogPart } from "@/lib/lab/catalog/parts";
 
 export function SectionLabel({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-      <span className="mono-label text-mute">{children}</span>
+    <div className="flex items-center justify-between px-4 pt-4 pb-2">
+      <span className="text-[12px] font-semibold tracking-wide text-mute uppercase">{children}</span>
       {right}
     </div>
   );
@@ -46,7 +46,7 @@ export function GhostButton({ className = "", ...props }: React.ButtonHTMLAttrib
   return (
     <button
       {...props}
-      className={`mono-label inline-flex h-8 items-center gap-1.5 border border-line-2 px-3 text-mute transition-colors hover:border-fg/40 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
+      className={`inline-flex h-8 items-center gap-1.5 rounded-xl bg-surface px-3 text-[12.5px] font-medium text-mute shadow-[0_0_0_1px_var(--color-line-2)] transition-colors hover:bg-surface-2 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
     />
   );
 }
@@ -55,7 +55,7 @@ export function PrimaryButton({ className = "", ...props }: React.ButtonHTMLAttr
   return (
     <button
       {...props}
-      className={`spectrum-border mono-label inline-flex h-9 items-center justify-center gap-2 rounded-[3px] bg-void px-4 text-fg transition-colors hover:bg-panel-2 disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
+      className={`inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-[13px] font-medium text-accent-fg shadow-[0_6px_20px_-8px_var(--color-accent)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
     />
   );
 }
@@ -163,7 +163,7 @@ export function DescribePanel({
           if (f) onData(f);
         }}
       >
-        <div className="relative border border-line-2 bg-void focus-within:border-fg/40">
+        <div className="relative border border-line-2 bg-void focus-within:border-fg/40 rounded-xl">
           <textarea
             value={text + (interim ? (text ? " " : "") + interim : "")}
             onChange={(e) => setText(e.target.value)}
@@ -231,7 +231,7 @@ export function DescribePanel({
         </div>
         {speech.error && <p className="mt-2 text-xs text-bad">{speech.error}</p>}
         {clipError && <p className="mt-2 text-xs text-bad">{clipError}</p>}
-        {error && <p className="mt-2 border border-warn/40 bg-warn/5 px-2.5 py-2 text-[11.5px] leading-relaxed text-warn">{error}</p>}
+        {error && <p className="mt-2 border border-warn/40 bg-warn/5 px-2.5 py-2 text-[11.5px] leading-relaxed text-warn rounded-xl">{error}</p>}
         {clip && (
           <VideoTrack
             file={clip}
@@ -290,7 +290,7 @@ export function DescribePanel({
                 key={p.id}
                 onClick={() => onPreset(p.id)}
                 disabled={busy}
-                className="border border-line px-2.5 py-1 text-[12px] text-mute transition-colors hover:border-line-2 hover:text-fg disabled:opacity-40"
+                className="border border-line px-2.5 py-1 text-[12px] text-mute transition-colors hover:border-line-2 hover:text-fg disabled:opacity-40 rounded-xl"
               >
                 {p.name}
               </button>
@@ -314,7 +314,7 @@ export function ModelCard({ model, notice }: { model: LabModel; notice: string |
   const src = { meta: "Meta Muse Spark", offline: "Physics library", data: "Identified from data" }[model.source];
   return (
     <div className="border-t border-line">
-      <SectionLabel right={<span className="mono-label rounded-[2px] border border-line-2 px-1.5 py-0.5 text-[10px] text-mute">{src}</span>}>02 · Model</SectionLabel>
+      <SectionLabel right={<span className="mono-label rounded-full border border-line-2 px-1.5 py-0.5 text-[10px] text-mute">{src}</span>}>02 · Model</SectionLabel>
       <div className="space-y-4 p-4">
         {notice && <p className="border-l-2 border-warn/60 pl-3 text-xs text-mute">{notice}</p>}
         <div>
@@ -330,7 +330,7 @@ export function ModelCard({ model, notice }: { model: LabModel; notice: string |
           </span>
         </div>
         {model.plant.kind === "tf" ? (
-          <div className="flex items-center gap-3 overflow-x-auto border border-line bg-void p-3 font-mono text-[12px]">
+          <div className="flex items-center gap-3 overflow-x-auto border border-line bg-void p-3 font-mono text-[12px] rounded-xl">
             <span className="shrink-0 text-mute">G(s) =</span>
             <span className="inline-flex flex-col items-center">
               <span className="px-1 whitespace-nowrap">{polyToString(model.plant.num)}</span>
@@ -340,7 +340,7 @@ export function ModelCard({ model, notice }: { model: LabModel; notice: string |
             {(model.plant.delay ?? 0) > 0 && <span className="shrink-0">· e^(−{fmtNum(model.plant.delay ?? 0)}s)</span>}
           </div>
         ) : (
-          <div className="overflow-x-auto border border-line bg-void p-3 font-mono text-[11px]">
+          <div className="overflow-x-auto border border-line bg-void p-3 font-mono text-[11px] rounded-xl">
             <p className="mb-1.5 text-mute">ẋ = A x + B u · states [{model.plant.stateNames.join(", ")}]</p>
             <table>
               <tbody>
@@ -588,7 +588,7 @@ export function Copilot({
                 animate={{ opacity: 1, scale: 1 }}
                 onClick={() => onRestore(it)}
                 title={`${it.label}: ${describeCtrl(it.controller)}`}
-                className={`shrink-0 border px-2 py-1 text-left font-mono text-[10px] transition-colors ${on ? "border-fg/50 bg-panel-2" : "border-line hover:border-line-2"}`}
+                className={`rounded-xl shrink-0 border px-2 py-1 text-left font-mono text-[10px] transition-colors ${on ? "border-fg/50 bg-panel-2" : "border-line hover:border-line-2"}`}
               >
                 <span className="flex items-center gap-1.5">
                   <span className={`size-1.5 rounded-full ${ok ? "bg-ok" : "bg-bad"}`} />v{it.id}
@@ -640,7 +640,7 @@ export function Copilot({
                       const pv = m.previews[j];
                       const applied = current && JSON.stringify(current) === JSON.stringify(p.controller);
                       return (
-                        <div key={j} className="border border-line bg-void p-2.5">
+                        <div key={j} className="border border-line bg-void p-2.5 rounded-xl">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <p className="text-[12px] font-medium">{p.label}</p>
@@ -649,7 +649,7 @@ export function Copilot({
                             <button
                               onClick={() => onApply(p.controller, p.label)}
                               disabled={!!busy || !!applied}
-                              className="mono-label shrink-0 border border-line-2 px-2 py-1 text-[10px] text-fg transition-colors hover:bg-panel-2 disabled:opacity-40"
+                              className="mono-label shrink-0 border border-line-2 px-2 py-1 text-[10px] text-fg transition-colors hover:bg-panel-2 disabled:opacity-40 rounded-xl"
                             >
                               {applied ? "Applied" : "Apply"}
                             </button>
@@ -698,7 +698,7 @@ export function Copilot({
             onAsk(q.trim());
             setQ("");
           }}
-          className="flex items-center border border-line-2 bg-void focus-within:border-fg/40"
+          className="flex items-center border border-line-2 bg-void focus-within:border-fg/40 rounded-xl"
         >
           <input
             value={q}
@@ -775,7 +775,7 @@ export function ValidatePanel({ results, running, total, onRun, refValue }: { re
   );
 }
 
-export function CodePanel({ code, ts, filename }: { code: string; ts: number; filename: string }) {
+export function CodePanel({ code, ts, filename, machine = false }: { code: string; ts: number; filename: string; machine?: boolean }) {
   const [copied, setCopied] = useState(false);
   const lines = useMemo(() => code.split("\n"), [code]);
   return (
@@ -784,7 +784,9 @@ export function CodePanel({ code, ts, filename }: { code: string; ts: number; fi
         <div>
           <p className="text-[15px] font-medium">Firmware</p>
           <p className="text-[13px] text-mute">
-            The same discrete controller the simulator runs, at a {ts * 1000} ms sample time (≈20 samples per crossover period).
+            {machine
+              ? "Generated from this design: pins from its wiring, motion from its program, logic from its rules (with the same hysteresis as the simulation)."
+              : `The same discrete controller the simulator runs, at a ${ts * 1000} ms sample time (≈20 samples per crossover period).`}
           </p>
         </div>
         <div className="flex gap-2">
@@ -810,7 +812,7 @@ export function CodePanel({ code, ts, filename }: { code: string; ts: number; fi
           </GhostButton>
         </div>
       </div>
-      <pre className="max-h-[520px] overflow-auto border border-line bg-void p-3 font-mono text-[11.5px] leading-relaxed">
+      <pre className="max-h-[520px] overflow-auto border border-line bg-void p-3 font-mono text-[11.5px] leading-relaxed rounded-xl">
         {lines.map((l, i) => (
           <div key={i} className="flex">
             <span className="w-8 shrink-0 pr-3 text-right text-dim select-none">{i + 1}</span>

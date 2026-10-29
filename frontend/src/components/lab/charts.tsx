@@ -208,7 +208,7 @@ export function TimeChart({
       </svg>
       {hoverT !== null && (
         <div
-          className="pointer-events-none absolute top-2 z-10 border border-line-2 bg-void/90 px-2.5 py-1.5 font-mono text-[11px] backdrop-blur"
+          className="pointer-events-none absolute top-2 z-10 border border-line-2 bg-void/90 px-2.5 py-1.5 font-mono text-[11px] backdrop-blur rounded-xl"
           style={{ left: Math.min(w - 150, X(hoverT) + 10) }}
         >
           <p className="text-dim">t = {fmtNum(hoverT)} s</p>

@@ -113,7 +113,7 @@ export default function AgentTrace() {
               { label: "Muse Spark's first try", y: trace.first.sim.y, pass: trace.firstPass },
               { label: trace.firstPass ? "Accepted as-is" : "After the engine's fix", y: trace.second.sim.y, pass: trace.accepted },
             ].map((c) => (
-              <div key={c.label} className="rounded-lg border border-line bg-panel p-3">
+              <div key={c.label} className="rounded-2xl border border-line bg-panel p-3">
                 <p className="mono-label flex items-center justify-between text-[9px] text-mute">
                   {c.label} <span className={c.pass ? "text-ok" : "text-bad"}>{c.pass ? "pass" : "fail"}</span>
                 </p>
@@ -123,7 +123,7 @@ export default function AgentTrace() {
           </div>
         </div>
 
-        <div ref={ref} className="meta-ring self-start rounded-xl bg-panel">
+        <div ref={ref} className="meta-ring self-start overflow-hidden rounded-3xl bg-panel">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <span className="mono-label text-[10px] text-mute">agent trace · rover speed loop</span>
             <span className="mono-label flex items-center gap-1.5 text-[10px] text-mute">

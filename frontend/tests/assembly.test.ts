@@ -81,7 +81,7 @@ describe("design format", () => {
   it("is valid for Meta's strict structured output", () => {
     const s = jsonSchemaFor(AssemblyOut) as { additionalProperties: boolean; required: string[] };
     expect(s.additionalProperties).toBe(false);
-    expect(s.required).toEqual(["title", "parts", "connections", "joints", "program", "signals", "rules", "timeScale", "simSeconds"]);
+    expect(s.required).toEqual(["title", "parts", "connections", "joints", "program", "signals", "rules", "timeScale", "simSeconds", "hardware"]);
   });
 
   it("teaches Muse Spark to build only from real parts", () => {
@@ -216,5 +216,20 @@ describe("fabricated parts look and weigh like the real thing", () => {
     expect(g).toMatch(/bracket-multi-servo/);
     expect(g).toMatch(/NEVER use a fab:printed or fab:plate part as a moving limb segment/);
     expect(g).toMatch(/rotation \[0, 0, -90\] so its shaft points \+x/);
+  });
+});
+
+describe("hardware build from the model", () => {
+  it("keeps real part ids, defaults the rest and clamps geometry", async () => {
+    const { sanitizeHardware } = await import("@/lib/lab/assembly");
+    const { SLOTS, GEOMETRY, defaultBuild } = await import("@/lib/lab/hardware/build");
+    const motor = SLOTS.rover.find((s) => s.slot === "motor")!.options[1].id;
+    const h = sanitizeHardware({ kind: "rover", board: "not-a-board", driver: "", motor, battery: "", sensor: "", prop: "", geom: [{ key: "wheelD", value: 9 }, { key: "bogus", value: 1 }] })!;
+    expect(h.kind).toBe("rover");
+    expect(h.parts.motor).toBe(motor);
+    expect(h.parts.board).toBe(defaultBuild("rover").parts.board);
+    expect(h.geom.wheelD).toBe(GEOMETRY.rover.find((g) => g.key === "wheelD")!.max);
+    expect(h.geom.bogus).toBeUndefined();
+    expect(sanitizeHardware({ kind: "none", board: "", driver: "", motor: "", battery: "", sensor: "", prop: "", geom: [] })).toBeUndefined();
   });
 });

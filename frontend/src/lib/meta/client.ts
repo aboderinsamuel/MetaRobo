@@ -60,6 +60,8 @@ export interface JsonRequest<S extends z.ZodType> {
   schemaName: string;
   system: string;
   user: string;
+  /** Images for Muse Spark vision: data: URLs (jpeg/png/webp), at most 50. */
+  images?: string[];
   maxTokens: number;
   effort?: "minimal" | "low" | "medium" | "high";
   model?: string;
@@ -159,7 +161,12 @@ export async function metaJson<S extends z.ZodType>(req: JsonRequest<S>): Promis
     model,
     messages: [
       { role: "developer", content: req.system },
-      { role: "user", content: req.user },
+      {
+        role: "user",
+        content: req.images?.length
+          ? [{ type: "text", text: req.user }, ...req.images.slice(0, 50).map((url) => ({ type: "image_url", image_url: { url } }))]
+          : req.user,
+      },
     ],
     max_completion_tokens: req.maxTokens,
     reasoning_effort: req.effort ?? "low",

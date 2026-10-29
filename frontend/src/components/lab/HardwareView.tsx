@@ -18,6 +18,8 @@ import { segmentAt } from "@/lib/lab/programs";
 import type { ProgramDef, ProgramRun } from "@/lib/lab/programs";
 import type { LabModel } from "@/lib/lab/types";
 import { Scene } from "./hw3d/parts3d";
+import { STAGE } from "@/lib/stage";
+import { useTheme } from "@/lib/theme";
 import type { PartStatus, SceneCtx } from "./hw3d/parts3d";
 import MachineRig, { gizmoActive, type GizmoMode } from "./hw3d/machine";
 import { at, simulateMachine, type MachineSim } from "@/lib/lab/actuation";
@@ -219,9 +221,10 @@ export default function HardwareView({
   }, [machine, onSelectPart]);
   const errors = checks.filter((c) => c.level === "error").length;
   const warns = checks.filter((c) => c.level === "warn").length;
+  const stage = STAGE[useTheme()];
 
   return (
-    <div data-tour="robot" className={`relative overflow-hidden bg-[#06080b] ${className ?? ""}`}>
+    <div data-tour="robot" className={`relative overflow-hidden bg-canvas ${className ?? ""}`}>
       <Canvas
         key={`${machine ? `machine-${machine.title}` : rig.kind}-${camKey}-${wide ? "w" : "n"}`}
         shadows
@@ -235,9 +238,9 @@ export default function HardwareView({
         }}
       >
         <Scene.Provider value={ctx}>
-          <color attach="background" args={["#06080b"]} />
-          {!machine && <fog attach="fog" args={["#06080b", 2.5, isDrone ? 9 : 6]} />}
-          <hemisphereLight args={["#bcd3ff", "#0b0f14", 0.65]} />
+          <color attach="background" args={[stage.bg]} />
+          {!machine && <fog attach="fog" args={[stage.bg, 2.5, isDrone ? 9 : 6]} />}
+          <hemisphereLight args={[stage.sky, stage.ground, stage.hemi]} />
           <directionalLight
             position={[1.2, 2, 1]}
             intensity={1.7}
@@ -250,10 +253,10 @@ export default function HardwareView({
           />
           <directionalLight position={[-1.5, 0.8, -1]} intensity={0.6} color="#7f5bff" />
           <pointLight position={[0.3, 0.4, 0.5]} intensity={0.4} color="#2dd4ff" />
-          <Grid infiniteGrid cellSize={0.05} sectionSize={0.25} cellColor="#16222f" sectionColor="#1f4257" fadeDistance={isDrone ? 7 : 3.5} fadeStrength={1.5} position={[0, -0.0005, 0]} />
+          <Grid infiniteGrid cellSize={0.05} sectionSize={0.25} cellColor={stage.cell} sectionColor={stage.section} fadeDistance={isDrone ? 7 : 3.5} fadeStrength={1.5} position={[0, -0.0005, 0]} />
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]} receiveShadow>
             <planeGeometry args={[60, 60]} />
-            <shadowMaterial opacity={0.35} />
+            <shadowMaterial opacity={stage.shadow} />
           </mesh>
           <Driver onFrame={advance} />
           {machine ? (
@@ -283,7 +286,7 @@ export default function HardwareView({
       {/* Top-left: rig + verdict */}
       <div className="pointer-events-none absolute top-0 left-0 flex max-w-[60%] flex-col gap-1.5 p-3">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mono-label inline-flex items-center gap-2 border border-line-2 bg-void/80 px-2 py-1 text-[10px] backdrop-blur">
+          <span className="mono-label inline-flex items-center gap-2 border border-line-2 bg-void/80 px-2 py-1 text-[10px] backdrop-blur rounded-xl">
             <span className="size-1.5 rounded-full" style={{ background: "var(--spectrum-conic)" }} />
             {machine ? machine.title : (title ?? RIGS[rig.kind].name)}
           </span>
@@ -293,13 +296,13 @@ export default function HardwareView({
             </span>
           )}
           {machine && model.review && (
-            <span className={`mono-label inline-flex items-center gap-1.5 border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${VERDICT_UI[model.review.verdict].cls}`}>
+            <span className={`mono-label inline-flex items-center gap-1.5 border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${VERDICT_UI[model.review.verdict].cls} rounded-xl`}>
               {VERDICT_UI[model.review.verdict].label}
               {model.review.bom.length > 0 && <span className="text-mute">· ≈ ${bomTotal(model.review).toFixed(0)}</span>}
             </span>
           )}
           {!machine && <span
-            className={`mono-label inline-flex items-center gap-1.5 border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${errors ? "border-bad/50 text-bad" : warns ? "border-warn/50 text-warn" : "border-ok/40 text-ok"}`}
+            className={`rounded-xl mono-label inline-flex items-center gap-1.5 border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${errors ? "border-bad/50 text-bad" : warns ? "border-warn/50 text-warn" : "border-ok/40 text-ok"}`}
           >
             {errors ? <XCircle className="size-3" /> : warns ? <AlertTriangle className="size-3" /> : <CheckCircle2 className="size-3" />}
             {errors ? (simple ? `${errors} thing${errors > 1 ? "s" : ""} to fix` : `${errors} blocking issue${errors > 1 ? "s" : ""}`) : warns ? `${warns} warning${warns > 1 ? "s" : ""}` : simple ? "ready to build" : "feasible"}
@@ -318,7 +321,7 @@ export default function HardwareView({
       <div className="pointer-events-none absolute top-0 right-0 space-y-1.5 p-3 text-right">
         <div className="pointer-events-auto flex justify-end gap-1">
           {machine && selectedPart && (
-            <div className="flex border border-spec-1/40 bg-void/80 backdrop-blur">
+            <div className="flex border border-spec-1/40 bg-void/80 backdrop-blur rounded-xl">
               {(
                 [
                   ["translate", "Move", "G"],
@@ -340,18 +343,18 @@ export default function HardwareView({
             <button
               onClick={() => setSound((v) => !v)}
               title={sound ? "Mute the buzzer" : "Play the buzzer through your speakers"}
-              className={`mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${sound ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
+              className={`rounded-xl mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${sound ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
             >
               {sound ? <Volume2 className="size-3" /> : <VolumeX className="size-3" />} Sound
             </button>
           )}
           <button
             onClick={() => setLabels((v) => !v)}
-            className={`mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${labels ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
+            className={`rounded-xl mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${labels ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
           >
             <Tag className="size-3" /> Labels
           </button>
-          <button onClick={() => setCamKey((k) => k + 1)} className="mono-label flex items-center border border-line-2 bg-void/80 px-2 py-1 text-[10px] text-dim backdrop-blur hover:text-fg" aria-label="Reset camera">
+          <button onClick={() => setCamKey((k) => k + 1)} className="mono-label flex items-center border border-line-2 bg-void/80 px-2 py-1 text-[10px] text-dim backdrop-blur hover:text-fg rounded-xl" aria-label="Reset camera">
             <RotateCcw className="size-3" />
           </button>
         </div>
@@ -370,7 +373,7 @@ export default function HardwareView({
             initial={{ opacity: 0, x: -12 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -12 }}
-            className="absolute top-20 left-3 z-10 w-[min(320px,calc(100%-24px))] border border-spec-1/40 bg-void/92 backdrop-blur"
+            className="absolute top-20 left-3 z-10 w-[min(320px,calc(100%-24px))] border border-spec-1/40 bg-void/92 backdrop-blur rounded-xl"
           >
             <Inspector hw={hw} slot={selected} checks={checks} onClose={() => onSelect(null)} onBuild={onBuild} />
           </motion.div>
@@ -382,7 +385,7 @@ export default function HardwareView({
         {dock}
         <div className="border-t border-line bg-void/90 backdrop-blur">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-2">
-            <div data-tour="programs" className="flex items-center gap-0.5 border border-line p-0.5">
+            <div data-tour="programs" className="flex items-center gap-0.5 border border-line p-0.5 rounded-xl">
               {programs.map((pr) => (
                 <button
                   key={pr.id}
@@ -426,8 +429,8 @@ function MachineHud({ playback, sim, assembly }: { playback: Playback; sim: Mach
   const amps = at(sim.totalCurrent, t);
   return (
     <>
-      <span className={`mono-label inline-block border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${cls}`}>{status}</span>
-      <div className="w-56 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
+      <span className={`mono-label inline-block border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${cls} rounded-xl`}>{status}</span>
+      <div className="w-56 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur rounded-xl">
         {sim.traces.slice(0, 6).map((tr) => {
           const v = at(tr.value, t);
           return (
@@ -541,20 +544,20 @@ function Hud({
   const heading = mo.pose ? Math.round(((((mo.pose.h[idx] * 180) / Math.PI) % 360) + 360) % 360) : 0;
   return (
     <>
-      <span className={`mono-label inline-block border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${statusCls}`}>{status}</span>
+      <span className={`mono-label inline-block border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${statusCls} rounded-xl`}>{status}</span>
       {custom ? (
-        <div className="w-52 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
+        <div className="w-52 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur rounded-xl">
           <Row k={model.output.name} v={`${fmtNum(value)} / ${fmtNum(run.r[idx] ?? model.sim.ref)} ${model.output.unit}`} />
           <Row k={model.input.name} v={`${fmtNum(run.u[idx] ?? 0)} ${model.input.unit}`} />
         </div>
       ) : simple ? (
-        <div className="w-44 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
+        <div className="w-44 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur rounded-xl">
           <Row k={model.output.name.replace(/ change$/, "")} v={friendly(value)} />
           <Row k="goal" v={friendly(run.r[idx] ?? model.sim.ref)} />
           {kind === "balancer" && <Row k="lean" v={`${fmtNum(((tiltNow || 0) * 180) / Math.PI, 2)}°`} />}
         </div>
       ) : (
-      <div className="w-52 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
+      <div className="w-52 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur rounded-xl">
         <Row k={model.output.name} v={`${fmtNum(value)} / ${fmtNum(run.r[idx] ?? model.sim.ref)} ${model.output.unit}`} />
         <Row k={isDrone ? "thrust Δ" : "motor V"} v={`${fmtNum(run.u[idx] ?? 0)} ${model.input.unit}`} />
         {kind === "rover" && mo.speed && <Row k="distance" v={`${fmtNum(mo.main[idx])} m`} />}
@@ -722,7 +725,7 @@ function Inspector({
                   {c.fix && (
                     <button
                       onClick={() => onBuild({ ...hw.build, parts: { ...hw.build.parts, ...c.fix!.parts }, geom: { ...hw.build.geom, ...c.fix!.geom } }, `fix: ${c.fix!.label}`)}
-                      className="mono-label mt-1 ml-[18px] inline-flex items-center gap-1 border border-spec-1/40 px-1.5 py-0.5 text-[10px] text-spec-1 hover:bg-spec-1/10"
+                      className="mono-label mt-1 ml-[18px] inline-flex items-center gap-1 border border-spec-1/40 px-1.5 py-0.5 text-[10px] text-spec-1 hover:bg-spec-1/10 rounded-xl"
                     >
                       <Wand2 className="size-3" /> {c.fix.label}
                     </button>

@@ -7,8 +7,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtNum, run } from "@/lib/lab/analysis";
 import { presetById } from "@/lib/lab/presets";
 import { useEngine } from "@/lib/sim/useEngine";
-import { LANGS, useLang, useStrings } from "@/lib/i18n";
-import { soundOn } from "@/lib/sound";
 import { LaunchButton, MetaBadge } from "./Chrome";
 import MiniChart from "./MiniChart";
 
@@ -27,46 +25,37 @@ function Crosshair({ className }: { className: string }) {
   );
 }
 
-/** Robo introduces itself in the page's language through the browser's own speech voices. */
+const INTRO = "Hi, I'm Robo. Tell me the machine you want to build, and I'll pick real parts, wire it up, and simulate it in 3D before you buy anything.";
+
+/** Robo introduces itself through the browser's own speech voice. */
 function HearRobo() {
-  const lang = useLang();
-  const t = useStrings().hero;
-  // Which language is being spoken; switching language stops the old voice.
-  const [speakingIn, setSpeakingIn] = useState<string | null>(null);
-  const speaking = speakingIn === lang;
-  useEffect(() => {
-    window.speechSynthesis?.cancel();
-  }, [lang]);
+  const [speaking, setSpeaking] = useState(false);
   useEffect(() => () => window.speechSynthesis?.cancel(), []);
   const speak = () => {
     const synth = window.speechSynthesis;
     if (!synth) return;
     if (speaking) {
       synth.cancel();
-      setSpeakingIn(null);
+      setSpeaking(false);
       return;
     }
-    const code = LANGS.find((l) => l.id === lang)!.speech;
-    const u = new SpeechSynthesisUtterance(t.speech);
-    u.lang = code;
-    u.voice = synth.getVoices().find((v) => v.lang.replace("_", "-").startsWith(code.slice(0, 2))) ?? null;
-    u.rate = lang === "en" ? 1.02 : 0.95;
+    const u = new SpeechSynthesisUtterance(INTRO);
+    u.lang = "en-US";
+    u.rate = 1.02;
     u.pitch = 1.25;
-    u.volume = soundOn() ? 1 : 0;
-    u.onend = u.onerror = () => setSpeakingIn((v) => (v === lang ? null : v));
+    u.onend = u.onerror = () => setSpeaking(false);
     synth.cancel();
     synth.speak(u);
-    setSpeakingIn(lang);
+    setSpeaking(true);
   };
   return (
-    <button type="button" onClick={speak} className="mono-label inline-flex h-9 items-center gap-2 rounded-[3px] border whitespace-nowrap border-line-2 px-3 text-mute transition-colors hover:text-fg">
-      {speaking ? <Square className="size-3" /> : <AudioLines className="size-3.5" />} {speaking ? t.stop : t.listen}
+    <button type="button" onClick={speak} className="mono-label inline-flex h-9 items-center gap-2 rounded-xl border border-line-2 px-3 whitespace-nowrap text-mute transition-colors hover:text-fg">
+      {speaking ? <Square className="size-3" /> : <AudioLines className="size-3.5" />} {speaking ? "Stop" : "Hear Robo"}
     </button>
   );
 }
 
 export default function Hero() {
-  const t = useStrings().hero;
   const scrollRef = useRef(0);
   const [robotReady, setRobotReady] = useState(false);
   // Never leave the hero empty if WebGL is slow or unavailable.
@@ -116,12 +105,12 @@ export default function Hero() {
           transition={{ delay: 0.3, duration: 0.8 }}
         >
           <p className="mono-label hidden max-w-[16rem] text-mute sm:block">
-            <span className="text-fg">[RC-LAB]</span> {t.tag}
+            <span className="text-fg">[RC-LAB]</span> Your idea → real parts → 3D simulation → Robo helps you fix it
           </p>
           <ul className="mono-label hidden space-y-1.5 text-right text-mute md:block">
-            {t.list.map((item, i) => (
-              <motion.li key={i} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.08 }}>
-                {item}
+            {["Ages 10 to engineer", "Simple & Pro modes", "Real part physics", "C++ → WebAssembly", "Meta Muse Spark"].map((t, i) => (
+              <motion.li key={t} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.08 }}>
+                {t}
               </motion.li>
             ))}
           </ul>
@@ -131,11 +120,11 @@ export default function Hero() {
           <div>
             <motion.div className="mb-5 flex flex-wrap items-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
               <MetaBadge />
-              <span className="mono-label text-mute">{t.noExp}</span>
+              <span className="mono-label text-mute">·· No experience needed</span>
             </motion.div>
             <h1 className="text-[clamp(2.4rem,5.6vw,5.2rem)] leading-[0.95] font-medium tracking-[-0.035em] [text-shadow:0_4px_40px_rgb(4_5_6_/_0.9)]">
               <motion.span className="block" initial={{ y: "110%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.9, ease, delay: 0.2 }}>
-                {t.h1a}
+                Build a robot.
               </motion.span>
               <motion.span
                 className="mt-2 flex flex-wrap items-center gap-x-[0.25em]"
@@ -143,14 +132,13 @@ export default function Hero() {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.9, ease, delay: 0.32 }}
               >
-                {t.h1b[0]}
+                Watch it
                 <span className="relative inline-block px-[0.18em]">
                   <Crosshair className="-top-1.5 -left-1.5" />
                   <Crosshair className="-right-1.5 -bottom-1.5" />
                   <span className="absolute inset-0 border border-line-2" />
-                  <span className={t.h1b[1] === "move" ? "font-pixel text-[0.86em] tracking-[-0.02em]" : "text-[0.92em]"}>{t.h1b[1]}</span>
+                  <span className="font-pixel text-[0.86em] tracking-[-0.02em]">move</span>
                 </span>
-                {t.h1b[2]}
               </motion.span>
             </h1>
           </div>
@@ -161,15 +149,14 @@ export default function Hero() {
             transition={{ delay: 0.7, duration: 0.7 }}
           >
             <p className="text-[15px] leading-relaxed text-mute [text-shadow:0_2px_18px_rgb(4_5_6_/_0.95)]">
-              {t.body[0]}
-              <span className="text-fg">{t.body[1]}</span>
-              {t.body[2]}
+              Pick a robot car, arm, balancer or drone, or just say <span className="text-fg">“a robot that picks up my toys”</span>. Press
+              Simulate and watch it move. Robo explains what won&apos;t work and fixes it with you. Pro mode adds the graphs, maths and firmware.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <LaunchButton label={t.start} href="/lab?onboard=1" />
+              <LaunchButton label="Start building" href="/create" />
               <HearRobo />
-              <a href="#loop" className="mono-label hidden h-9 items-center gap-2 px-3 text-mute transition-colors hover:text-fg sm:inline-flex">
-                {t.how} <ArrowDown className="size-3.5" />
+              <a href="#loop" className="mono-label inline-flex h-9 items-center gap-2 px-3 text-mute transition-colors hover:text-fg">
+                How it works <ArrowDown className="size-3.5" />
               </a>
             </div>
           </motion.div>

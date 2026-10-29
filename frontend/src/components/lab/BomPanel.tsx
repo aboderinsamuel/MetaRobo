@@ -46,7 +46,7 @@ export default function BomPanel({ assembly }: { assembly: Assembly }) {
       </button>
       {open && (
         <div className="px-4 pb-4">
-          <ul className="divide-y divide-line border border-line">
+          <ul className="divide-y divide-line border border-line rounded-xl">
             {rows.map((r) => (
               <li key={r.key} className="px-2.5 py-1.5">
                 <p className="flex justify-between gap-2 text-[12px]">
@@ -80,7 +80,7 @@ export default function BomPanel({ assembly }: { assembly: Assembly }) {
               </li>
             ))}
           </ul>
-          <button onClick={download} className="mono-label mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 border border-line-2 text-[10px] text-mute hover:text-fg">
+          <button onClick={download} className="mono-label mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 border border-line-2 text-[10px] text-mute hover:text-fg rounded-xl">
             <Download className="size-3" /> Download BOM (CSV)
           </button>
           <p className="mt-1 text-[10px] text-dim">Typical street prices. Supplier links open each store&apos;s search for the part.</p>

@@ -23,8 +23,8 @@ export default function Footer() {
             </p>
           </div>
           {[
-            { href: "/studio/arm", icon: Bot, name: "3-axis arm", text: "Inverse kinematics, torque sizing, servo rail" },
-            { href: "/studio/rover", icon: Car, name: "Rover", text: "Drive-force budget, H-bridge matching, runtime" },
+            { href: "/lab?preset=arm", icon: Bot, name: "3-axis arm", text: "Inverse kinematics, torque sizing, servo rail" },
+            { href: "/lab?preset=rover", icon: Car, name: "Rover", text: "Drive-force budget, H-bridge matching, runtime" },
           ].map(({ href, icon: Icon, name, text }) => (
             <Link key={href} href={href} className="group flex flex-col justify-between gap-8 bg-void p-6 transition-colors hover:bg-panel sm:p-10">
               <Icon className="size-6 text-mute transition-colors group-hover:text-fg" />

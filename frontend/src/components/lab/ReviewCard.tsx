@@ -25,7 +25,7 @@ export default function ReviewCard({ review }: { review: Review }) {
       </button>
       {open && (
         <div className="space-y-3 px-4 pb-4">
-          <span className={`mono-label inline-flex items-center gap-1.5 border px-2 py-1 text-[10px] ${v.cls}`}>
+          <span className={`mono-label inline-flex items-center gap-1.5 border px-2 py-1 text-[10px] ${v.cls} rounded-xl`}>
             <Icon className="size-3" /> {v.label}
           </span>
           <p className="text-[13px] leading-snug font-medium">{review.headline}</p>
@@ -43,7 +43,7 @@ export default function ReviewCard({ review }: { review: Review }) {
                 </span>
                 <span className="text-fg">≈ ${total.toFixed(0)}</span>
               </p>
-              <ul className="mt-1.5 divide-y divide-line border border-line">
+              <ul className="mt-1.5 divide-y divide-line border border-line rounded-xl">
                 {review.bom.map((b, i) => (
                   <li key={i} className="px-2.5 py-1.5">
                     <p className="flex justify-between gap-2 text-[12px]">
@@ -78,7 +78,7 @@ export default function ReviewCard({ review }: { review: Review }) {
           )}
 
           {review.alternative && (
-            <div className="border border-spec-2/30 bg-spec-2/5 px-2.5 py-2">
+            <div className="border border-spec-2/30 bg-spec-2/5 px-2.5 py-2 rounded-xl">
               <p className="mono-label text-[9px] text-spec-1">Buy or build instead</p>
               <p className="mt-1 text-[12px] leading-relaxed">{review.alternative}</p>
             </div>

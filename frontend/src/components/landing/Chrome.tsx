@@ -1,17 +1,15 @@
 "use client";
 
-import { ArrowUpRight, Menu, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowUpRight, Menu, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import RoboMark from "@/components/brand/RoboMark";
-import { LANGS, setLang, useLang, useStrings } from "@/lib/i18n";
-import { chime, setSound, tick, useSound } from "@/lib/sound";
+import { ThemeToggle } from "@/components/create/ui";
 
 // `nav` marks the sections linked from the top bar; the side rail shows them all.
 export const SECTIONS = [
   { id: "intro", label: "Intro" },
-  { id: "styles", label: "Robo" },
   { id: "meta", label: "Meta stack", nav: true },
   { id: "loop", label: "The loop", nav: true },
   { id: "trace", label: "Agent", nav: true },
@@ -36,66 +34,18 @@ export function MetaBadge({ className = "" }: { className?: string }) {
   );
 }
 
-export function LaunchButton({ className = "", label, href = "/lab" }: { className?: string; label?: string; href?: string }) {
-  const launch = useStrings().launch;
-  label ??= launch;
+export function LaunchButton({ className = "", label = "Open studio", href = "/create" }: { className?: string; label?: string; href?: string }) {
   return (
     <Link
       href={href}
-      className={`spectrum-border group inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-[3px] bg-void px-4 font-mono text-[11px] tracking-[0.08em] text-fg uppercase transition-colors hover:bg-panel-2 ${className}`}
+      className={`spectrum-border group inline-flex h-9 items-center gap-2 rounded-xl bg-void px-4 font-mono text-[11px] tracking-[0.08em] text-fg uppercase transition-colors hover:bg-panel-2 ${className}`}
     >
       <span className="text-mute transition-colors group-hover:text-fg">··</span> {label}
     </Link>
   );
 }
 
-/** EN / 日本語 / 中文, each in its own script. */
-export function LangSwitch({ className = "" }: { className?: string }) {
-  const lang = useLang();
-  return (
-    <div role="group" aria-label="Language" className={`flex h-8 items-center rounded-full border border-line-2 bg-void/60 p-0.5 backdrop-blur ${className}`}>
-      {LANGS.map((l) => (
-        <button
-          key={l.id}
-          type="button"
-          lang={l.id}
-          onMouseEnter={tick}
-          onClick={() => {
-            if (l.id === lang) return;
-            setLang(l.id);
-            chime();
-          }}
-          aria-pressed={l.id === lang}
-          className={`h-full rounded-full px-2.5 text-[12px] whitespace-nowrap transition-colors ${l.id === lang ? "bg-fg text-void" : "text-mute hover:text-fg"}`}
-        >
-          {l.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function SoundToggle() {
-  const on = useSound();
-  const [onLabel, offLabel] = useStrings().sound;
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        setSound(!on);
-        if (!on) chime();
-      }}
-      aria-label={on ? offLabel : onLabel}
-      title={on ? onLabel : offLabel}
-      className="flex size-8 items-center justify-center rounded-full border border-line-2 text-mute transition-colors hover:text-fg"
-    >
-      {on ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
-    </button>
-  );
-}
-
 export function Nav() {
-  const t = useStrings().nav;
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -112,20 +62,19 @@ export function Nav() {
         <Link href="/" className="flex items-center gap-2.5">
           <RoboMark className="size-7" />
           <span className="text-[15px] font-medium tracking-tight">RoboCraft</span>
-          <span className="mono-label hidden rounded-[2px] border border-line-2 px-1.5 py-0.5 text-[9px] text-mute sm:inline">Control lab</span>
+          <span className="mono-label hidden rounded-full border border-line-2 px-1.5 py-0.5 text-[9px] text-mute sm:inline">Control lab</span>
         </Link>
-        <nav className="hidden items-center gap-6 lg:flex">
+        <nav className="hidden items-center gap-6 md:flex">
           {SECTIONS.filter((s) => s.nav).map((s) => (
-            <a key={s.id} href={`#${s.id}`} className="mono-label whitespace-nowrap text-mute transition-colors hover:text-fg">
-              {t[s.id as keyof typeof t] ?? s.label}
+            <a key={s.id} href={`#${s.id}`} className="mono-label text-mute transition-colors hover:text-fg">
+              {s.label}
             </a>
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <LangSwitch className="hidden sm:flex" />
-          <SoundToggle />
-          <LaunchButton className="hidden xl:inline-flex" />
-          <button className="flex size-9 items-center justify-center text-mute lg:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
+          <ThemeToggle />
+          <LaunchButton className="hidden sm:inline-flex" />
+          <button className="flex size-9 items-center justify-center text-mute md:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
         </div>
@@ -136,15 +85,14 @@ export function Nav() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t border-line bg-void lg:hidden"
+            className="overflow-hidden border-t border-line bg-void md:hidden"
           >
             {SECTIONS.filter((s) => s.nav).map((s) => (
               <a key={s.id} href={`#${s.id}`} onClick={() => setOpen(false)} className="mono-label flex items-center justify-between border-b border-line px-4 py-4 text-mute">
-                {t[s.id as keyof typeof t] ?? s.label} <ArrowUpRight className="size-3.5" />
+                {s.label} <ArrowUpRight className="size-3.5" />
               </a>
             ))}
-            <div className="space-y-3 p-4">
-              <LangSwitch className="w-fit sm:hidden" />
+            <div className="p-4">
               <LaunchButton className="w-full justify-center" />
             </div>
           </motion.nav>

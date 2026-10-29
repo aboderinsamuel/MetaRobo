@@ -103,7 +103,7 @@ function LiveChecks({ engine, model, spec }: { engine: Engine; model: LabModel; 
 
 function Panel({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="relative h-full w-full border border-line bg-panel/80 backdrop-blur">
+    <div className="rounded-2xl relative h-full w-full border border-line bg-panel/80 backdrop-blur">
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
         <span className="mono-label text-mute">{label}</span>
         <span className="flex gap-1">
@@ -190,7 +190,7 @@ export default function LoopStory() {
               <motion.div key={step} {...fade} className="h-full max-h-[560px]">
                 {step === 0 && (
                   <Panel label="01 · Describe">
-                    <div className="min-h-28 rounded-[3px] border border-line-2 bg-void p-4 text-[15px] leading-relaxed">
+                    <div className="min-h-28 rounded-xl border border-line-2 bg-void p-4 text-[15px] leading-relaxed">
                       <span className="caret">{prompt}</span>
                     </div>
                     <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -289,7 +289,7 @@ export default function LoopStory() {
                         ["Ki", BEFORE.type === "pid" ? BEFORE.ki : 0, 0.75],
                         ["Kd", BEFORE.type === "pid" ? BEFORE.kd : 0, 0.05],
                       ].map(([k, v, f]) => (
-                        <div key={k as string} className="border border-line p-3">
+                        <div key={k as string} className="rounded-2xl border border-line p-3">
                           <p className="mono-label text-mute">{k}</p>
                           <p className="mt-1 font-mono text-xl tabular-nums">{fmtNum(v as number)}</p>
                           <div className="mt-2 h-0.5 bg-line">
@@ -330,7 +330,7 @@ export default function LoopStory() {
                 {step === 4 && (
                   <Panel label="05 · Explain & iterate">
                     <div className="space-y-3">
-                      <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="ml-auto max-w-[80%] rounded-[3px] bg-panel-2 px-3.5 py-2.5 text-sm">
+                      <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="ml-auto max-w-[80%] rounded-xl bg-panel-2 px-3.5 py-2.5 text-sm">
                         Why does the arm swing past the shelf?
                       </motion.div>
                       <motion.div

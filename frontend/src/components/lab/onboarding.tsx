@@ -51,7 +51,7 @@ export function Welcome({ onDone, onClose }: { onDone: (mode: Mode, pick: RigKin
       <motion.div
         initial={{ y: 16, opacity: 0, scale: 0.98 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
-        className="spectrum-border relative w-full max-w-[640px] rounded-[6px] bg-panel p-6 sm:p-8"
+        className="spectrum-border relative w-full max-w-[640px] rounded-3xl bg-panel p-6 shadow-[0_40px_120px_-40px_rgb(0_0_0/0.5)] sm:p-8"
         role="dialog"
         aria-modal="true"
         aria-label="Welcome to RoboCraft"
@@ -80,7 +80,7 @@ export function Welcome({ onDone, onClose }: { onDone: (mode: Mode, pick: RigKin
                       setPersona(p);
                       setStep(1);
                     }}
-                    className="group flex items-center gap-4 border border-line-2 bg-void px-4 py-3.5 text-left transition-colors hover:border-spec-1/60 hover:bg-panel-2"
+                    className="group flex items-center gap-4 border border-line-2 bg-void px-4 py-3.5 text-left transition-colors hover:border-spec-1/60 hover:bg-panel-2 rounded-xl"
                   >
                     <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-line-2 text-spec-1 group-hover:border-spec-1/60">
                       <p.icon className="size-5" />
@@ -101,7 +101,7 @@ export function Welcome({ onDone, onClose }: { onDone: (mode: Mode, pick: RigKin
                   <button
                     key={k}
                     onClick={() => onDone(persona?.mode ?? "simple", k, true)}
-                    className="group flex flex-col items-start gap-2 border border-line-2 bg-void p-4 text-left transition-colors hover:border-spec-1/60 hover:bg-panel-2"
+                    className="group flex flex-col items-start gap-2 border border-line-2 bg-void p-4 text-left transition-colors hover:border-spec-1/60 hover:bg-panel-2 rounded-xl"
                   >
                     <span className="text-spec-1 [&_svg]:h-8 [&_svg]:w-12">{RIG_ICON[k]}</span>
                     <span className="text-[15px] font-medium">{FRIENDLY[k].name}</span>
@@ -111,7 +111,7 @@ export function Welcome({ onDone, onClose }: { onDone: (mode: Mode, pick: RigKin
               </div>
               <button
                 onClick={() => onDone(persona?.mode ?? "simple", "describe", true)}
-                className="mt-2.5 flex w-full items-center justify-center gap-2 border border-dashed border-line-2 px-4 py-3 text-[13px] text-mute transition-colors hover:border-spec-1/60 hover:text-fg"
+                className="mt-2.5 flex w-full items-center justify-center gap-2 border border-dashed border-line-2 px-4 py-3 text-[13px] text-mute transition-colors hover:border-spec-1/60 hover:text-fg rounded-xl"
               >
                 <Sparkles className="size-4 text-spec-1" /> Or describe my own idea in words (or say it out loud)
               </button>
@@ -240,7 +240,7 @@ export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => voi
         key={i}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="absolute border border-spec-1/50 bg-panel p-4 shadow-2xl"
+        className="absolute rounded-2xl border border-spec-1/40 bg-panel p-4 shadow-2xl"
         style={{ left, top, width: cardW }}
         role="dialog"
         aria-label={step.title}
@@ -256,11 +256,11 @@ export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => voi
           </button>
           <div className="flex gap-1.5">
             {i > 0 && (
-              <button onClick={() => setI(i - 1)} className="mono-label border border-line-2 px-2.5 py-1.5 text-[10px] text-mute hover:text-fg">
+              <button onClick={() => setI(i - 1)} className="mono-label border border-line-2 px-2.5 py-1.5 text-[10px] text-mute hover:text-fg rounded-xl">
                 Back
               </button>
             )}
-            <button onClick={() => (last ? onClose() : setI(i + 1))} className="mono-label px-3 py-1.5 text-[10px] text-void" style={{ background: "var(--spectrum)" }}>
+            <button onClick={() => (last ? onClose() : setI(i + 1))} className="mono-label rounded-xl px-3 py-1.5 text-[10px] text-white" style={{ background: "var(--spectrum)" }}>
               {last ? "Let's go" : "Next"}
             </button>
           </div>
@@ -368,7 +368,7 @@ export function CoachPanel({
   const mood = allOk ? "Your robot works great! Try a different mission or swap a part to see what changes." : issues.some((c) => c.level === "error") ? "Some parts won't work together yet. Fix those first." : motionOk ? "It moves nicely, but a few parts need attention." : "The parts are fine. The robot just needs better tuning.";
   return (
     <div className="space-y-3 p-3">
-      <div className={`flex gap-3 border px-3 py-3 ${allOk ? "border-ok/40 bg-ok/[0.06]" : "border-line-2 bg-panel"}`}>
+      <div className={`rounded-xl flex gap-3 border px-3 py-3 ${allOk ? "border-ok/40 bg-ok/[0.06]" : "border-line-2 bg-panel"}`}>
         <motion.div animate={allOk ? { rotate: [0, -8, 8, 0] } : { y: [0, -2, 0] }} transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1 }}>
           <RoboMark className="size-9" />
         </motion.div>
@@ -380,7 +380,7 @@ export function CoachPanel({
 
       <ul className="space-y-1.5">
         {items.map((r) => (
-          <li key={r.key} className="flex items-start gap-2.5 border border-line bg-panel/60 px-3 py-2">
+          <li key={r.key} className="flex items-start gap-2.5 border border-line bg-panel/60 px-3 py-2 rounded-xl">
             {r.ok ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />}
             <span>
               <span className="block text-[13px] font-medium">{r.label}</span>
@@ -401,7 +401,7 @@ export function CoachPanel({
           <p className="mono-label pb-1.5 text-[10px] text-mute">Things to fix</p>
           <ul className="space-y-1.5">
             {issues.map((c) => (
-              <li key={c.id} className="border border-line bg-panel/60 px-3 py-2">
+              <li key={c.id} className="border border-line bg-panel/60 px-3 py-2 rounded-xl">
                 <button onClick={() => c.slot && onSelect(c.slot)} className="flex w-full items-start gap-2 text-left">
                   {c.level === "error" ? <XCircle className="mt-0.5 size-4 shrink-0 text-bad" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />}
                   <span className="text-[12.5px] leading-snug">{c.title}</span>
@@ -409,7 +409,7 @@ export function CoachPanel({
                 {c.fix && (
                   <button
                     onClick={() => onBuild({ ...hw.build, parts: { ...hw.build.parts, ...c.fix!.parts }, geom: { ...hw.build.geom, ...c.fix!.geom } }, `fix: ${c.fix!.label}`)}
-                    className="mono-label mt-1.5 ml-6 inline-flex items-center gap-1 border border-spec-1/40 px-1.5 py-1 text-[10px] text-spec-1 hover:bg-spec-1/10"
+                    className="mono-label mt-1.5 ml-6 inline-flex items-center gap-1 border border-spec-1/40 px-1.5 py-1 text-[10px] text-spec-1 hover:bg-spec-1/10 rounded-xl"
                   >
                     <Wand2 className="size-3" /> Fix it: {c.fix.label}
                   </button>
@@ -422,7 +422,7 @@ export function CoachPanel({
 
       <div className="grid grid-cols-2 gap-2">
         {hw.stats.map((s) => (
-          <div key={s.label} className="border border-line bg-panel px-3 py-2">
+          <div key={s.label} className="border border-line bg-panel px-3 py-2 rounded-xl">
             <p className="text-[11px] text-dim">{s.label}</p>
             <p className={`mt-0.5 font-mono text-[16px] tabular-nums ${s.tone === "bad" ? "text-bad" : s.tone === "warn" ? "text-warn" : ""}`}>{s.value}</p>
           </div>

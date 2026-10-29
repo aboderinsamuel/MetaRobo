@@ -44,7 +44,7 @@ export default function MetaStack() {
           <ControlLoop onStage={setStage} className="py-10" />
         </motion.div>
 
-        <div className="mt-14 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
           {MODELS.map((m, i) => {
             const on = m.stage === stage;
             return (
