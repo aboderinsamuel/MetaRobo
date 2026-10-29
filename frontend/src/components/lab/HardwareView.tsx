@@ -20,6 +20,7 @@ import type { LabModel } from "@/lib/lab/types";
 import { Scene } from "./hw3d/parts3d";
 import type { PartStatus, SceneCtx } from "./hw3d/parts3d";
 import MachineRig, { gizmoActive, type GizmoMode } from "./hw3d/machine";
+import { at, simulateMachine, type MachineSim } from "@/lib/lab/actuation";
 import { VERDICT_UI } from "./ReviewCard";
 import { bomTotal } from "@/lib/lab/review";
 import { ArmRig, BalancerRig, DroneRig, RoverRig } from "./hw3d/rigs";
@@ -114,9 +115,13 @@ export default function HardwareView({
   className?: string;
 }) {
   const rig = useMemo(() => model.rig ?? { kind: hw.build.kind, signal: "position" as const }, [model.rig, hw.build.kind]);
-  const tEnd = run.tEnd;
+  // An AI-designed machine replaces the preset rig: its own parts, joints and per-actuator simulation.
+  const machine = model.assembly;
+  const machineSim = useMemo(() => (machine ? simulateMachine(machine) : null), [machine]);
+  const tEnd = machineSim ? machineSim.tEnd : run.tEnd;
   // Short missions play in slow motion so the motion is readable; long programs run in real time.
-  const baseRate = tEnd / Math.min(30, Math.max(4, tEnd));
+  // A machine's program always plays in real time: its timing is the actuators' real speed.
+  const baseRate = machineSim ? 1 : tEnd / Math.min(30, Math.max(4, tEnd));
   const [mult, setMult] = useState(1);
   const [labels, setLabels] = useState(false);
   const [camKey, setCamKey] = useState(0);
@@ -190,9 +195,6 @@ export default function HardwareView({
     return { target: c.target, pos: c.pos.map((v, i) => c.target[i] + (v - c.target[i]) * k) as [number, number, number] };
   }, [hw, narrow, wide]);
   const isDrone = rig.kind === "drone";
-  // An AI-designed machine replaces the preset rig; it frames its own camera and has no slot checks.
-  const machine = model.assembly;
-  const machineRun = useMemo(() => ({ y: run.y, dt: run.dt }), [run]);
   const [gizmo, setGizmo] = useState<GizmoMode>("translate");
   const selectPart = useCallback((id: string | null) => onSelectPart?.(id), [onSelectPart]);
   const transformPart = useCallback(
@@ -254,7 +256,7 @@ export default function HardwareView({
           {machine ? (
             <MachineRig
               assembly={machine}
-              run={machineRun}
+              sim={machineSim}
               clock={clock}
               labels={labels}
               selected={selectedPart}
@@ -340,7 +342,11 @@ export default function HardwareView({
             <RotateCcw className="size-3" />
           </button>
         </div>
-        <Hud playback={playback} hw={hw} model={model} run={run} tel={tel} motion={motionData} stable={stable} settlingTime={settlingTime} simple={simple} />
+        {machineSim ? (
+          <MachineHud playback={playback} sim={machineSim} />
+        ) : (
+          <Hud playback={playback} hw={hw} model={model} run={run} tel={tel} motion={motionData} stable={stable} settlingTime={settlingTime} simple={simple} />
+        )}
       </div>
 
       {/* Part inspector */}
@@ -377,10 +383,62 @@ export default function HardwareView({
             </div>
             <PlaybackBar playback={playback} onSimulate={simulate} mult={mult} setMult={setMult} baseRate={baseRate} />
           </div>
-          <Caption playback={playback} run={run} simple={simple} />
+          {machineSim ? <MachineCaption playback={playback} sim={machineSim} /> : <Caption playback={playback} run={run} simple={simple} />}
         </div>
       </div>
     </div>
+  );
+}
+
+/** Live readouts for an AI-designed machine: each joint's actuator and the total current draw. */
+function MachineHud({ playback, sim }: { playback: Playback; sim: MachineSim }) {
+  const { t } = usePlayback(playback);
+  const errors = sim.checks.filter((c) => c.level === "error").length;
+  const step = sim.steps.find((s) => t >= s.t0 && t < s.t1);
+  const status = errors ? "CHECK PARTS" : t === 0 ? "READY" : t >= sim.tEnd - 1e-6 ? "DONE" : step ? "RUNNING" : "HOLD";
+  const cls = errors ? "text-bad border-bad/50" : status === "DONE" ? "text-ok border-ok/40" : status === "READY" ? "text-mute border-line-2" : "text-spec-1 border-spec-1/40";
+  const unit = (k: string) => (k === "spin" ? "rpm" : k === "slide" || k === "lift" ? "mm" : k === "articulate" ? "" : "°");
+  const amps = at(sim.totalCurrent, t);
+  return (
+    <>
+      <span className={`mono-label inline-block border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${cls}`}>{status}</span>
+      <div className="w-56 border border-line bg-void/85 px-2.5 py-2 text-left font-mono text-[11px] backdrop-blur">
+        {sim.traces.slice(0, 6).map((tr) => {
+          const v = at(tr.value, t);
+          return (
+            <Row
+              key={tr.joint.id}
+              k={tr.joint.id.replace(/_/g, " ")}
+              v={tr.joint.kind === "articulate" ? `${Math.round(v * 100)}%` : `${fmtNum(v, 3)}${unit(tr.joint.kind)}`}
+              cls={tr.stalled ? "text-bad" : tr.torqueRatio > 0.6 ? "text-warn" : ""}
+            />
+          );
+        })}
+        {sim.traces.length > 6 && <p className="text-[9px] text-dim">+{sim.traces.length - 6} more joints</p>}
+        <div className="mt-1 border-t border-line pt-1">
+          <Row k="total current" v={`${amps.toFixed(2)} A`} cls={amps > sim.peakA * 0.95 && errors ? "text-bad" : ""} />
+          <Row k="peak / average" v={`${sim.peakA.toFixed(1)} / ${sim.avgA.toFixed(2)} A`} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function MachineCaption({ playback, sim }: { playback: Playback; sim: MachineSim }) {
+  const { t } = usePlayback(playback);
+  const i = sim.steps.findIndex((s) => t >= s.t0 && t < s.t1);
+  return (
+    <p className="truncate px-3 pt-1 pb-2 font-mono text-[10.5px] text-mute">
+      {sim.steps.length ? (
+        <>
+          <span className="text-dim">{`step ${Math.max(1, i + 1)}/${sim.steps.length} · `}</span>
+          {sim.steps[Math.max(0, i)]?.label}
+          <span className="text-dim"> · real actuator speeds and torque limits</span>
+        </>
+      ) : (
+        "No motion program yet: give a part a joint, then add steps"
+      )}
+    </p>
   );
 }
 

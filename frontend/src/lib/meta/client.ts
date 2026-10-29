@@ -222,3 +222,71 @@ interface ChatResponse {
   };
   error?: { message?: string };
 }
+
+// ---------------------------------------------------------------------------
+// Web search grounding (Responses API + web_search tool)
+// ---------------------------------------------------------------------------
+
+/** $2.50 per 1,000 searches, on top of tokens (dev.meta.ai/docs/pricing-rate-limits). */
+const USD_PER_SEARCH = 0.0025;
+
+interface ResponsesResult {
+  output?: { type?: string; content?: { type?: string; text?: string; annotations?: { type?: string; url?: string }[] }[] }[];
+  output_text?: string;
+  usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number }; output_tokens_details?: { reasoning_tokens?: number } };
+  error?: { message?: string };
+}
+
+/**
+ * Asks Muse Spark to look something up on the web and answer as JSON matching `schema`.
+ * The answer is parsed from the text (search grounding doesn't promise strict JSON), validated,
+ * cached and costed like every other call. Returns the cited source URLs too.
+ */
+export async function metaSearchJson<S extends z.ZodType>(req: Omit<JsonRequest<S>, "effort">): Promise<JsonResult<z.infer<S>> & { sources: string[] }> {
+  const model = req.model ?? TEXT_MODEL;
+  const body = {
+    model,
+    instructions: `${req.system}\n\nReply with ONLY a JSON object matching this JSON Schema, no prose:\n${JSON.stringify(jsonSchemaFor(req.schema))}`,
+    input: req.user,
+    tools: [{ type: "web_search", search_context_size: "low" }],
+    max_output_tokens: req.maxTokens,
+    reasoning: { effort: "low" },
+  };
+  const key = createHash("sha256").update("search").update(JSON.stringify(body)).digest("hex");
+  const file = await cachePath(key);
+  try {
+    const hit = JSON.parse(await readFile(file, "utf8")) as { content: string; sources: string[] };
+    return { data: req.schema.parse(JSON.parse(hit.content)), usage: zeroUsage(), cached: true, model, sources: hit.sources ?? [] };
+  } catch {
+    // Not cached: go live.
+  }
+  await assertCanSpend();
+  const res = await fetch(`${BASE_URL}/responses`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(110_000),
+  });
+  const json = (await res.json().catch(() => null)) as ResponsesResult | null;
+  if (!res.ok || !json) throw new MetaError(json?.error?.message ?? `Meta API error ${res.status}`, res.status);
+
+  const searches = (json.output ?? []).filter((o) => o.type === "web_search_call").length;
+  const u = json.usage ?? {};
+  const raw = {
+    inputTokens: u.input_tokens ?? 0,
+    cachedTokens: u.input_tokens_details?.cached_tokens ?? 0,
+    outputTokens: u.output_tokens ?? 0,
+    reasoningTokens: u.output_tokens_details?.reasoning_tokens ?? 0,
+  };
+  const usage = { ...raw, costUsd: estimateCost(model, raw) + searches * USD_PER_SEARCH };
+  await recordUsage(model, `${req.schemaName}+search×${searches}`, usage);
+
+  const parts = (json.output ?? []).flatMap((o) => (o.type === "message" ? (o.content ?? []) : []));
+  const text = json.output_text ?? parts.map((c) => c.text ?? "").join("");
+  const sources = [...new Set(parts.flatMap((c) => (c.annotations ?? []).filter((a) => a.type === "url_citation" && a.url).map((a) => a.url!)))];
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new MetaError("The web search didn't return a usable answer.");
+  const data = req.schema.parse(JSON.parse(match[0]));
+  await writeFile(file, JSON.stringify({ model, schemaName: req.schemaName, content: match[0], sources })).catch(() => {});
+  return { data, usage, cached: false, model, sources };
+}

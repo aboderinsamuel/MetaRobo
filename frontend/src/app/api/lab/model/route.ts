@@ -6,12 +6,16 @@
 // `presetId`, i.e. when the user picks one.
 // With `assembly` (an engineer's edited design), the physics is re-derived from its parts list and
 // the design is kept exactly as edited.
-import { MAX_ATTEMPTS, aiEnabled, describeError, designAssembly, modelFromDescription, offlineModel, reviewIdea } from "@/lib/lab/ai";
+import { MAX_ATTEMPTS, aiEnabled, describeError, designAssembly, findPartOnline, modelFromDescription, offlineModel, reviewIdea } from "@/lib/lab/ai";
 import { reviewBrief } from "@/lib/lab/review";
-import { describeAssembly, sanitizeAssembly, type Assembly } from "@/lib/lab/assembly";
+import { describeAssembly, resolveNeeds, sanitizeAssembly, type Assembly } from "@/lib/lab/assembly";
+import { acceptUploaded } from "@/lib/lab/catalog/io";
+import type { CatalogPart } from "@/lib/lab/catalog/parts";
 import type { CallUsage } from "@/lib/lab/types";
 
 export const maxDuration = 300;
+
+const MAX_SEARCHES = 3;
 
 /** Runs `fn` until it succeeds or the attempts run out; adds up what every attempt cost. */
 async function withRetry<T extends { usage?: CallUsage }>(fn: (attempt: number) => Promise<T>): Promise<{ result?: T; spent: CallUsage[]; error?: unknown }> {
@@ -37,8 +41,10 @@ function total(parts: (CallUsage | undefined)[]): CallUsage | undefined {
 }
 
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => ({}))) as { description?: string; dataSummary?: string; presetId?: string; assembly?: Assembly };
+  const body = (await req.json().catch(() => ({}))) as { description?: string; dataSummary?: string; presetId?: string; assembly?: Assembly; customParts?: unknown };
   const description = (body.description ?? "").slice(0, 4000).trim();
+  // The user's uploaded parts library: Muse Spark builds from these as well as the catalogue.
+  const extra = acceptUploaded(body.customParts);
   // Demo robots: only when the user picked one.
   if (body.presetId) return Response.json(offlineModel(description, body.presetId));
   if (!description) return Response.json({ error: "Describe the machine first." }, { status: 400 });
@@ -47,7 +53,7 @@ export async function POST(req: Request) {
   if (body.assembly) {
     let edited: Assembly;
     try {
-      edited = sanitizeAssembly(body.assembly);
+      edited = sanitizeAssembly(body.assembly, extra);
     } catch (err) {
       return Response.json({ error: `That design can't be used: ${describeError(err)}` }, { status: 400 });
     }
@@ -59,7 +65,7 @@ export async function POST(req: Request) {
 
   // 1. Engineering review: buildable from buyable parts? Rethink it into a practical design if so.
   //    A failed review never blocks the build: the 3D render always happens.
-  const reviewed = await withRetry((a) => reviewIdea(description, a));
+  const reviewed = await withRetry((a) => reviewIdea(description, a, extra));
   const review = reviewed.result?.review;
   const brief = review ? `${description}\n\nEngineering review:\n${reviewBrief(review)}` : description;
 
@@ -70,7 +76,7 @@ export async function POST(req: Request) {
   }
 
   // 3. The 3D build: the practical variant from real parts, or the concept exactly as imagined.
-  const design = await withRetry((a) => designAssembly(description, physics.result!.model, a, review));
+  const design = await withRetry((a) => designAssembly(description, physics.result!.model, a, review, extra));
   if (!design.result) {
     return Response.json(
       {
@@ -80,9 +86,27 @@ export async function POST(req: Request) {
       { status: 502 },
     );
   }
+
+  // 4. Real parts the design needs that the catalogue doesn't have: look them up on the web (at most
+  //    3 per build, to keep cost down). Anything still not found stays flagged in the design.
+  let assembly = design.result.assembly;
+  const searched: CallUsage[] = [];
+  const found = new Map<string, CatalogPart>();
+  for (const name of (assembly.unresolved ?? []).slice(0, MAX_SEARCHES)) {
+    try {
+      const r = await findPartOnline(name, `${physics.result.model.title}: ${description}`);
+      searched.push(r.usage);
+      if (r.part) found.set(name, r.part);
+    } catch {
+      // A failed lookup leaves the part flagged; the build still succeeds.
+    }
+  }
+  assembly = resolveNeeds(assembly, found);
+
   return Response.json({
     ...physics.result,
-    model: { ...physics.result.model, assembly: design.result.assembly, review },
-    usage: total([...reviewed.spent, ...physics.spent, ...design.spent]),
+    model: { ...physics.result.model, assembly, review },
+    foundOnline: [...found.values()],
+    usage: total([...reviewed.spent, ...physics.spent, ...design.spent, ...searched]),
   });
 }
