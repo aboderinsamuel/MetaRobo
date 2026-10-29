@@ -342,7 +342,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
       });
       await sleep(400);
       setPipeline(1);
-      const body = (await (await res).json()) as { model?: LabModel; error?: string; usage?: CallUsage };
+      const body = (await (await res).json()) as { model?: LabModel; error?: string; usage?: CallUsage; foundOnline?: { name: string }[]; searchNotes?: string[] };
       // A description only ever becomes the machine Muse Spark designed. Never a demo robot.
       if (!body.model?.assembly || body.model.source !== "meta") throw new Error(body.error ?? "Muse Spark didn't return a design. Try again.");
       addSpend(body.usage);
@@ -351,7 +351,13 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
       const b = applyHints(defaultBuild(rigFor(body.model, text).kind), text);
       await adopt(
         b,
-        `Muse Spark designed "${body.model.assembly.title}" (${body.model.assembly.parts.length} parts) and its physics; the engine checked it. Click any part to edit it, or press Simulate to test.`,
+        [
+          `Muse Spark designed "${body.model.assembly.title}" (${body.model.assembly.parts.length} parts) and its physics; the engine checked it. Click any part to edit it, or press Simulate to test.`,
+          body.foundOnline?.length ? `Found online: ${body.foundOnline.map((p) => p.name).join(", ")}.` : "",
+          ...(body.searchNotes ?? []),
+        ]
+          .filter(Boolean)
+          .join(" "),
         body.model,
       );
       setLeftTab("hardware");

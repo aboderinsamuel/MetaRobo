@@ -92,13 +92,17 @@ export async function POST(req: Request) {
   let assembly = design.result.assembly;
   const searched: CallUsage[] = [];
   const found = new Map<string, CatalogPart>();
+  const searchNotes: string[] = [];
   for (const name of (assembly.unresolved ?? []).slice(0, MAX_SEARCHES)) {
     try {
       const r = await findPartOnline(name, `${physics.result.model.title}: ${description}`);
       searched.push(r.usage);
       if (r.part) found.set(name, r.part);
-    } catch {
-      // A failed lookup leaves the part flagged; the build still succeeds.
+      else searchNotes.push(`Couldn't find a real "${name}" online.`);
+    } catch (err) {
+      // A failed lookup leaves the part flagged; the build still succeeds, and the user is told why.
+      console.warn(`[lab] web search for "${name}" failed:`, err);
+      searchNotes.push(`Web search for "${name}" failed: ${describeError(err)}`);
     }
   }
   assembly = resolveNeeds(assembly, found);
@@ -107,6 +111,7 @@ export async function POST(req: Request) {
     ...physics.result,
     model: { ...physics.result.model, assembly, review },
     foundOnline: [...found.values()],
+    searchNotes,
     usage: total([...reviewed.spent, ...physics.spent, ...design.spent, ...searched]),
   });
 }

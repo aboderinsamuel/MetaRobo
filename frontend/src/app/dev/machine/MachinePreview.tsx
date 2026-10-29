@@ -6,7 +6,8 @@ import { useMemo, useRef, useState } from "react";
 import MachineRig from "@/components/lab/hw3d/machine";
 import type { Clock } from "@/components/lab/hw3d/rigs";
 import { simulateMachine } from "@/lib/lab/actuation";
-import { sanitizeAssembly, type AiAssembly } from "@/lib/lab/assembly";
+import { behaviourIndex } from "@/lib/lab/behaviour";
+import { sanitizeAssembly, type AiAssembly, type AssemblyInput } from "@/lib/lab/assembly";
 
 // A test fixture in exactly the format Muse Spark returns: a waving robot built only from catalogue
 // parts and fabricated parts.
@@ -26,7 +27,7 @@ const P = (p: Partial<Raw> & Pick<Raw, "id" | "ref">): Raw => ({
   ...p,
 });
 
-const FIXTURE: AiAssembly = {
+const FIXTURE: AssemblyInput = {
   title: "Waving robot (test fixture)",
   parts: [
     P({ id: "base", name: "Base plate", ref: "fab:plate", size: [0.22, 0.003, 0.2], material: "acrylic" }),
@@ -68,8 +69,56 @@ function Tick({ onTick }: { onTick: (delta: number) => void }) {
   return null;
 }
 
-export default function MachinePreview() {
-  const assembly = useMemo(() => sanitizeAssembly(FIXTURE), []);
+// The plant waterer from the user's prompt: pot + soil probe, reservoir + pump, tube, controller,
+// relay, buzzer and LCD on a base, all wired, with the controller's watering rule.
+const PLANT: AssemblyInput = {
+  title: "Smart plant waterer (test fixture)",
+  parts: [
+    P({ id: "base", name: "Base plate", ref: "fab:plate", size: [0.17, 0.003, 0.13], material: "acrylic", position: [0.12, 0, 0] }),
+    P({ id: "uno", name: "Controller", ref: "arduino-uno", parent: "base", position: [-0.04, 0.003, 0.02] }),
+    P({ id: "relay", name: "Pump relay", ref: "relay-1ch", parent: "base", position: [0.045, 0.003, 0.035] }),
+    P({ id: "lcd", name: "Display", ref: "lcd1602-i2c", parent: "base", position: [0.03, 0.003, -0.035] }),
+    P({ id: "buzzer", name: "Buzzer", ref: "buzzer-active", parent: "base", position: [-0.065, 0.003, -0.045] }),
+    P({ id: "power", name: "USB supply", ref: "usb-5v-2a", position: [0.24, 0, 0.02] }),
+    P({ id: "pot", name: "Plant pot", ref: "pot-12cm", position: [-0.04, 0, 0] }),
+    P({ id: "probe", name: "Soil probe", ref: "soil-cap-v12", parent: "pot", position: [0.025, 0.045, 0.01] }),
+    P({ id: "tank", name: "Reservoir", ref: "reservoir-1l", position: [-0.05, 0, -0.16] }),
+    P({ id: "pump", name: "Pump", ref: "pump-mini-5v", parent: "tank", position: [0, 0.004, 0] }),
+  ],
+  connections: [
+    { from: "power", fromPin: "5V", to: "uno", toPin: "5V", kind: "power" },
+    { from: "uno", fromPin: "5V", to: "probe", toPin: "VCC", kind: "power" },
+    { from: "uno", fromPin: "GND", to: "probe", toPin: "GND", kind: "ground" },
+    { from: "probe", fromPin: "AOUT", to: "uno", toPin: "A0", kind: "signal" },
+    { from: "uno", fromPin: "D7", to: "relay", toPin: "IN", kind: "signal" },
+    { from: "uno", fromPin: "5V", to: "relay", toPin: "VCC", kind: "power" },
+    { from: "relay", fromPin: "NO", to: "pump", toPin: "+", kind: "motor" },
+    { from: "uno", fromPin: "D8", to: "buzzer", toPin: "+", kind: "signal" },
+    { from: "uno", fromPin: "SDA", to: "lcd", toPin: "SDA", kind: "data" },
+    { from: "pump", fromPin: "OUTLET", to: "pot", toPin: "IN", kind: "tube" },
+  ],
+  joints: [],
+  program: [],
+  signals: [{ id: "moisture", sensor: "probe", name: "Soil moisture", unit: "%", min: 0, max: 100, start: 40, drift: -0.02, effects: [{ part: "pump", rate: 2 }], shows: "pot" }],
+  rules: [
+    {
+      signal: "moisture",
+      op: "<",
+      value: 30,
+      hysteresis: 15,
+      outputs: [
+        { part: "relay", action: "on", text: "" },
+        { part: "buzzer", action: "beep", text: "" },
+        { part: "lcd", action: "display", text: "Watering...\nSoil {moisture}%" },
+      ],
+    },
+  ],
+  timeScale: 180,
+  simSeconds: 3600,
+};
+
+export default function MachinePreview({ which, freeze }: { which: "plant" | "waver"; freeze?: number }) {
+  const assembly = useMemo(() => sanitizeAssembly(which === "plant" ? PLANT : FIXTURE), [which]);
   const sim = useMemo(() => simulateMachine(assembly), [assembly]);
   const clock = useRef<Clock>({ t: 0, playing: true, rate: 1 });
   const [selected, setSelected] = useState<string | null>(null);
@@ -86,7 +135,7 @@ export default function MachinePreview() {
         </mesh>
         <Tick
           onTick={(d) => {
-            clock.current.t = (clock.current.t + d) % sim.tEnd;
+            clock.current.t = freeze !== undefined ? freeze : (clock.current.t + d) % sim.tEnd;
           }}
         />
         <MachineRig assembly={assembly} sim={sim} clock={clock} labels={false} selected={selected} onSelect={setSelected} gizmo="translate" onTransform={() => {}} />
@@ -94,6 +143,7 @@ export default function MachinePreview() {
       </Canvas>
       <pre id="sim-report" className="absolute top-2 left-2 max-w-md font-mono text-[10px] whitespace-pre-wrap text-mute">
         {sim.checks.map((c) => `${c.level.toUpperCase()} ${c.title}`).join("\n")}
+        {freeze !== undefined && sim.behaviour && `\n@${freeze}s: ${sim.behaviour.signals.map((s) => `${s.id}=${s.value[behaviourIndex(sim.behaviour!, freeze)].toFixed(1)}`).join(" ")} on=[${[...sim.behaviour.on].filter(([, a]) => a[behaviourIndex(sim.behaviour!, freeze)]).map(([id]) => id).join(",")}] firstPump=${sim.behaviour.realT[sim.behaviour.on.get("pump")?.findIndex((v) => v > 0) ?? 0]?.toFixed(2)}s`}
       </pre>
     </div>
   );

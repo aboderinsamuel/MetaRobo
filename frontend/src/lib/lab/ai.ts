@@ -26,6 +26,13 @@ const ATTEMPTS = [
 ];
 export const MAX_ATTEMPTS = ATTEMPTS.length;
 
+// The 3D design is the hardest step (parts, placement, wiring, behaviour), so it thinks harder:
+// medium effort with plenty of room first, then a lighter retry.
+const DESIGN_ATTEMPTS = [
+  { maxTokens: 24000, effort: "medium" as const },
+  { maxTokens: 24000, effort: "low" as const },
+];
+
 const assemblySystem = (extra: CatalogPart[]) => `You are a mechanical design engineer inside RoboCraft Control Lab. A control engineer has already modelled the machine below.
 Now engineer the physical device itself from real parts, so it can be built, simulated and edited by an engineer.
 ${assemblyGuide(extra)}`;
@@ -119,7 +126,7 @@ export async function designAssembly(description: string, model: LabModel, attem
     ]
       .filter(Boolean)
       .join("\n"),
-    ...ATTEMPTS[Math.min(attempt, ATTEMPTS.length - 1)],
+    ...DESIGN_ATTEMPTS[Math.min(attempt, DESIGN_ATTEMPTS.length - 1)],
   });
   return { assembly: sanitizeAssembly(res.data, extra), usage: callUsage(res) };
 }

@@ -18,6 +18,7 @@ import type { CatalogPart, FabKind } from "@/lib/lab/catalog/parts";
 import { ALTIMETERS, BATTERIES, BOARDS, DRIVERS, GEARMOTORS, IMUS } from "@/lib/lab/hardware/parts";
 import type { Board } from "@/lib/lab/hardware/parts";
 import { BatteryMesh, BoardMesh, DriverMesh, GearMotorMesh, SensorMesh, Wheel } from "./parts3d";
+import { Buzzer, DhtSensor, Fan, Lcd, Led, LevelSensor, PlantPot, Potentiometer, Pump12, PumpMini, Relay, Reservoir, Solenoid, SoilProbe, TubeCoil, type LiveFn } from "./liveMeshes";
 
 const MM = 0.001;
 
@@ -393,9 +394,39 @@ function Extrusion2020({ len }: { len: number }) {
 // ---------------------------------------------------------------- the switch
 
 /** Draws a catalogue part at real scale. `color` overrides the accent colour where it makes sense. */
-export function CatalogMesh({ part, color }: { part: CatalogPart; color?: string }) {
+export function CatalogMesh({ part, color, live }: { part: CatalogPart; color?: string; live?: LiveFn }) {
   const [x, y, z] = part.dims.map((v) => v * MM) as [number, number, number];
   switch (part.model) {
+    case "sensor_soil":
+      return <SoilProbe x={x} y={y} resistive={part.id.includes("yl69")} />;
+    case "sensor_level":
+      return <LevelSensor x={x} y={y} z={z} />;
+    case "sensor_dht":
+      return <DhtSensor x={x} y={y} z={z} />;
+    case "relay_module":
+      return <Relay x={x} z={z} channels={part.electrical?.channels ?? 1} live={live} />;
+    case "pump_mini":
+      return <PumpMini x={x} y={y} z={z} live={live} />;
+    case "pump_12v":
+      return <Pump12 x={x} y={y} live={live} />;
+    case "solenoid_valve":
+      return <Solenoid x={x} y={y} z={z} live={live} />;
+    case "buzzer":
+      return <Buzzer x={x} y={y} live={live} />;
+    case "led":
+      return <Led y={y} color={color || "#ff3b30"} live={live} />;
+    case "fan":
+      return <Fan x={x} y={y} live={live} />;
+    case "potentiometer":
+      return <Potentiometer x={x} y={y} />;
+    case "lcd":
+      return <Lcd x={x} z={z} live={live} />;
+    case "pot_plant":
+      return <PlantPot x={x} y={y} live={live} />;
+    case "reservoir":
+      return <Reservoir x={x} y={y} z={z} live={live} />;
+    case "tube_coil":
+      return <TubeCoil x={x} />;
     case "servo_micro":
       return <ServoCase L={x} H={y} W={z} color={color || "#2a5bd7"} label="#e8ebef" />;
     case "servo_standard":
