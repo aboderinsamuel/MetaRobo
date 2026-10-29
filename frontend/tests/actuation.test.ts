@@ -111,3 +111,33 @@ describe("limb check", () => {
     expect(simulateMachine(proper).checks.some((c) => c.id.startsWith("limb-"))).toBe(false);
   });
 });
+
+describe("hardware fit", () => {
+  const build = (horn: string, extraServoOnKit = false) =>
+    simulateMachine(
+      sanitizeAssembly({
+        title: "Fit",
+        parts: [
+          raw({ id: "base", ref: "fab:plate", size: [0.2, 0.003, 0.15] }),
+          raw({ id: "servo", ref: "sg90", parent: "base" }),
+          raw({ id: "horn", ref: horn, parent: "servo" }),
+          raw({ id: "kit", ref: "pan-tilt-sg90", parent: "base" }),
+          ...(extraServoOnKit ? [raw({ id: "spare", ref: "sg90", parent: "kit" })] : []),
+          raw({ id: "uno", ref: "arduino-uno", parent: "base" }),
+          raw({ id: "power", ref: "batt-aa4", parent: "base" }),
+        ],
+        joints: [],
+        program: [],
+      }),
+    ).checks;
+
+  it("flags a standard horn on a micro servo, and passes the right one", () => {
+    expect(build("horn-metal-25t").find((c) => c.id === "fit-horn")).toMatchObject({ level: "warn" });
+    expect(build("horn-micro-21t").some((c) => c.id.startsWith("fit-"))).toBe(false);
+  });
+
+  it("flags servos bought twice on a kit that already includes them", () => {
+    expect(build("horn-micro-21t", true).find((c) => c.id === "duplicate-kit")).toMatchObject({ level: "warn", part: "spare" });
+    expect(build("horn-micro-21t").some((c) => c.id.startsWith("duplicate-"))).toBe(false);
+  });
+});

@@ -212,6 +212,31 @@ function machineChecks(a: Assembly, traces: JointTrace[], peakA: number, avgA: n
     }
   }
 
+  // Hardware must fit the servo it's bolted to: standard brackets/horns on micro servos (or the reverse).
+  const STANDARD_HW = new Set(["bracket-u-servo", "bracket-multi-servo", "bracket-l-servo", "horn-metal-25t"]);
+  const MICRO_HW = new Set(["bracket-u-micro", "horn-micro-21t"]);
+  const servoSize = (p?: PartSpec) => (p ? (cat(p)?.model === "servo_micro" ? "micro" : cat(p)?.category === "servo" ? "standard" : null) : null);
+  for (const p of a.parts) {
+    const hw = STANDARD_HW.has(p.catalogId ?? "") ? "standard" : MICRO_HW.has(p.catalogId ?? "") ? "micro" : null;
+    if (!hw) continue;
+    const near = [a.parts.find((q) => q.id === p.parent), ...a.parts.filter((q) => q.parent === p.id)];
+    const clash = near.find((q) => servoSize(q) && servoSize(q) !== hw);
+    if (clash) {
+      out.push({
+        id: `fit-${p.id}`,
+        level: "warn",
+        part: p.id,
+        title: `${p.name} doesn't fit ${clash.name}`,
+        detail: hw === "standard" ? `It's sized for standard servos (MG996R class); ${cat(clash)?.name} is a micro servo. Use horn-micro-21t / bracket-u-micro.` : `It's for 9 g micro servos; ${cat(clash)?.name} is a standard servo. Use horn-metal-25t / standard brackets.`,
+      });
+    }
+  }
+  // Kits that already include their servos.
+  for (const k of a.parts.filter((p) => p.catalogId === "pan-tilt-sg90" || p.catalogId === "gripper-claw-mg996")) {
+    const extra = a.parts.filter((q) => q.parent === k.id && cat(q)?.category === "servo");
+    if (extra.length) out.push({ id: `duplicate-${k.id}`, level: "warn", part: extra[0].id, title: `${k.name} already includes its servo${k.catalogId === "pan-tilt-sg90" ? "s" : ""}`, detail: `${extra.map((q) => q.name).join(", ")} would be bought twice. Remove ${extra.length > 1 ? "them" : "it"} and put the joint on the kit.` });
+  }
+
   // Power: does a supply exist, does its voltage suit the actuators, can it deliver the peak?
   const supplies = a.parts.filter((p) => cat(p)?.category === "power");
   const batteries = supplies.filter((p) => cat(p)?.electrical?.mAh);
