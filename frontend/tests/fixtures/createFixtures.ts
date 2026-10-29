@@ -71,4 +71,5 @@ export const ARM_FIXTURE: DesignAi = {
     step({ label: "Fold the towel", action: "fold", target: "towel", duration: 4 }),
   ],
   notes: [],
+  hardware: { kind: "none", board: "", driver: "", motor: "", battery: "", sensor: "", prop: "", geom: [] },
 };

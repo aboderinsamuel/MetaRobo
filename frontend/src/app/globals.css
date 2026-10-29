@@ -59,35 +59,38 @@
   color-scheme: dark;
 }
 
-/* Light theme: its own palette (warm-neutral greys, ink text, deeper accent), not an inversion.
+/* Light theme: soft daylight greys for long building sessions. No pure white surfaces (they glare
+   on bright screens), graphite text instead of black (≈12:1 contrast, well past WCAG AAA for
+   body text), and a calmer accent. Its own palette, not an inversion of the dark one.
    Set on <html data-theme="light"> before first paint; see the theme script in the layout. */
 :root[data-theme="light"] {
   color-scheme: light;
-  --color-void: #f4f5f7;
-  --color-panel: #ffffff;
-  --color-panel-2: #eef0f3;
-  --color-line: rgb(20 24 33 / 0.08);
-  --color-line-2: rgb(20 24 33 / 0.15);
-  --color-fg: #15171c;
-  --color-mute: #5b616d;
-  --color-dim: #979dab;
-  --color-ok: #15803d;
-  --color-warn: #b45309;
-  --color-bad: #dc2626;
-  --color-accent: #6247f5;
-  --color-accent-soft: rgb(98 71 245 / 0.1);
-  --color-surface: #ffffff;
-  --color-surface-2: #f2f3f6;
-  --color-canvas: #eceef2;
-  --color-ink-950: #f4f5f7;
-  --color-ink-900: #ffffff;
-  --color-ink-850: #f3f4f7;
-  --color-ink-800: #e8eaef;
-  --color-ink-700: #d4d8e0;
-  --color-ink-600: #b6bcc8;
-  --color-ink-400: #6b7280;
-  --color-ink-300: #4a5060;
-  --color-ink-100: #15171c;
+  --color-void: #e3e4e7;
+  --color-panel: #edeef0;
+  --color-panel-2: #e2e3e7;
+  --color-line: rgb(28 32 40 / 0.1);
+  --color-line-2: rgb(28 32 40 / 0.17);
+  --color-fg: #24272d;
+  --color-mute: #5d626c;
+  --color-dim: #8b909a;
+  --color-ok: #16794a;
+  --color-warn: #a1561a;
+  --color-bad: #b83636;
+  --color-accent: #5b4bd6;
+  --color-accent-soft: rgb(91 75 214 / 0.11);
+  --color-accent-fg: #f4f3fb;
+  --color-surface: #ecedf0;
+  --color-surface-2: #e0e2e6;
+  --color-canvas: #dcdee2;
+  --color-ink-950: #e3e4e7;
+  --color-ink-900: #ecedf0;
+  --color-ink-850: #e6e7ea;
+  --color-ink-800: #dcdee2;
+  --color-ink-700: #cbced4;
+  --color-ink-600: #afb3bb;
+  --color-ink-400: #6a6f79;
+  --color-ink-300: #4b4f58;
+  --color-ink-100: #24272d;
 }
 
 body {

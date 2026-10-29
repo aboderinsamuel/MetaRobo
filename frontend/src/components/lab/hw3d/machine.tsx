@@ -5,12 +5,14 @@
 // per-actuator simulation (lib/lab/actuation.ts). Click to select; the gizmo moves the selection.
 import { Environment, Lightformer, TransformControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { at, type MachineSim } from "@/lib/lab/actuation";
 import { armSpec, catalogOf, childrenOf, type Assembly, type PartSpec } from "@/lib/lab/assembly";
 import { CatalogMesh, FabMesh } from "./catalogMeshes";
+import { buildGeometry } from "@/lib/create/geometry";
+import { materialFor } from "@/lib/create/materials";
 import { Label } from "./parts3d";
 import RobotArm from "./robotArm";
 import type { LiveFn, PartLive } from "./liveMeshes";
@@ -24,7 +26,18 @@ type Refs = Map<string, THREE.Group>;
 
 const isArmKit = (p: PartSpec) => p.model === "arm_kit";
 
-function PartBody({ part, stroke, held, live }: { part: PartSpec; stroke: () => number; held?: React.ReactNode; live?: LiveFn }) {
+/** A designed body shell, drawn with the designer's own geometry and physically based material. */
+/** In X-ray view the shells turn to glass so the real hardware inside shows through. */
+const XRAY_SHELL = new THREE.MeshStandardMaterial({ color: "#9fb4d8", transparent: true, opacity: 0.14, depthWrite: false, roughness: 0.2 });
+
+function ShellMesh({ shell, xray }: { shell: NonNullable<PartSpec["shell"]>; xray?: boolean }) {
+  const geometry = useMemo(() => buildGeometry(shell), [shell]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <mesh geometry={geometry} material={xray ? XRAY_SHELL : materialFor(shell.material, shell.color)} castShadow={!xray} receiveShadow />;
+}
+
+function PartBody({ part, stroke, held, live, xray }: { part: PartSpec; stroke: () => number; held?: React.ReactNode; live?: LiveFn; xray?: boolean }) {
+  if (part.kind === "shell" && part.shell) return <ShellMesh shell={part.shell} xray={xray} />;
   if (part.kind === "catalog" && isArmKit(part)) return <RobotArm part={part} stroke={stroke} held={held} />;
   if (part.kind === "catalog") {
     const c = catalogOf(part);
@@ -64,6 +77,8 @@ interface TreeCtx {
   /** What each part is doing right now in the behaviour simulation (lit, running, wet, text). */
   live: (id: string) => PartLive | undefined;
   labels: boolean;
+  /** Show the hardware inside the shells (actuators, electronics). */
+  xray: boolean;
   selected: string | null;
   onSelect: (id: string | null) => void;
 }
@@ -118,11 +133,13 @@ function PartNode({ part, ctx, depth, anchored = false }: { part: PartSpec; ctx:
           }}
           onPointerOut={() => (document.body.style.cursor = "")}
         >
-          {copies.map((t, k) => (
-            <group key={k} position={t.position} rotation={t.rotation}>
-              <PartBody part={part} stroke={() => ctx.strokes.get(part.id) ?? 0} held={k === 0 ? held : undefined} live={() => ctx.live(part.id)} />
-            </group>
-          ))}
+          {/* Internal hardware shows in X-ray view or when it's selected; the shells show the robot as built. */}
+          {(!part.internal || ctx.xray || on) &&
+            copies.map((t, k) => (
+              <group key={k} position={t.position} rotation={t.rotation}>
+                <PartBody part={part} stroke={() => ctx.strokes.get(part.id) ?? 0} held={k === 0 ? held : undefined} live={() => ctx.live(part.id)} xray={ctx.xray} />
+              </group>
+            ))}
         </group>
         {!isArmKit(part) && children.map((c) => <PartNode key={c.id} part={c} ctx={ctx} depth={depth + 1} />)}
         {(on || (ctx.labels && depth <= 1)) && (
@@ -232,7 +249,9 @@ export default function MachineRig({
   gizmo,
   onTransform,
   sound = true,
+  xray = false,
 }: {
+  xray?: boolean;
   assembly: Assembly;
   sim: MachineSim | null;
   /** Play the buzzer through the speakers. */
@@ -270,7 +289,8 @@ export default function MachineRig({
     [sim, clock],
   );
   useBuzzerAudio(assembly, sim?.behaviour ?? null, clock, sound);
-  const ctx: TreeCtx = { kids, motion, nodes, bodies, strokes, labels, selected, onSelect, live };
+  const ctx: TreeCtx = { kids, motion, nodes, bodies, strokes, labels, xray, selected, onSelect, live };
+  const hiddenParts = useMemo(() => (xray ? new Set<string>() : new Set(assembly.parts.filter((p) => p.internal).map((p) => p.id))), [assembly.parts, xray]);
   const [target, setTarget] = useState<THREE.Group | undefined>(undefined);
   // The selected part's group only exists after commit, so it can't be read during render.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -294,7 +314,7 @@ export default function MachineRig({
           <PartNode key={p.id} part={p} ctx={ctx} depth={0} />
         ))}
       </group>
-      <Wires assembly={assembly} nodes={nodes} behaviour={sim?.behaviour ?? null} clock={clock} />
+      <Wires assembly={assembly} nodes={nodes} behaviour={sim?.behaviour ?? null} clock={clock} hidden={hiddenParts} />
       <SelectionBox target={selected && target ? bodies.get(selected) : undefined} />
       {target && selected && (
         <TransformControls

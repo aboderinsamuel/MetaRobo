@@ -143,15 +143,17 @@ function WireMesh({ c, index, nodes, heights, containers, inside, behaviour, clo
   );
 }
 
-export function Wires({ assembly, nodes, behaviour, clock }: { assembly: Assembly; nodes: Refs; behaviour: BehaviourSim | null; clock: React.RefObject<Clock> }) {
+export function Wires({ assembly, nodes, behaviour, clock, hidden }: { assembly: Assembly; nodes: Refs; behaviour: BehaviourSim | null; clock: React.RefObject<Clock>; hidden?: Set<string> }) {
   const heights = useMemo(() => new Map(assembly.parts.map((p) => [p.id, p.size[1]])), [assembly.parts]);
   const containers = useMemo(() => new Set(assembly.parts.filter((p) => p.model === "pot_plant" || p.model === "reservoir").map((p) => p.id)), [assembly.parts]);
   const inside = useMemo(() => new Map(assembly.parts.filter((p) => p.parent && containers.has(p.parent)).map((p) => [p.id, p.parent!])), [assembly.parts, containers]);
   return (
     <group>
-      {assembly.connections.map((c, i) => (
+      {assembly.connections.map((c, i) =>
+        hidden?.has(c.from) || hidden?.has(c.to) ? null : (
         <WireMesh key={`${c.from}.${c.fromPin}-${c.to}.${c.toPin}-${i}`} c={c} index={i} nodes={nodes} heights={heights} containers={containers} inside={inside} behaviour={behaviour} clock={clock} />
-      ))}
+        ),
+      )}
     </group>
   );
 }

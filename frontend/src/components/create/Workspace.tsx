@@ -4,11 +4,13 @@
 // designs it; the canvas shows it in 3D and plays its physically simulated task; the side panel
 // changes it in plain words, edits parts directly, walks the task, and reports the engineering.
 // Every change is a version you can step back and forward through; projects save in the browser.
-import { Box, Boxes, ChevronLeft, ChevronRight, Cpu, FolderOpen, ListChecks, Loader2, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, ScanEye, SlidersHorizontal, Sparkles, Trash2, Video, Wand2 } from "lucide-react";
+import { Box, Boxes, ChevronLeft, ChevronRight, Copy, Cpu, FlaskConical, FolderOpen, ListChecks, Loader2, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, ScanEye, SlidersHorizontal, Sparkles, Trash2, Video, Wand2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
+import { sendToLab } from "@/lib/create/handoff";
 import type { Design } from "@/lib/create/design";
 import { usePlayback } from "@/lib/create/playback";
 import { deleteProject, loadProjects, newProjectId, saveProject, type Project } from "@/lib/create/projects";
@@ -99,10 +101,12 @@ function ProjectsMenu({ current, onOpen, onNew }: { current: string | null; onOp
       >
         <FolderOpen className="size-4" /> Projects
       </Button>
+      {/* The click-catcher goes away at once, not after the menu's exit animation (which stalls in a
+          background tab and would swallow the next click). */}
+      {open && <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />}
       <AnimatePresence>
         {open && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="absolute top-11 left-0 z-50 w-80 rounded-2xl bg-surface p-2 shadow-[0_24px_60px_-20px_rgb(0_0_0/0.4),0_0_0_1px_var(--color-line)]">
               <button
                 onClick={() => {
@@ -150,8 +154,68 @@ function ProjectsMenu({ current, onOpen, onNew }: { current: string | null; onOp
   );
 }
 
+/** What produced a version, from its prompt. */
+function kindOf(prompt: string, i: number): { label: string; cls: string } {
+  if (i === 0) return { label: "Created", cls: "bg-accent-soft text-accent" };
+  if (/^Edited\b/.test(prompt)) return { label: "Edited", cls: "bg-surface-2 text-mute" };
+  if (/^(Fixed|Upsized)\b/.test(prompt)) return { label: "Engineering fix", cls: "bg-ok/12 text-ok" };
+  return { label: "Changed", cls: "bg-[#0ea5e9]/12 text-[#0284c7] dark:text-[#38bdf8]" };
+}
+
+/** Every prompt, change and edit in this project, in full, oldest first; click one to open it. */
+function History({ project, onOpen }: { project: Project; onOpen: (i: number) => void }) {
+  const [copied, setCopied] = useState<number | null>(null);
+  return (
+    <section>
+      <p className="mb-2 flex items-center justify-between text-[12px] font-semibold text-mute">
+        <span>Project history</span>
+        <span className="font-normal text-dim">
+          {project.versions.length} version{project.versions.length > 1 ? "s" : ""}
+        </span>
+      </p>
+      <ol className="relative space-y-2 before:absolute before:top-3 before:bottom-3 before:left-[15px] before:w-px before:bg-line-2">
+        {project.versions.map((v, i) => {
+          const k = kindOf(v.prompt, i);
+          const on = i === project.cursor;
+          return (
+            <li key={i} className="relative">
+              <div className={cx("ml-0 flex gap-3 rounded-2xl p-2.5 transition-colors", on ? "bg-accent-soft/70" : "hover:bg-surface-2")}>
+                <button onClick={() => onOpen(i)} aria-label={`Open version ${i + 1}`} className={cx("relative z-10 flex size-[22px] shrink-0 items-center justify-center rounded-full text-[10.5px] font-semibold tabular-nums", on ? "bg-accent text-accent-fg" : "bg-surface text-mute ring-1 ring-line-2")}>
+                  {i + 1}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={cx("rounded-full px-2 py-0.5 text-[10.5px] font-semibold", k.cls)}>{k.label}</span>
+                    <span className="text-[11px] text-dim">{new Date(v.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>
+                  </div>
+                  <button onClick={() => onOpen(i)} className="mt-1 block w-full text-left text-[13px] leading-relaxed whitespace-pre-wrap text-fg">
+                    {v.prompt}
+                  </button>
+                  <p className="mt-1 text-[11.5px] text-mute">{v.design.title}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(v.prompt);
+                    setCopied(i);
+                    setTimeout(() => setCopied(null), 1200);
+                  }}
+                  title="Copy this prompt"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-lg text-dim hover:bg-surface hover:text-fg"
+                >
+                  {copied === i ? <span className="text-[10px]">✓</span> : <Copy className="size-3.5" />}
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 export default function Workspace({ initial }: { initial?: Design }) {
   const theme = useTheme();
+  const router = useRouter();
   const [status, refreshStatus] = useStatus();
   const [project, setProject] = useState<Project | null>(() => (initial ? { id: "fixture", title: initial.title, updated: Date.now(), versions: [{ design: initial, prompt: "Test fixture", at: Date.now() }], cursor: 0 } : null));
   const [tab, setTab] = useState<Tab>("prompt");
@@ -299,6 +363,18 @@ export default function Workspace({ initial }: { initial?: Design }) {
                       <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-relaxed text-mute">{design.summary}</p>
                     </div>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    className="mt-3 w-full"
+                    title="The same robot in the Control Lab, with a real actuator on every joint and its controller, power and wiring inside: swap and edit parts, run the checks, get firmware. Instant, no AI call."
+                    onClick={() => {
+                      sendToLab(project);
+                      router.push("/lab?from=create");
+                    }}
+                  >
+                    <FlaskConical className="size-4" /> Open in Control Lab
+                  </Button>
                   <div className="mt-3 flex items-center gap-2">
                     <IconButton label="Previous version" disabled={project.cursor === 0} onClick={() => goto(project.cursor - 1)}>
                       <ChevronLeft className="size-4" />
@@ -328,21 +404,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
                     <div className="space-y-4">
                       <p className="text-[13px] leading-relaxed text-mute">Say what to change: add an environment, swap a gripper for a hand, make it taller, give it a new task. Muse Spark revises this version and keeps everything else.</p>
                       <PromptBox placeholder="e.g. Add a laundry basket by the washing machine and fold two towels too" busy={!!busy} onSubmit={(t) => void change(t)} submitLabel="Change" examples={["Make it 20% taller with longer arms", "Swap the grippers for five-finger hands", "Add a second table and stack the folded clothes on it"]} />
-                      {project && project.versions.length > 1 && (
-                        <div>
-                          <p className="mb-2 text-[12px] font-semibold text-mute">History</p>
-                          <ol className="space-y-1">
-                            {project.versions.map((v, i) => (
-                              <li key={i}>
-                                <button onClick={() => goto(i)} className={cx("flex w-full gap-2.5 rounded-xl px-2.5 py-2 text-left text-[12.5px] hover:bg-surface-2", i === project.cursor && "bg-accent-soft")}>
-                                  <span className="shrink-0 font-medium text-mute tabular-nums">v{i + 1}</span>
-                                  <span className="line-clamp-2">{v.prompt}</span>
-                                </button>
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-                      )}
+                      {project && <History project={project} onOpen={goto} />}
                     </div>
                   ) : (
                     <div className="space-y-3">
