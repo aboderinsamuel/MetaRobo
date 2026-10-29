@@ -4,18 +4,19 @@ import {
   ArrowRight,
   Check,
   Copy,
+  Cpu,
   Download,
   FileSpreadsheet,
   Film,
+  Lightbulb,
   Loader2,
   Mic,
   MicOff,
   Play,
   RotateCcw,
   Send,
-  Sparkles,
+  SlidersHorizontal,
   Upload,
-  Wand2,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -249,7 +250,7 @@ export function DescribePanel({
           </p>
         )}
         <PrimaryButton className="mt-3 w-full" onClick={onBuild} disabled={busy || !text.trim()}>
-          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} Build model & controller
+          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Cpu className="size-3.5" />} Build model & controller
         </PrimaryButton>
 
         <PartsLibrary parts={userParts} onChange={onUserParts} />
@@ -620,7 +621,7 @@ export function Copilot({
               {m.kind === "advice" && (
                 <div className="border-l-2 pl-3" style={{ borderImage: "var(--spectrum) 1" }}>
                   <p className="flex items-start gap-1.5 text-[13px] font-medium">
-                    <Sparkles className="mt-0.5 size-3.5 shrink-0" />
+                    <Lightbulb className="mt-0.5 size-3.5 shrink-0" />
                     {m.advice.headline}
                   </p>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-mute">{m.advice.explanation}</p>
@@ -679,13 +680,13 @@ export function Copilot({
           <GhostButton
             onClick={() => onAsk()}
             disabled={!ready || !!busy}
-            className={`justify-center ${aiOn ? "meta-ring" : ""}`}
+            className="justify-center"
             title={aiOn ? "Ask Meta Muse Spark to explain this response (a live call, about 1¢)" : "Explain with the offline advisor"}
           >
-            <Sparkles className="size-3" /> {aiOn ? <span className="text-spectrum font-semibold">Ask Muse</span> : "Explain"}
+            <Lightbulb className="size-3" /> Explain
           </GhostButton>
           <GhostButton onClick={onTune} disabled={!ready || !!busy} className="justify-center">
-            <Wand2 className="size-3" /> Auto-tune
+            <SlidersHorizontal className="size-3" /> Auto-tune
           </GhostButton>
           <GhostButton onClick={onAuto} disabled={!ready || !!busy} className={`justify-center ${specOk ? "" : "border-fg/30 text-fg"}`}>
             {busy === "auto" ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />} Iterate

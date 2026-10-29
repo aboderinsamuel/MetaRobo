@@ -4,7 +4,7 @@
 // designs it; the canvas shows it in 3D and plays its physically simulated task; the side panel
 // changes it in plain words, edits parts directly, walks the task, and reports the engineering.
 // Every change is a version you can step back and forward through; projects save in the browser.
-import { Box, Boxes, ChevronLeft, ChevronRight, Copy, Cpu, FlaskConical, FolderOpen, ListChecks, Loader2, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, ScanEye, SlidersHorizontal, Sparkles, Trash2, Video, Wand2 } from "lucide-react";
+import { Box, Boxes, ChevronLeft, ChevronRight, Copy, Cpu, FlaskConical, FolderOpen, ListChecks, Loader2, PanelLeftClose, PanelLeftOpen, PenLine, Plus, RotateCcw, ScanEye, SlidersHorizontal, Trash2, Video } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -63,11 +63,11 @@ function Generating({ startedAt, change }: { startedAt: number; change: boolean 
       <div className="w-[min(92%,380px)] rounded-3xl bg-surface p-6 shadow-[0_30px_80px_-30px_rgb(0_0_0/0.45),0_0_0_1px_var(--color-line)]">
         <div className="flex items-center gap-3">
           <span className="relative flex size-10 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-            <Sparkles className="size-5" />
+            <Box className="size-5" />
             <span className="absolute inset-0 animate-ping rounded-2xl bg-accent/20" />
           </span>
           <div>
-            <p className="text-[15px] font-semibold">Muse Spark is {change ? "changing" : "designing"} it</p>
+            <p className="text-[15px] font-semibold">{change ? "Changing" : "Designing"} your robot</p>
             <p className="text-[12.5px] text-mute tabular-nums">{Math.floor(s)} s · usually 40–120 s</p>
           </div>
         </div>
@@ -298,7 +298,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
   const live = status?.ai ?? false;
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "prompt", label: design ? "Change" : "Create", icon: <Wand2 className="size-3.5" /> },
+    { id: "prompt", label: design ? "Change" : "Create", icon: <PenLine className="size-3.5" /> },
     { id: "edit", label: "Edit", icon: <SlidersHorizontal className="size-3.5" /> },
     { id: "task", label: "Task", icon: <ListChecks className="size-3.5" /> },
     { id: "engineer", label: "Engineer", icon: <Cpu className="size-3.5" /> },
@@ -327,17 +327,11 @@ export default function Workspace({ initial }: { initial?: Design }) {
           />
         </div>
         <div className="flex items-center gap-2">
-          {status && (
-            <span title={live ? "Meta Muse spend today, against the daily cap" : "Live AI is off on this server"} className={cx("hidden h-8 items-center gap-2 rounded-xl px-3 text-[12px] sm:inline-flex", live ? "bg-surface-2 text-mute" : "bg-warn/12 text-warn")}>
-              <span className={cx("size-1.5 rounded-full", live ? "bg-ok" : "bg-warn")} />
-              {live ? (
-                <>
-                  Muse Spark · <span className="text-fg tabular-nums">${status.spent.toFixed(2)}</span>
-                  {status.budget > 0 && <span className="tabular-nums">/ ${status.budget}</span>}
-                </>
-              ) : (
-                "AI offline"
-              )}
+          {status && live && (
+            <span title="Meta Muse spend today, against the daily cap" className="hidden h-8 items-center gap-2 rounded-xl bg-surface-2 px-3 text-[12px] text-mute sm:inline-flex">
+              <span className="size-1.5 rounded-full bg-ok" />
+              Muse Spark · <span className="text-fg tabular-nums">${status.spent.toFixed(2)}</span>
+              {status.budget > 0 && <span className="tabular-nums">/ ${status.budget}</span>}
             </span>
           )}
           <ThemeToggle />
@@ -435,7 +429,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
                 {tab === "engineer" && design && <EngineeringPanel design={design} recording={sim.recording} onApply={(d, what) => addVersion(d, what)} onSelect={(id) => (setSelected(id), setTab("edit"))} />}
                 {tab === "video" && <VideoPanel design={design} recording={sim.recording} busy={!!busy} onBuild={(p, o) => void create(p, o)} onSpend={refreshStatus} />}
                 {error && <p className="mt-4 rounded-xl bg-bad/10 px-3 py-2.5 text-[12.5px] leading-relaxed text-bad">{error}</p>}
-                {!live && status && <p className="mt-4 rounded-xl bg-warn/10 px-3 py-2.5 text-[12.5px] leading-relaxed text-warn">Live AI is off on this server (META_LIVE isn&apos;t set), so designs can&apos;t be generated here. Saved projects still open and simulate.</p>}
+                {!live && status && <p className="mt-4 rounded-xl bg-surface-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-mute">New designs are paused on this demo right now. Saved projects still open and simulate.</p>}
               </div>
             </motion.aside>
           )}
@@ -498,7 +492,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(var(--color-line)_1px,transparent_1px),linear-gradient(90deg,var(--color-line)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)] bg-[size:32px_32px]" />
               <div className="relative w-full max-w-2xl">
                 <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1 text-[12px] font-medium text-accent">
-                  <Sparkles className="size-3.5" /> Designed by Meta Muse Spark · simulated with real physics
+                  Real joints, real actuators, real physics
                 </p>
                 <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] leading-[1.08] font-semibold tracking-[-0.025em]">What should we build?</h2>
                 <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-mute">Describe any robot and the job it should do. You&apos;ll get a custom 3D design with real joints and actuators, the space it works in, and a simulation of it doing the task.</p>

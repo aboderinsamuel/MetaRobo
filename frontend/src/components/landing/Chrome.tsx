@@ -12,27 +12,14 @@ export const SECTIONS = [
   { id: "intro", label: "Intro" },
   { id: "meta", label: "Meta stack", nav: true },
   { id: "loop", label: "The loop", nav: true },
+  { id: "systems", label: "Systems" },
   { id: "trace", label: "Agent", nav: true },
   { id: "engine", label: "Engine", nav: true },
   { id: "validation", label: "Validation" },
-  { id: "systems", label: "Systems" },
   { id: "pricing", label: "Pricing", nav: true },
   { id: "log", label: "Hackathon", nav: true },
   { id: "builder", label: "Builder" },
 ];
-
-/** "Powered by Meta Muse" badge: plain-text attribution, no Meta logo. */
-export function MetaBadge({ className = "" }: { className?: string }) {
-  return (
-    <span className={`meta-ring inline-flex h-6 items-center gap-1.5 rounded-full bg-void/70 px-2.5 text-[11px] font-medium text-fg backdrop-blur ${className}`}>
-      <span className="relative flex size-1.5">
-        <span className="absolute inline-flex size-full animate-ping rounded-full bg-spec-2 opacity-70" />
-        <span className="relative inline-flex size-1.5 rounded-full bg-spec-2" />
-      </span>
-      Powered by <span className="text-spectrum font-semibold">Meta Muse</span>
-    </span>
-  );
-}
 
 export function LaunchButton({ className = "", label = "Open studio", href = "/create" }: { className?: string; label?: string; href?: string }) {
   return (

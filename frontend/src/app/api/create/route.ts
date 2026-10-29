@@ -9,7 +9,7 @@ const reason = (err: unknown) => (err instanceof Error ? err.message : String(er
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { prompt?: string; observed?: string; design?: Design; change?: string; history?: string[] };
-  if (!metaEnabled()) return Response.json({ error: "Muse Spark is off: live mode isn't enabled on this server, so it can't design anything." }, { status: 503 });
+  if (!metaEnabled()) return Response.json({ error: "New designs are paused on this demo right now. Saved projects still open and simulate." }, { status: 503 });
   try {
     if (body.design && body.change?.trim()) {
       // The client's design is untrusted input: validate it before sending it back to the model.

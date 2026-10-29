@@ -3,7 +3,7 @@
 // RoboCraft Control Lab: describe → build the hardware → model → control → simulate → explain →
 // iterate → validate. The hardware build is the source of truth: parts and dimensions give the
 // plant, the actuator limits and the design checks.
-import { Activity, Box, Cable, ChevronDown, CircleHelp, Code2, Cpu, Download, MessageSquare, ShieldCheck, SlidersHorizontal, Sparkles, Waves } from "lucide-react";
+import { Activity, Box, Cable, ChevronDown, CircleHelp, Code2, Cpu, Download, MessageSquare, PenLine, ShieldCheck, SlidersHorizontal, Waves } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -806,12 +806,12 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
               simple
                 ? [
                     { id: "hardware", label: machine ? "Parts" : "Demos", icon: Cpu },
-                    { id: "describe", label: "Describe", icon: Sparkles },
+                    { id: "describe", label: "Describe", icon: PenLine },
                   ]
                 : [
                     { id: "hardware", label: machine ? "Parts" : "Demos", icon: Cpu },
                     { id: "control", label: "Control", icon: SlidersHorizontal },
-                    { id: "describe", label: "Describe", icon: Sparkles },
+                    { id: "describe", label: "Describe", icon: PenLine },
                   ]
             }
             layoutId="left-tab"

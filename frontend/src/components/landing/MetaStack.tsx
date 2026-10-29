@@ -23,7 +23,7 @@ export default function MetaStack() {
       <div className="relative mx-auto max-w-[1440px] px-4 py-24 sm:px-6 sm:py-32">
         <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <p className="mono-label text-mute">·· Powered by Meta Muse</p>
+            <p className="mono-label text-mute">·· The stack</p>
             <h2 className="mt-4 max-w-3xl text-[clamp(2rem,4.6vw,3.8rem)] leading-[1.02] font-semibold tracking-[-0.03em]">
               Meta&apos;s models, wired into <span className="text-spectrum">one closed loop</span>.
             </h2>

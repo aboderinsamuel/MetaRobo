@@ -6,7 +6,7 @@ export const maxDuration = 120;
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { images?: string[]; note?: string };
-  if (!metaEnabled()) return Response.json({ error: "Muse Spark is off: live mode isn't enabled on this server." }, { status: 503 });
+  if (!metaEnabled()) return Response.json({ error: "Video reading is paused on this demo right now." }, { status: 503 });
   const images = (body.images ?? []).filter((s) => typeof s === "string" && /^data:image\/(jpeg|png|webp);base64,/.test(s) && s.length < 4_000_000).slice(0, 12);
   if (images.length < 2) return Response.json({ error: "Send at least two keyframes." }, { status: 400 });
   try {

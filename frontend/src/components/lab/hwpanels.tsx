@@ -2,7 +2,7 @@
 
 // Hardware side of the lab: pick parts and dimensions, read the design checks and bill of
 // materials, and see the auto-generated wiring.
-import { AlertTriangle, CheckCircle2, ChevronDown, Download, Info, Wand2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Download, Info, Wrench, XCircle } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { GEOMETRY, SLOTS } from "@/lib/lab/hardware/build";
@@ -219,7 +219,7 @@ export function ChecksPanel({
           <span className="mono-label rounded-full bg-ok/10 px-1.5 py-0.5 text-[10px] text-ok">{passed} passed</span>
           {autos > 0 && (
             <span className="mono-label inline-flex items-center gap-1 rounded-full bg-spec-1/10 px-1.5 py-0.5 text-[10px] text-spec-1">
-              <Wand2 className="size-3" /> {autos} safety fix{autos > 1 ? "es" : ""} applied
+              <Wrench className="size-3" /> {autos} safety fix{autos > 1 ? "es" : ""} applied
             </span>
           )}
         </div>
@@ -276,7 +276,7 @@ export function ChecksPanel({
                     <span className="flex-1 text-[12px] leading-snug">{c.title}</span>
                     {c.auto && (
                       <span className="mono-label inline-flex shrink-0 items-center gap-1 rounded-full bg-spec-1/10 px-1 py-0.5 text-[9px] text-spec-1">
-                        <Wand2 className="size-2.5" /> auto
+                        <Wrench className="size-2.5" /> auto
                       </span>
                     )}
                     <ChevronDown className={`mt-0.5 size-3 shrink-0 text-dim transition-transform ${isOpen ? "rotate-180" : ""}`} />
@@ -290,7 +290,7 @@ export function ChecksPanel({
                             onClick={() => onBuild({ ...hw.build, parts: { ...hw.build.parts, ...c.fix!.parts }, geom: { ...hw.build.geom, ...c.fix!.geom } }, `fix: ${c.fix!.label}`)}
                             className="mono-label mb-2 ml-8 inline-flex items-center gap-1 border border-spec-1/40 px-1.5 py-1 text-[10px] text-spec-1 hover:bg-spec-1/10 rounded-xl"
                           >
-                            <Wand2 className="size-3" /> Apply fix · {c.fix.label}
+                            <Wrench className="size-3" /> Apply fix · {c.fix.label}
                           </button>
                         )}
                       </motion.div>
@@ -319,7 +319,7 @@ export function ChecksPanel({
                     <tr key={i} className="border-b border-line/60 last:border-0">
                       <td className="py-1 pl-3 text-mute">
                         {l.name}
-                        {l.auto && <Wand2 className="ml-1 inline size-2.5 text-spec-1" />}
+                        {l.auto && <Wrench className="ml-1 inline size-2.5 text-spec-1" />}
                       </td>
                       <td className="py-1 text-right font-mono text-dim">×{l.qty}</td>
                       <td className="py-1 pr-3 text-right font-mono">${(l.price * l.qty).toFixed(2)}</td>

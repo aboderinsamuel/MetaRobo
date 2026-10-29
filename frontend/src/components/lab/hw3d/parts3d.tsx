@@ -28,6 +28,8 @@ export interface SceneCtx {
   labels: boolean;
   /** 0..1 load per slot, updated every frame by the rig (motor current / rating etc.). */
   load: React.RefObject<Partial<Record<SlotId, number>>>;
+  /** The robot on its own (landing page): no lab props, rulers, targets or labels. */
+  showcase?: boolean;
 }
 
 export const Scene = createContext<SceneCtx | null>(null);
@@ -56,6 +58,7 @@ export function Label({
   border?: string;
   bg?: string;
 }) {
+  const showcase = useContext(Scene)?.showcase;
   const { tex, aspect } = useMemo(() => {
     const c = document.createElement("canvas");
     const ctx = c.getContext("2d")!;
@@ -83,6 +86,7 @@ export function Label({
     return { tex: t, aspect: w / 68 };
   }, [text, color, box, border, bg]);
   useEffect(() => () => tex.dispose(), [tex]);
+  if (showcase) return null;
   return (
     <sprite position={position} scale={[size * aspect, size, 1]} renderOrder={10}>
       <spriteMaterial map={tex} transparent depthTest={false} toneMapped={false} />
@@ -653,6 +657,8 @@ export function curve(a: V3, b: V3, lift = 0.02, n = 16): V3[] {
 
 /** A dimension line with end ticks and a label, like a drawing. */
 export function Dimension({ a, b, text, offset = [0, 0, 0] as V3 }: { a: V3; b: V3; text: string; offset?: V3 }) {
+  const showcase = useContext(Scene)?.showcase;
+  if (showcase) return null;
   const A: V3 = [a[0] + offset[0], a[1] + offset[1], a[2] + offset[2]];
   const B: V3 = [b[0] + offset[0], b[1] + offset[1], b[2] + offset[2]];
   const mid: V3 = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2 + 0.008, (A[2] + B[2]) / 2];

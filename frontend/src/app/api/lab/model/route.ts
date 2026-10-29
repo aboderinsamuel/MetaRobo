@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   // Demo robots: only when the user picked one.
   if (body.presetId) return Response.json(offlineModel(description, body.presetId));
   if (!description) return Response.json({ error: "Describe the machine first." }, { status: 400 });
-  if (!aiEnabled()) return Response.json({ error: "Muse Spark is off (live mode isn't enabled), so it can't build what you describe. Demo robots still work from the Demos tab." }, { status: 503 });
+  if (!aiEnabled()) return Response.json({ error: "Building from a description is paused on this demo right now. The demo robots in the Demos tab work fully." }, { status: 503 });
 
   if (body.assembly) {
     let edited: Assembly;
