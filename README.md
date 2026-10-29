@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.png" alt="RoboCraft: describe it, simulate it, build it" width="100%" />
+  <img src="docs/assets/banner.webp" alt="RoboCraft. Describe a robot. Watch it move. Then build it." width="100%" />
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://robocraft-six.vercel.app"><img alt="Live demo" src="https://img.shields.io/badge/live%20demo-robocraft--six.vercel.app-8B7FFF?style=flat-square" /></a>
+  <a href="https://robocraftlaunch.vercel.app"><img alt="Live demo" src="https://img.shields.io/badge/live%20demo-robocraftlaunch.vercel.app-8B7FFF?style=flat-square" /></a>
   <img alt="Meta Muse Spark" src="https://img.shields.io/badge/Meta-Muse%20Spark-0082FB?style=flat-square" />
   <img alt="SAM 3.1" src="https://img.shields.io/badge/Meta-SAM%203.1-0082FB?style=flat-square" />
   <img alt="Tests" src="https://img.shields.io/badge/tests-124%20passing-2ea44f?style=flat-square" />
@@ -19,9 +19,9 @@
 </p>
 
 <p align="center">
-  <a href="https://robocraft-six.vercel.app"><b>Live demo</b></a> ·
-  <a href="https://robocraft-six.vercel.app/create">Create</a> ·
-  <a href="https://robocraft-six.vercel.app/lab?preset=arm">Control Lab</a> ·
+  <a href="https://robocraftlaunch.vercel.app"><b>Live demo</b></a> ·
+  <a href="https://robocraftlaunch.vercel.app/create">Create</a> ·
+  <a href="https://robocraftlaunch.vercel.app/lab?preset=arm">Control Lab</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#how-we-use-metas-models">Meta models</a> ·
   <a href="#run-it-locally">Run it</a>
