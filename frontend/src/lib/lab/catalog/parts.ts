@@ -79,7 +79,22 @@ export type ModelKind =
   | "bearing"
   | "shaft_coupler"
   | "timing_pulley"
-  | "lead_screw";
+  | "lead_screw"
+  | "sensor_soil"
+  | "sensor_level"
+  | "sensor_dht"
+  | "relay_module"
+  | "pump_mini"
+  | "pump_12v"
+  | "solenoid_valve"
+  | "buzzer"
+  | "led"
+  | "fan"
+  | "potentiometer"
+  | "lcd"
+  | "pot_plant"
+  | "reservoir"
+  | "tube_coil";
 
 export interface Actuator {
   kind: "servo" | "continuous_servo" | "dc" | "stepper";
@@ -110,6 +125,8 @@ export interface CatalogPart {
   actuator?: Actuator;
   /** Supply range and what it can deliver (batteries, regulators, drivers). */
   electrical?: { vMin: number; vMax: number; maxA?: number; mAh?: number; channels?: number };
+  /** Pumps and valves: flow at rated voltage (L/min) and max head (m). */
+  fluid?: { flowLpm: number; headM: number };
   /** Arm kits: reach (mm), joints, end effector. */
   kit?: { reachMm: number; dof: number; effector: "gripper" | "hand" | "suction" };
   /** Source when added by web search or an upload. */
@@ -229,6 +246,33 @@ export const CATALOG: CatalogPart[] = [
   { id: "button-12mm", name: "12 mm tactile push button", category: "electronics", model: "button", dims: [12, 8, 12], massG: 1, priceUsd: 0.3, spec: "Momentary · through-hole", suppliers: ["sparkfun", "adafruit", "lcsc"], search: "12mm tactile button" },
   { id: "estop-22mm", name: "22 mm emergency-stop button", category: "electronics", model: "button", dims: [40, 45, 40], massG: 60, priceUsd: 6, spec: "Latching · NC contact", suppliers: ["amazon", "aliexpress"], search: "22mm emergency stop button" },
   { id: "rocker-switch", name: "Rocker power switch", category: "electronics", model: "switch", dims: [21, 15, 15], massG: 3, priceUsd: 1, spec: "6 A · panel mount", suppliers: ["sparkfun", "adafruit", ...hobby], search: "rocker switch panel mount" },
+
+  // ---------------------------------------------------------------- sensing, plants & automation
+  { id: "soil-cap-v12", name: "Capacitive soil moisture sensor v1.2", category: "sensor", model: "sensor_soil", dims: [23, 98, 4], massG: 3, priceUsd: 3, spec: "3.3–5 V · analog out · no exposed metal, so it doesn't corrode", suppliers: ["dfrobot", "adafruit", ...hobby], search: "capacitive soil moisture sensor v1.2" },
+  { id: "soil-yl69", name: "YL-69 resistive soil probe + comparator", category: "sensor", model: "sensor_soil", dims: [20, 60, 2], massG: 4, priceUsd: 1.5, spec: "Analog + digital out · corrodes over weeks", suppliers: [...hobby, "lcsc"], search: "YL-69 soil moisture sensor" },
+  { id: "water-level", name: "Water level sensor strip", category: "sensor", model: "sensor_level", dims: [20, 62, 2], massG: 3, priceUsd: 1.5, spec: "Analog · 0–40 mm depth", suppliers: [...hobby], search: "water level sensor arduino" },
+  { id: "float-switch", name: "Vertical float switch", category: "sensor", model: "sensor_level", dims: [24, 52, 24], massG: 12, priceUsd: 3, spec: "Tank low/high level · reed switch", suppliers: ["adafruit", ...hobby], search: "float switch water level" },
+  { id: "dht22", name: "DHT22 temperature & humidity sensor", category: "sensor", model: "sensor_dht", dims: [15.1, 25, 7.7], massG: 2.4, priceUsd: 5, spec: "−40–80 °C ±0.5 · 0–100 % RH ±2 %", suppliers: ["adafruit", "sparkfun", ...hobby], search: "DHT22 AM2302" },
+  { id: "bme280", name: "BME280 temperature / humidity / pressure", category: "sensor", model: "module_pcb", dims: [13, 3, 10], massG: 1, priceUsd: 8, spec: "I²C · ±1 °C · ±3 % RH", suppliers: ["adafruit", "sparkfun"], search: "BME280 breakout" },
+  { id: "ldr-module", name: "Light sensor (LDR) module", category: "sensor", model: "module_pcb", dims: [32, 6, 14], massG: 2, priceUsd: 1, spec: "Analog + digital out", suppliers: [...hobby], search: "LDR photoresistor module" },
+  { id: "potentiometer-10k", name: "10 kΩ potentiometer with knob", category: "electronics", model: "potentiometer", dims: [17, 20, 17], massG: 4, priceUsd: 0.6, spec: "Linear · set a threshold by hand", suppliers: ["sparkfun", "adafruit", ...hobby], search: "10k potentiometer knob" },
+  { id: "relay-1ch", name: "1-channel 5 V relay module (SRD-05VDC)", category: "driver", model: "relay_module", dims: [50, 19, 26], massG: 15, priceUsd: 2, spec: "5 V coil · 10 A contacts · opto-isolated", suppliers: ["sparkfun", ...hobby, "lcsc"], search: "1 channel 5V relay module", electrical: { vMin: 5, vMax: 5, maxA: 10, channels: 1 } },
+  { id: "relay-2ch", name: "2-channel 5 V relay module", category: "driver", model: "relay_module", dims: [50, 19, 38], massG: 25, priceUsd: 3, spec: "5 V coils · 10 A contacts", suppliers: [...hobby, "lcsc"], search: "2 channel 5V relay module", electrical: { vMin: 5, vMax: 5, maxA: 10, channels: 2 } },
+  { id: "mosfet-module", name: "Logic-level MOSFET switch module", category: "driver", model: "module_pcb", dims: [34, 12, 20], massG: 5, priceUsd: 2, spec: "Switch pumps / LEDs / fans from a 3.3–5 V pin · 5 A", suppliers: ["sparkfun", ...hobby], search: "MOSFET switch module arduino", electrical: { vMin: 3, vMax: 24, maxA: 5, channels: 1 } },
+  { id: "pump-mini-5v", name: "Mini submersible pump 3–5 V", category: "motor", model: "pump_mini", dims: [45, 30, 24], massG: 28, priceUsd: 3, spec: "3–5 V · 100–200 mA · ~1.2 L/min · 6 mm tube", suppliers: ["adafruit", ...hobby], search: "mini submersible water pump 5V", actuator: { kind: "dc", ratedV: 5, stallKgcm: 0.05, speed: 2500, stallA: 0.25, idleA: 0.13 }, fluid: { flowLpm: 1.2, headM: 0.8 } },
+  { id: "pump-12v-r385", name: "R385 12 V diaphragm pump", category: "motor", model: "pump_12v", dims: [90, 40, 40], massG: 120, priceUsd: 6, spec: "12 V · 0.5–0.8 A · ~2 L/min · self-priming", suppliers: [...hobby], search: "R385 diaphragm pump 12V", actuator: { kind: "dc", ratedV: 12, stallKgcm: 0.3, speed: 3000, stallA: 1, idleA: 0.5 }, fluid: { flowLpm: 2, headM: 2 } },
+  { id: "solenoid-12v", name: "12 V solenoid water valve (1/2 inch)", category: "driver", model: "solenoid_valve", dims: [85, 60, 45], massG: 120, priceUsd: 8, spec: "12 V · 0.5 A · normally closed · 0.02–0.8 MPa", suppliers: ["adafruit", ...hobby], search: "12V solenoid valve 1/2 inch", fluid: { flowLpm: 6, headM: 0 } },
+  { id: "tube-silicone-6mm", name: "Silicone tubing 6 mm ID (1 m)", category: "structure", model: "tube_coil", dims: [60, 10, 60], massG: 30, priceUsd: 2, spec: "Food-safe · fits mini pumps", suppliers: ["adafruit", ...hobby], search: "silicone tubing 6mm ID" },
+  { id: "buzzer-active", name: "Active piezo buzzer 5 V (12 mm)", category: "electronics", model: "buzzer", dims: [12, 9.5, 12], massG: 2, priceUsd: 0.5, spec: "85 dB @ 10 cm · 2.3 kHz · beeps when powered", suppliers: ["adafruit", "sparkfun", ...hobby], search: "active buzzer 5V 12mm" },
+  { id: "buzzer-passive", name: "Passive piezo buzzer (12 mm)", category: "electronics", model: "buzzer", dims: [12, 8, 12], massG: 2, priceUsd: 0.4, spec: "Plays tones / melodies from PWM", suppliers: ["adafruit", ...hobby], search: "passive piezo buzzer" },
+  { id: "led-5mm", name: "5 mm LED + 220 Ω resistor", category: "electronics", model: "led", dims: [5, 9, 5], massG: 0.3, priceUsd: 0.1, spec: "Status light · 20 mA", suppliers: ["sparkfun", "adafruit", "lcsc"], search: "5mm LED" },
+  { id: "led-rgb", name: "5 mm RGB LED (common cathode)", category: "electronics", model: "led", dims: [5, 9, 5], massG: 0.4, priceUsd: 0.3, spec: "Any colour · 3 PWM pins", suppliers: ["sparkfun", "adafruit"], search: "RGB LED common cathode 5mm" },
+  { id: "fan-5v-40", name: "40 mm 5 V fan", category: "motor", model: "fan", dims: [40, 10, 40], massG: 12, priceUsd: 3, spec: "5 V · 0.1 A · 6000 rpm", suppliers: ["adafruit", ...hobby], search: "40mm 5V fan", actuator: { kind: "dc", ratedV: 5, stallKgcm: 0.02, speed: 6000, stallA: 0.15, idleA: 0.08 } },
+  { id: "lcd1602-i2c", name: "LCD 16×2 with I²C backpack", category: "electronics", model: "lcd", dims: [80, 13, 36], massG: 35, priceUsd: 6, spec: "Shows readings and messages", suppliers: ["adafruit", "sparkfun", ...hobby], search: "LCD 1602 I2C" },
+  { id: "usb-5v-2a", name: "USB 5 V 2 A wall adapter + cable", category: "power", model: "module_pcb", dims: [45, 25, 40], massG: 60, priceUsd: 6, spec: "5 V · 2 A · mains powered", suppliers: ["adafruit", "amazon"], search: "5V 2A USB power adapter", electrical: { vMin: 5, vMax: 5, maxA: 2 } },
+  { id: "jumper-kit", name: "Jumper wire kit (M-M / M-F / F-F)", category: "electronics", model: "module_pcb", dims: [60, 10, 40], massG: 40, priceUsd: 6, spec: "120 × 20 cm Dupont wires", suppliers: ["adafruit", "sparkfun", ...hobby], search: "jumper wire kit dupont" },
+  { id: "pot-12cm", name: "Plant pot 12 cm with drainage", category: "structure", model: "pot_plant", dims: [125, 110, 125], massG: 90, priceUsd: 3, spec: "Plastic · holds ~0.9 L of soil", suppliers: ["amazon"], search: "12cm plastic plant pot" },
+  { id: "reservoir-1l", name: "Water reservoir 1 L (food-safe box)", category: "structure", model: "reservoir", dims: [130, 90, 130], massG: 80, priceUsd: 4, spec: "1 L · lid with tube hole", suppliers: ["amazon"], search: "1 liter food container" },
 ];
 
 export const CATALOG_BY_ID = new Map(CATALOG.map((p) => [p.id, p]));

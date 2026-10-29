@@ -8,6 +8,7 @@ import Loader from "@/components/landing/Loader";
 import LoopStory from "@/components/landing/LoopStory";
 import MetaStack from "@/components/landing/MetaStack";
 import Pricing from "@/components/landing/Pricing";
+import RoboStyles from "@/components/landing/RoboStyles";
 import Systems from "@/components/landing/Systems";
 
 export default function Home() {
@@ -18,6 +19,7 @@ export default function Home() {
       <SideIndex />
       <main>
         <Hero />
+        <RoboStyles />
         <MetaStack />
         <LoopStory />
         <AgentTrace />

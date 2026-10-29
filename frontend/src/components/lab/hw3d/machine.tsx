@@ -5,7 +5,7 @@
 // per-actuator simulation (lib/lab/actuation.ts). Click to select; the gizmo moves the selection.
 import { Environment, Lightformer, TransformControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { at, type MachineSim } from "@/lib/lab/actuation";
@@ -13,6 +13,9 @@ import { armSpec, catalogOf, childrenOf, type Assembly, type PartSpec } from "@/
 import { CatalogMesh, FabMesh } from "./catalogMeshes";
 import { Label } from "./parts3d";
 import RobotArm from "./robotArm";
+import type { LiveFn, PartLive } from "./liveMeshes";
+import { Wires, useBuzzerAudio } from "./wiring";
+import { behaviourIndex, textAt } from "@/lib/lab/behaviour";
 import type { Clock } from "./rigs";
 
 const DEG = Math.PI / 180;
@@ -21,11 +24,11 @@ type Refs = Map<string, THREE.Group>;
 
 const isArmKit = (p: PartSpec) => p.model === "arm_kit";
 
-function PartBody({ part, stroke, held }: { part: PartSpec; stroke: () => number; held?: React.ReactNode }) {
+function PartBody({ part, stroke, held, live }: { part: PartSpec; stroke: () => number; held?: React.ReactNode; live?: LiveFn }) {
   if (part.kind === "catalog" && isArmKit(part)) return <RobotArm part={part} stroke={stroke} held={held} />;
   if (part.kind === "catalog") {
     const c = catalogOf(part);
-    return c ? <CatalogMesh part={c} color={part.color || undefined} /> : null;
+    return c ? <CatalogMesh part={c} color={part.color || undefined} live={live} /> : null;
   }
   if (part.kind === "fab" && part.fab) return <FabMesh kind={part.fab} size={part.size} material={part.material} color={part.color || undefined} />;
   // Not in the catalogue yet: a plain module, outlined in amber so it stands out.
@@ -56,6 +59,8 @@ interface TreeCtx {
   nodes: Refs;
   /** Stroke of each arm kit, set every frame from the simulation. */
   strokes: Map<string, number>;
+  /** What each part is doing right now in the behaviour simulation (lit, running, wet, text). */
+  live: (id: string) => PartLive | undefined;
   labels: boolean;
   selected: string | null;
   onSelect: (id: string | null) => void;
@@ -109,7 +114,7 @@ function PartNode({ part, ctx, depth, anchored = false }: { part: PartSpec; ctx:
         >
           {copies.map((t, k) => (
             <group key={k} position={t.position} rotation={t.rotation}>
-              <PartBody part={part} stroke={() => ctx.strokes.get(part.id) ?? 0} held={k === 0 ? held : undefined} />
+              <PartBody part={part} stroke={() => ctx.strokes.get(part.id) ?? 0} held={k === 0 ? held : undefined} live={() => ctx.live(part.id)} />
             </group>
           ))}
         </group>
@@ -220,9 +225,12 @@ export default function MachineRig({
   onSelect,
   gizmo,
   onTransform,
+  sound = true,
 }: {
   assembly: Assembly;
   sim: MachineSim | null;
+  /** Play the buzzer through the speakers. */
+  sound?: boolean;
   clock: React.RefObject<Clock>;
   labels: boolean;
   selected: string | null;
@@ -239,7 +247,23 @@ export default function MachineRig({
   useJoints(assembly, sim, clock, motion, strokes);
   // Reframe only for a new design, not for every edit.
   useGroundAndFrame(root, assembly.title);
-  const ctx: TreeCtx = { kids, motion, nodes, strokes, labels, selected, onSelect };
+  const live = useCallback(
+    (id: string): PartLive | undefined => {
+      const b = sim?.behaviour;
+      if (!b) return undefined;
+      const k = behaviourIndex(b, clock.current.t);
+      const sig = b.signals.find((x) => x.shows === id);
+      const fill = b.fill.get(id);
+      return {
+        on: b.on.get(id)?.[k],
+        level: fill ? fill[k] : sig ? (sig.value[k] - sig.min) / Math.max(1e-6, sig.max - sig.min) : undefined,
+        text: textAt(b, id, k),
+      };
+    },
+    [sim, clock],
+  );
+  useBuzzerAudio(assembly, sim?.behaviour ?? null, clock, sound);
+  const ctx: TreeCtx = { kids, motion, nodes, strokes, labels, selected, onSelect, live };
   const [target, setTarget] = useState<THREE.Group | undefined>(undefined);
   // The selected part's group only exists after commit, so it can't be read during render.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -263,6 +287,7 @@ export default function MachineRig({
           <PartNode key={p.id} part={p} ctx={ctx} depth={0} />
         ))}
       </group>
+      <Wires assembly={assembly} nodes={nodes} behaviour={sim?.behaviour ?? null} clock={clock} />
       <SelectionBox target={target} />
       {target && selected && (
         <TransformControls

@@ -4,7 +4,7 @@
 // part to inspect or swap it; parts that fail a design check glow and show what's wrong.
 import { Grid, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { AlertTriangle, CheckCircle2, Info, Pause, Play, RotateCcw, Tag, Wand2, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Pause, Play, RotateCcw, Tag, Volume2, VolumeX, Wand2, X, XCircle } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtNum } from "@/lib/lab/analysis";
@@ -21,6 +21,8 @@ import { Scene } from "./hw3d/parts3d";
 import type { PartStatus, SceneCtx } from "./hw3d/parts3d";
 import MachineRig, { gizmoActive, type GizmoMode } from "./hw3d/machine";
 import { at, simulateMachine, type MachineSim } from "@/lib/lab/actuation";
+import type { Assembly } from "@/lib/lab/assembly";
+import { behaviourIndex } from "@/lib/lab/behaviour";
 import { VERDICT_UI } from "./ReviewCard";
 import { bomTotal } from "@/lib/lab/review";
 import { ArmRig, BalancerRig, DroneRig, RoverRig } from "./hw3d/rigs";
@@ -196,6 +198,7 @@ export default function HardwareView({
   }, [hw, narrow, wide]);
   const isDrone = rig.kind === "drone";
   const [gizmo, setGizmo] = useState<GizmoMode>("translate");
+  const [sound, setSound] = useState(true);
   const selectPart = useCallback((id: string | null) => onSelectPart?.(id), [onSelectPart]);
   const transformPart = useCallback(
     (id: string, p: [number, number, number], r: [number, number, number]) => onTransformPart?.(id, p, r),
@@ -257,6 +260,7 @@ export default function HardwareView({
             <MachineRig
               assembly={machine}
               sim={machineSim}
+              sound={sound}
               clock={clock}
               labels={labels}
               selected={selectedPart}
@@ -332,6 +336,15 @@ export default function HardwareView({
               ))}
             </div>
           )}
+          {machineSim?.behaviour && (
+            <button
+              onClick={() => setSound((v) => !v)}
+              title={sound ? "Mute the buzzer" : "Play the buzzer through your speakers"}
+              className={`mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${sound ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
+            >
+              {sound ? <Volume2 className="size-3" /> : <VolumeX className="size-3" />} Sound
+            </button>
+          )}
           <button
             onClick={() => setLabels((v) => !v)}
             className={`mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${labels ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
@@ -343,7 +356,7 @@ export default function HardwareView({
           </button>
         </div>
         {machineSim ? (
-          <MachineHud playback={playback} sim={machineSim} />
+          <MachineHud playback={playback} sim={machineSim} assembly={machine!} />
         ) : (
           <Hud playback={playback} hw={hw} model={model} run={run} tel={tel} motion={motionData} stable={stable} settlingTime={settlingTime} simple={simple} />
         )}
@@ -391,8 +404,20 @@ export default function HardwareView({
 }
 
 /** Live readouts for an AI-designed machine: each joint's actuator and the total current draw. */
-function MachineHud({ playback, sim }: { playback: Playback; sim: MachineSim }) {
+function clockText(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return `⏱ ${h}:${String(m).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function MachineHud({ playback, sim, assembly }: { playback: Playback; sim: MachineSim; assembly: Assembly }) {
   const { t } = usePlayback(playback);
+  const b = sim.behaviour;
+  const bk = b ? behaviourIndex(b, t) : 0;
+  const rules = assembly.rules;
+  const names = new Map(assembly.parts.map((p) => [p.id, p.name]));
+  const onNow = b ? [...b.on].filter(([, arr]) => arr[bk]).map(([id]) => names.get(id) ?? id) : [];
   const errors = sim.checks.filter((c) => c.level === "error").length;
   const step = sim.steps.find((s) => t >= s.t0 && t < s.t1);
   const status = errors ? "CHECK PARTS" : t === 0 ? "READY" : t >= sim.tEnd - 1e-6 ? "DONE" : step ? "RUNNING" : "HOLD";
@@ -415,6 +440,18 @@ function MachineHud({ playback, sim }: { playback: Playback; sim: MachineSim }) 
           );
         })}
         {sim.traces.length > 6 && <p className="text-[9px] text-dim">+{sim.traces.length - 6} more joints</p>}
+        {b && (
+          <div className={sim.traces.length ? "mt-1 border-t border-line pt-1" : ""}>
+            <Row k="sim clock" v={`${clockText(bk * b.dtSim)}${b.speed[bk] > 1.05 ? ` · ×${Math.round(b.speed[bk])}` : " · real time"}`} cls={b.speed[bk] < b.timeScale ? "text-spec-1" : ""} />
+            {b.signals.map((s) => {
+              const v = s.value[bk];
+              const r = rules.find((x) => x.signal === s.id);
+              const past = r ? (r.op === "<" ? v < r.value : v > r.value) : false;
+              return <Row key={s.id} k={s.name.toLowerCase()} v={`${fmtNum(v, 3)}${s.unit}${r ? ` (${r.op}${r.value})` : ""}`} cls={past ? "text-warn" : "text-ok"} />;
+            })}
+            {onNow.length > 0 && <p className="mt-0.5 truncate text-[10px] text-spec-1">on: {onNow.join(", ")}</p>}
+          </div>
+        )}
         <div className="mt-1 border-t border-line pt-1">
           <Row k="total current" v={`${amps.toFixed(2)} A`} cls={amps > sim.peakA * 0.95 && errors ? "text-bad" : ""} />
           <Row k="peak / average" v={`${sim.peakA.toFixed(1)} / ${sim.avgA.toFixed(2)} A`} />

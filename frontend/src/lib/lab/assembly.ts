@@ -60,16 +60,63 @@ export const StepOut = z.object({
   targets: z.array(z.object({ joint: z.string(), value: z.number() })).describe("Where each joint should go (joints not listed hold)"),
 });
 
+export const WIRE_KINDS = ["power", "ground", "signal", "data", "motor", "tube"] as const;
+export type WireKind = (typeof WIRE_KINDS)[number];
+
+export const ConnectionOut = z.object({
+  from: z.string().describe("Part id"),
+  fromPin: z.string().describe("Pin / port on that part, e.g. 5V, GND, A0, D7, VCC, SIG, NO, COM, OUT, IN, OUTLET"),
+  to: z.string().describe("Part id"),
+  toPin: z.string(),
+  kind: z.enum(WIRE_KINDS).describe("power (red), ground (black), signal (analog/digital), data (I²C/serial/PWM), motor (to a motor/pump/valve), tube (water/air)"),
+});
+
+export const SignalOut = z.object({
+  id: z.string().describe("Short id, e.g. moisture, temperature, distance, light"),
+  sensor: z.string().describe("id of the sensor part that measures it"),
+  name: z.string().describe("e.g. 'Soil moisture'"),
+  unit: z.string().describe("e.g. %, °C, cm, lux"),
+  min: z.number(),
+  max: z.number(),
+  start: z.number().describe("Value at the start of the simulation"),
+  drift: z.number().describe("Natural change per simulated second with nothing on (e.g. soil drying: −0.02 %/s)"),
+  effects: z
+    .array(z.object({ part: z.string().describe("id of an actuator/output part"), rate: z.number().describe("Change per simulated second while that part is on (e.g. pump on: +0.5 %/s)") }))
+    .describe("How outputs change this signal"),
+  shows: z.string().describe("id of a part whose look follows this signal (the pot's soil, the reservoir's water), or ''"),
+});
+
+export const RuleOut = z.object({
+  signal: z.string().describe("Signal id"),
+  op: z.enum(["<", ">"]),
+  value: z.number().describe("Threshold"),
+  hysteresis: z.number().describe("Turn back off only once the signal is this far past the threshold"),
+  outputs: z
+    .array(z.object({ part: z.string().describe("Output part id: relay, pump, LED, buzzer, fan, solenoid, display"), action: z.enum(["on", "beep", "display"]), text: z.string().describe("display only: text, may use {signal id} placeholders, '\\n' for line 2; else ''") }))
+    .describe("What the controller does while the rule is active"),
+});
+
 export const AssemblyOut = z.object({
   title: z.string().describe("Name of the machine"),
   parts: z.array(PartOut),
+  connections: z.array(ConnectionOut).describe("EVERY wire and tube: power, ground, signals, data, motor leads, water tubes"),
   joints: z.array(JointOut),
-  program: z.array(StepOut).describe("A realistic motion routine for the machine's task, 3-12 steps"),
+  program: z.array(StepOut).describe("A realistic motion routine for the machine's task (empty if nothing moves mechanically)"),
+  signals: z.array(SignalOut).describe("What the sensors measure and how it changes over time (empty for pure motion machines)"),
+  rules: z.array(RuleOut).describe("The controller's logic: if a signal crosses a threshold, switch outputs"),
+  timeScale: z.number().describe("Simulated seconds per real second of playback: 1 for fast mechanisms, 30-600 for slow processes like soil drying"),
+  simSeconds: z.number().describe("How many simulated seconds to run the behaviour for (e.g. 1800 for a plant drying and being watered)"),
 });
 
 export type AiAssembly = z.infer<typeof AssemblyOut>;
+/** What the validator accepts: a full AI design, or an older / partial one without behaviour or wiring. */
+export type AssemblyInput = Omit<AiAssembly, "connections" | "signals" | "rules" | "timeScale" | "simSeconds"> &
+  Partial<Pick<AiAssembly, "connections" | "signals" | "rules" | "timeScale" | "simSeconds">>;
 export type JointSpec = z.infer<typeof JointOut>;
 export type ProgramStep = z.infer<typeof StepOut>;
+export type Connection = z.infer<typeof ConnectionOut>;
+export type SignalSpec = z.infer<typeof SignalOut>;
+export type RuleSpec = z.infer<typeof RuleOut>;
 
 // ---------------------------------------------------------------- the resolved design
 
@@ -109,6 +156,13 @@ export interface Assembly {
   parts: PartSpec[];
   joints: JointSpec[];
   program: ProgramStep[];
+  /** Every wire and tube between parts. */
+  connections: Connection[];
+  /** Behaviour: sensor signals, the controller's rules, and how fast to play it back. */
+  signals: SignalSpec[];
+  rules: RuleSpec[];
+  timeScale: number;
+  simSeconds: number;
   /** Parts the design needs that aren't in the catalogue yet ("need:" refs not yet resolved). */
   unresolved?: string[];
 }
@@ -161,7 +215,7 @@ function fromCatalog(c: CatalogPart): Pick<PartSpec, "kind" | "catalogId" | "mod
  * as unresolved. Parents and joints are repaired; throws only when nothing usable is left.
  * `extra` adds parts found by web search or uploaded by the user.
  */
-export function sanitizeAssembly(raw: AiAssembly | Assembly, extra: CatalogPart[] = []): Assembly {
+export function sanitizeAssembly(raw: AssemblyInput | Assembly, extra: CatalogPart[] = []): Assembly {
   const byId = new Map<string, CatalogPart>(CATALOG_BY_ID);
   for (const e of extra) byId.set(e.id, e);
   const seen = new Set<string>();
@@ -270,7 +324,66 @@ export function sanitizeAssembly(raw: AiAssembly | Assembly, extra: CatalogPart[
     }))
     .filter((s) => s.targets.length > 0 || s.duration > 0);
 
-  return { title: (raw.title || "Machine").slice(0, 80), parts, joints, program, unresolved: [...unresolved] };
+  // Wires and tubes must join two real parts.
+  const seenWire = new Set<string>();
+  const connections: Connection[] = [];
+  for (const c of (raw.connections ?? []).slice(0, 80)) {
+    if (!partById.has(c.from) || !partById.has(c.to) || c.from === c.to) continue;
+    const kind = (WIRE_KINDS as readonly string[]).includes(c.kind) ? c.kind : "signal";
+    const key = `${c.from}.${c.fromPin}>${c.to}.${c.toPin}`;
+    if (seenWire.has(key)) continue;
+    seenWire.add(key);
+    connections.push({ from: c.from, to: c.to, fromPin: (c.fromPin || "").slice(0, 12), toPin: (c.toPin || "").slice(0, 12), kind });
+  }
+
+  // Signals are measured by a real part; effects come from real outputs.
+  const signalIds = new Set<string>();
+  const signals: SignalSpec[] = [];
+  for (const s of (raw.signals ?? []).slice(0, 8)) {
+    if (!partById.has(s.sensor)) continue;
+    let id = (s.id || s.name || "signal").replace(/[^\w]/g, "_").slice(0, 24);
+    while (signalIds.has(id)) id += "_";
+    signalIds.add(id);
+    const lo = finite(s.min, 0);
+    const hi = finite(s.max, 100);
+    const span = Math.max(1e-6, Math.abs(hi - lo));
+    signals.push({
+      ...s,
+      id,
+      name: (s.name || id).slice(0, 40),
+      unit: (s.unit || "").slice(0, 8),
+      min: Math.min(lo, hi),
+      max: Math.max(lo, hi),
+      start: clamp(finite(s.start, lo), Math.min(lo, hi), Math.max(lo, hi)),
+      drift: clamp(finite(s.drift, 0), -span, span),
+      effects: (s.effects ?? []).filter((e) => partById.has(e.part)).map((e) => ({ part: e.part, rate: clamp(finite(e.rate, 0), -span, span) })),
+      shows: partById.has(s.shows) ? s.shows : "",
+    });
+  }
+  const rules: RuleSpec[] = (raw.rules ?? [])
+    .slice(0, 12)
+    .filter((r) => signalIds.has(r.signal))
+    .map((r) => ({
+      ...r,
+      op: r.op === ">" ? (">" as const) : ("<" as const),
+      value: finite(r.value, 0),
+      hysteresis: Math.max(0, finite(r.hysteresis, 0)),
+      outputs: (r.outputs ?? []).filter((o) => partById.has(o.part)).map((o) => ({ part: o.part, action: o.action === "beep" || o.action === "display" ? o.action : ("on" as const), text: (o.text ?? "").slice(0, 40) })),
+    }))
+    .filter((r) => r.outputs.length > 0);
+
+  return {
+    title: (raw.title || "Machine").slice(0, 80),
+    parts,
+    joints,
+    program,
+    connections,
+    signals,
+    rules,
+    timeScale: clamp(finite(raw.timeScale, 1), 1, 3600),
+    simSeconds: clamp(finite(raw.simSeconds, 0), 0, 86400),
+    unresolved: [...unresolved],
+  };
 }
 
 /** Children of each part id ("" = roots), in input order. */
@@ -343,6 +456,29 @@ Bodies and enclosures are fab:printed shells (anything over 12 mm in every direc
 JOINTS: one per moving part, each driven by the actuator part that really drives it (the servo or motor it's mounted on, or the arm kit itself). Give the real load in grams and its lever arm in mm so torque can be checked. Limits within the actuator's range.
 
 PROGRAM: a realistic routine for the machine's task, 3-12 steps, e.g. for a waving robot: raise the arm to 120°, wave the forearm 60° ↔ 120° three times, lower. Durations long enough for the actuators' real speeds. spin values are rpm, slide/lift mm, rotate degrees, articulate 0 (rest) to 1 (full stroke; use opposite strokes on two arms to alternate).
+
+LAYOUT: lay the device out as it would sit on a desk, compact and tidy. Mount every board, driver, relay, regulator and battery on a base plate (fab:plate) or inside an enclosure (fab:printed shell), close together, with standoffs where a PCB sits on a plate. Separate units (a plant pot, a water reservoir, a sensor on a stalk) sit right next to the base, never far away, and are joined to it by wires and tubes. Nothing loose, nothing floating, nothing scattered across the floor.
+
+WIRING (connections): list EVERY wire and tube, like a real wiring diagram, using each part's real pin names:
+- power: the supply (or a regulator's output) to every powered part's VCC / 5V / VIN / + pin; ground: GND to GND for every powered part (a common ground);
+- signal: sensor outputs (AOUT, DOUT, SIG, TRIG/ECHO) to the controller's pins (A0-A5 analog, D2-D13 digital); data: I²C / serial / servo PWM leads (SDA, SCL, TX, RX, PWM);
+- the controller's output pin to a driver's input (relay IN, MOSFET SIG, L298N IN1-IN4, PCA9685 SDA/SCL);
+- motor: a driver's or relay's switched output (relay COM/NO, MOSFET OUT, L298N OUT1-OUT4) to the motor / pump / valve / fan;
+- tube: a pump's OUTLET to where the water goes (the pot), and its INLET sits in the reservoir.
+A relay or MOSFET always sits between a controller pin and a pump, motor, valve or fan; never drive those straight from a pin.
+
+BEHAVIOUR (signals + rules), for anything that senses and reacts:
+- signals: what each sensor measures, with realistic numbers: its range, a start value, its natural drift per simulated second (soil drying ≈ −0.02 %/s, a room warming ≈ +0.002 °C/s), and how each output changes it while on (a 1.2 L/min pump watering a pot ≈ +0.5 %/s). Set shows to the part whose look follows it (the pot's soil for moisture).
+- rules: the controller's logic: if signal < or > threshold → switch outputs on (relay, pump, LED, fan, valve), beep a buzzer, or put text on an LCD / OLED (use {signal id} in the text, '\\n' for line 2). Use hysteresis so outputs don't chatter (water below 30 %, stop above 45 %: value 30, hysteresis 15).
+- timeScale and simSeconds: real processes are slow, so compress them: soil drying and watering ≈ simSeconds 3600 with timeScale 180 (one simulated hour in 20 s of playback); a thermostat ≈ 1800 / 90; a fast mechanism 1 / 1.
+
+PLAYBOOKS: follow the one that matches the machine.
+- Plant care / watering / sensing a value: pot-12cm with soil-cap-v12 pushed into the soil (child of the pot, its tip below the soil surface); reservoir-1l beside it with pump-mini-5v inside (child of the reservoir); a tube from the pump's OUTLET to the pot; arduino-uno (or esp32-devkitc) + relay-1ch (or mosfet-module) + buzzer-active / led-5mm / lcd1602-i2c on a fab:plate base beside the pot; usb-5v-2a or batt-aa4 for power; jumper-kit and tube-silicone-6mm in the build. Signal: moisture; rules: water when dry (relay + pump on, buzzer beep, LCD "Watering..."), LED on when the tank is empty if there's a level sensor.
+- Robot arm / manipulator / pick-and-place: an arm kit, or a servo → horn → bracket chain; pca9685 for more than 4 servos; ubec-5a from a 2S battery or a 6 V supply; a motion program for the task.
+- Mobile robot / car / line follower / obstacle avoider: chassis-2wd-acrylic (or 4wd), two tt-motor (or n20-100) with wheel-tt-65 on their shafts, caster-ball, l298n or tb6612, batt-18650x2, hc-sr04 / line-array at the front; spin joints on the wheels; signals: distance or line position; rules: stop / turn when an obstacle is close.
+- Animatronic / waving / humanoid / desk companion: fab:printed shell body and head, servo-chain limbs (see LIMBS), pan-tilt-sg90 for a head, pir-hcsr501 or hc-sr04 to notice people, oled-128x64 face; a program for the gesture, rules for what the sensor triggers (LED / display / buzzer).
+- Linear axis / conveyor / plotter / camera slider: fab:extrusion frame, nema17 + a4988 + lead-screw-t8-300 (or gt2-pulley-20t), limit-switch end stops, psu-12v-5a; slide joints.
+- Monitor / weather station / smart home: esp32-devkitc, dht22 / bme280 / ldr-module, lcd1602-i2c or oled-128x64, fan-5v-40 or led-rgb as outputs via mosfet-module; signals with slow drift; rules for the outputs.
 
 SCOPE: only the device itself; no tables, benches, rooms, people or props.`;
 }

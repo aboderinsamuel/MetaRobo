@@ -328,3 +328,16 @@ html {
     animation: none;
   }
 }
+
+/* Native-script fallbacks for the Japanese and Chinese landing page. */
+html:lang(ja) body {
+  font-family: var(--font-geist-sans), "Hiragino Sans", "Yu Gothic UI", "Meiryo", "Noto Sans JP", sans-serif;
+}
+html:lang(zh-Hans) body {
+  font-family: var(--font-geist-sans), "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+html:lang(ja) .mono-label,
+html:lang(zh-Hans) .mono-label {
+  letter-spacing: 0.02em;
+  text-transform: none;
+}

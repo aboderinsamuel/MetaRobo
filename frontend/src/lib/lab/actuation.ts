@@ -10,6 +10,7 @@
 // voltage, drivers and runtime against the parts in the design.
 import type { Actuator, CatalogPart } from "./catalog/parts";
 import { catalogOf, type Assembly, type JointSpec, type PartSpec } from "./assembly";
+import { behaviourChecks, behaviourIndex, simulateBehaviour, type BehaviourSim } from "./behaviour";
 
 export const SIM_DT = 0.01;
 
@@ -46,6 +47,8 @@ export interface MachineSim {
   peakA: number;
   avgA: number;
   checks: MachineCheck[];
+  /** Sensors, logic and outputs over (time-compressed) time; null for pure motion machines. */
+  behaviour: BehaviourSim | null;
 }
 
 function actuatorOf(a: Assembly, j: JointSpec, extra: Map<string, CatalogPart>): { part?: PartSpec; cat?: CatalogPart } {
@@ -69,7 +72,8 @@ export function simulateMachine(a: Assembly, extraParts: CatalogPart[] = []): Ma
     steps.push({ t0: t, t1: t + s.duration, label: s.label });
     t += s.duration;
   }
-  const tEnd = Math.min(90, t + 0.6);
+  const behaviour = simulateBehaviour(a);
+  const tEnd = Math.min(90, Math.max(t + 0.6, behaviour?.duration ?? 0));
   const n = Math.max(2, Math.round(tEnd / SIM_DT) + 1);
   const traces: JointTrace[] = [];
   const total = new Float32Array(n);
@@ -164,12 +168,22 @@ export function simulateMachine(a: Assembly, extraParts: CatalogPart[] = []): Ma
   let peakA = 0;
   let sum = 0;
   for (let i = 0; i < n; i++) {
-    total[i] += base;
+    total[i] += base + (behaviour ? behaviour.current[behaviourIndex(behaviour, i * SIM_DT)] : 0);
     peakA = Math.max(peakA, total[i]);
     sum += total[i];
   }
   const avgA = sum / n;
-  return { dt: SIM_DT, tEnd, steps, traces, totalCurrent: total, peakA, avgA, checks: machineChecks(a, traces, peakA, avgA, extra) };
+  return {
+    dt: SIM_DT,
+    tEnd,
+    steps,
+    traces,
+    totalCurrent: total,
+    peakA,
+    avgA,
+    checks: sortChecks([...machineChecks(a, traces, peakA, avgA, extra), ...behaviourChecks(a, behaviour)]),
+    behaviour,
+  };
 }
 
 function machineChecks(a: Assembly, traces: JointTrace[], peakA: number, avgA: number, extra: Map<string, CatalogPart>): MachineCheck[] {
@@ -271,11 +285,15 @@ function machineChecks(a: Assembly, traces: JointTrace[], peakA: number, avgA: n
   const has = (id: string) => a.parts.some((p) => p.catalogId === id);
   if (!a.parts.some((p) => cat(p)?.category === "controller")) out.push({ id: "controller", level: "error", title: "No controller", detail: "Add an Arduino, ESP32, Pico or Raspberry Pi to run the program." });
   if (servos > 6 && !has("pca9685")) out.push({ id: "servo-driver", level: "warn", title: `${servos} servos without a servo driver`, detail: "Add a PCA9685 16-channel driver so the controller isn't out of PWM pins, and power servos from it." });
-  if (dcs > 0 && !a.parts.some((p) => ["l298n", "tb6612", "drv8833", "motor-shield-v2"].includes(p.catalogId ?? ""))) out.push({ id: "motor-driver", level: "error", title: `${dcs} DC motor${dcs > 1 ? "s" : ""} without a motor driver`, detail: "Add an L298N, TB6612 or DRV8833; a microcontroller pin can't drive a motor." });
+  if (dcs > 0 && !a.parts.some((p) => ["l298n", "tb6612", "drv8833", "motor-shield-v2", "relay-1ch", "relay-2ch", "mosfet-module"].includes(p.catalogId ?? ""))) out.push({ id: "motor-driver", level: "error", title: `${dcs} DC motor${dcs > 1 ? "s" : ""} without a motor driver`, detail: "Add an L298N, TB6612 or DRV8833 (or a relay / MOSFET module for a pump or fan); a microcontroller pin can't drive a motor." });
   if (steppers > 0 && !a.parts.some((p) => ["a4988", "uln2003"].includes(p.catalogId ?? ""))) out.push({ id: "stepper-driver", level: "error", title: "Stepper without a driver", detail: "Add an A4988 (NEMA 17) or ULN2003 (28BYJ-48)." });
   if (a.unresolved?.length) out.push({ id: "unresolved", level: "warn", title: `${a.unresolved.length} part${a.unresolved.length > 1 ? "s" : ""} not in the catalogue`, detail: a.unresolved.join(", ") });
-  if (!a.joints.length) out.push({ id: "joints", level: "info", title: "Nothing moves yet", detail: "Select a part and give it a joint driven by one of the servos or motors." });
+  if (!a.joints.length && !a.signals.length && !a.rules.length) out.push({ id: "joints", level: "info", title: "Nothing moves yet", detail: "Select a part and give it a joint driven by one of the servos or motors." });
 
+  return sortChecks(out);
+}
+
+function sortChecks(out: MachineCheck[]): MachineCheck[] {
   const rank = { error: 0, warn: 1, info: 2, pass: 3 };
   return out.sort((x, y) => rank[x.level] - rank[y.level]);
 }

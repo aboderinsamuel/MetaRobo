@@ -17,6 +17,7 @@ import {
   totalMassG,
   updatePart,
   type AiAssembly,
+  type AssemblyInput,
 } from "@/lib/lab/assembly";
 import { CATALOG, CATALOG_BY_ID } from "@/lib/lab/catalog/parts";
 import { armPose } from "@/components/lab/hw3d/robotArm";
@@ -37,7 +38,7 @@ const raw = (p: Partial<Raw> & Pick<Raw, "id" | "ref">): Raw => ({
   repeatStep: 0,
   ...p,
 });
-const asm = (parts: Raw[], joints: AiAssembly["joints"] = [], program: AiAssembly["program"] = []): AiAssembly => ({ title: "Test", parts, joints, program });
+const asm = (parts: Raw[], joints: AiAssembly["joints"] = [], program: AiAssembly["program"] = []): AssemblyInput => ({ title: "Test", parts, joints, program });
 
 /** A small waving robot: base, servo, horn, arm. */
 const waver = () =>
@@ -80,7 +81,7 @@ describe("design format", () => {
   it("is valid for Meta's strict structured output", () => {
     const s = jsonSchemaFor(AssemblyOut) as { additionalProperties: boolean; required: string[] };
     expect(s.additionalProperties).toBe(false);
-    expect(s.required).toEqual(["title", "parts", "joints", "program"]);
+    expect(s.required).toEqual(["title", "parts", "connections", "joints", "program", "signals", "rules", "timeScale", "simSeconds"]);
   });
 
   it("teaches Muse Spark to build only from real parts", () => {

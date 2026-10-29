@@ -5,6 +5,7 @@
 import { Activity, AlertTriangle, CheckCircle2, ChevronDown, Info, XCircle } from "lucide-react";
 import { useState } from "react";
 import type { MachineCheck, MachineSim } from "@/lib/lab/actuation";
+import { behaviourIndex, type BehaviourSim } from "@/lib/lab/behaviour";
 import { totalMassG, totalPriceUsd, type Assembly } from "@/lib/lab/assembly";
 import type { Playback } from "@/lib/lab/playback";
 import { TimeChart } from "./charts";
@@ -12,6 +13,15 @@ import { TimeChart } from "./charts";
 const ICON = { pass: CheckCircle2, info: Info, warn: AlertTriangle, error: XCircle };
 const CLS = { pass: "text-ok", info: "text-spec-1", warn: "text-warn", error: "text-bad" };
 const COLORS = ["#2dd4ff", "#9b5cff", "#ff5ca8", "#4ade80", "#ffb020", "#7fd4ff"];
+
+// Behaviour plays on an event-aware clock; charts need evenly spaced playback time.
+const PLAY_DT = 0.05;
+function onPlaybackTime(b: BehaviourSim, v: Float32Array): Float32Array {
+  const n = Math.ceil(b.duration / PLAY_DT) + 1;
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) out[i] = v[behaviourIndex(b, i * PLAY_DT)];
+  return out;
+}
 
 /** Group checks into the four things a builder cares about. */
 function areas(checks: MachineCheck[]) {
@@ -104,13 +114,23 @@ export function MachineScope({ sim, playback, simKey }: { sim: MachineSim; playb
       </button>
       {open && (
         <div className="grid grid-cols-1 gap-px px-1 pb-1 sm:grid-cols-2">
-          <TimeChart
-            className="h-[104px]"
-            animateKey={`m-${simKey}`}
-            playback={playback}
-            yLabel="joint angle [°]"
-            series={angular.map((t, i) => ({ y: t.joint.kind === "articulate" ? Array.from(t.value, (v) => v * 90) : t.value, dt: sim.dt, color: COLORS[i % COLORS.length], label: t.joint.id, width: 1.5 }))}
-          />
+          {angular.length || !sim.behaviour ? (
+            <TimeChart
+              className="h-[104px]"
+              animateKey={`m-${simKey}`}
+              playback={playback}
+              yLabel="joint angle [°]"
+              series={angular.map((t, i) => ({ y: t.joint.kind === "articulate" ? Array.from(t.value, (v) => v * 90) : t.value, dt: sim.dt, color: COLORS[i % COLORS.length], label: t.joint.id, width: 1.5 }))}
+            />
+          ) : (
+            <TimeChart
+              className="h-[104px]"
+              animateKey={`s-${simKey}`}
+              playback={playback}
+              yLabel={sim.behaviour.signals.map((s) => `${s.name} [${s.unit}]`).join(" · ")}
+              series={sim.behaviour.signals.map((s, i) => ({ y: onPlaybackTime(sim.behaviour!, s.value), dt: PLAY_DT, color: COLORS[i % COLORS.length], label: s.id, width: 1.6 }))}
+            />
+          )}
           <TimeChart
             className="hidden h-[104px] sm:block"
             animateKey={`c-${simKey}`}
