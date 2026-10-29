@@ -1,18 +1,17 @@
 "use client";
 
-import { ArrowDown, AudioLines, Square } from "lucide-react";
-import { motion } from "motion/react";
-import dynamic from "next/dynamic";
+// The landing hero: a centred pitch, then the RoboCraft film in a cinematic frame. The film plays
+// muted on loop (browsers only autoplay silent video), with one click for sound; it pauses when
+// it's off-screen and doesn't autoplay for people who prefer reduced motion.
+import { ArrowRight, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { motion, useScroll, useTransform } from "motion/react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtNum, run } from "@/lib/lab/analysis";
 import { presetById } from "@/lib/lab/presets";
 import { useEngine } from "@/lib/sim/useEngine";
-import { LaunchButton, MetaBadge } from "./Chrome";
+import { MetaBadge } from "./Chrome";
 import MiniChart from "./MiniChart";
-
-// Start downloading the 3D robot as soon as this module runs (during hydration), not after mount.
-const robotChunk = typeof window !== "undefined" ? import("./HeroRobot") : null;
-const HeroRobot = dynamic(() => robotChunk ?? import("./HeroRobot"), { ssr: false });
 
 const ease = [0.6, 0, 0.2, 1] as const;
 
@@ -25,51 +24,99 @@ function Crosshair({ className }: { className: string }) {
   );
 }
 
-const INTRO = "Hi, I'm Robo. Tell me the machine you want to build, and I'll pick real parts, wire it up, and simulate it in 3D before you buy anything.";
+function Film() {
+  const frame = useRef<HTMLDivElement>(null);
+  const video = useRef<HTMLVideoElement>(null);
+  const [muted, setMuted] = useState(true);
+  const [playing, setPlaying] = useState(false);
+  // Eases in as it scrolls into view.
+  const { scrollYProgress } = useScroll({ target: frame, offset: ["start end", "center center"] });
+  const scale = useTransform(scrollYProgress, [0, 1], [0.92, 1]);
+  const lift = useTransform(scrollYProgress, [0, 1], [40, 0]);
 
-/** Robo introduces itself through the browser's own speech voice. */
-function HearRobo() {
-  const [speaking, setSpeaking] = useState(false);
-  useEffect(() => () => window.speechSynthesis?.cancel(), []);
-  const speak = () => {
-    const synth = window.speechSynthesis;
-    if (!synth) return;
-    if (speaking) {
-      synth.cancel();
-      setSpeaking(false);
-      return;
+  // Autoplay (muted) unless reduced motion is preferred; pause while off-screen.
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting && !reduced && v.dataset.userPaused !== "1") void v.play().catch(() => {});
+        else if (!e.isIntersecting) v.pause();
+      },
+      { threshold: 0.25 },
+    );
+    io.observe(v);
+    return () => io.disconnect();
+  }, []);
+
+  const toggleSound = () => {
+    const v = video.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    setMuted(v.muted);
+    // Sound on starts from the top, so the line lands as cut.
+    if (!v.muted) {
+      v.currentTime = 0;
+      v.dataset.userPaused = "0";
+      void v.play().catch(() => {});
     }
-    const u = new SpeechSynthesisUtterance(INTRO);
-    u.lang = "en-US";
-    u.rate = 1.02;
-    u.pitch = 1.25;
-    u.onend = u.onerror = () => setSpeaking(false);
-    synth.cancel();
-    synth.speak(u);
-    setSpeaking(true);
   };
+  const togglePlay = () => {
+    const v = video.current;
+    if (!v) return;
+    if (v.paused) {
+      v.dataset.userPaused = "0";
+      void v.play().catch(() => {});
+    } else {
+      v.dataset.userPaused = "1";
+      v.pause();
+    }
+  };
+
   return (
-    <button type="button" onClick={speak} className="mono-label inline-flex h-9 items-center gap-2 rounded-xl border border-line-2 px-3 whitespace-nowrap text-mute transition-colors hover:text-fg">
-      {speaking ? <Square className="size-3" /> : <AudioLines className="size-3.5" />} {speaking ? "Stop" : "Hear Robo"}
-    </button>
+    <motion.div ref={frame} style={{ scale, y: lift }} className="relative mx-auto w-full max-w-[1120px]">
+      {/* Soft spectrum glow behind the frame. */}
+      <div aria-hidden className="pointer-events-none absolute -inset-x-10 -inset-y-8 -z-10 rounded-[48px] opacity-60 blur-3xl" style={{ background: "radial-gradient(60% 60% at 50% 55%, rgb(0 130 251 / 0.28), rgb(155 92 255 / 0.18) 45%, transparent 75%)" }} />
+      <div className="group relative overflow-hidden rounded-[28px] bg-black shadow-[0_50px_120px_-40px_rgb(0_0_0/0.65),0_0_0_1px_rgb(255_255_255/0.08)] sm:rounded-[32px]">
+        <video
+          ref={video}
+          className="aspect-video w-full object-cover"
+          src="/video/robocraft.mp4"
+          poster="/video/robocraft-poster.jpg"
+          muted
+          loop
+          playsInline
+          preload="auto"
+          // Lets the boot screen lift as soon as the film can show its first frame.
+          onLoadedData={() => window.dispatchEvent(new Event("rc-hero-ready"))}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          aria-label="RoboCraft film: built with Meta Muse Spark, Muse Wonder, Muse Image and SAM 3.1"
+        />
+        {/* Controls: always reachable, quiet until hovered. */}
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/55 to-transparent p-4 opacity-90 transition-opacity sm:p-5 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+          <button onClick={togglePlay} aria-label={playing ? "Pause the film" : "Play the film"} className="flex size-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-md transition-colors hover:bg-white/25">
+            {playing ? <Pause className="size-4" /> : <Play className="size-4 translate-x-px" />}
+          </button>
+          <button onClick={toggleSound} className="inline-flex h-10 items-center gap-2 rounded-full bg-white/15 px-4 text-[13px] font-medium text-white backdrop-blur-md transition-colors hover:bg-white/25">
+            {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+            {muted ? "Sound on" : "Mute"}
+          </button>
+        </div>
+        {/* A sound hint that disappears once used. */}
+        {muted && (
+          <button onClick={toggleSound} className="absolute top-4 right-4 hidden h-8 items-center gap-1.5 rounded-full bg-black/40 px-3 text-[12px] font-medium text-white/90 backdrop-blur-md transition-colors hover:bg-black/60 sm:top-5 sm:right-5 sm:inline-flex">
+            <VolumeX className="size-3.5" /> Tap for sound
+          </button>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
 export default function Hero() {
-  const scrollRef = useRef(0);
-  const [robotReady, setRobotReady] = useState(false);
-  // Never leave the hero empty if WebGL is slow or unavailable.
-  useEffect(() => {
-    const id = setTimeout(() => setRobotReady(true), 4000);
-    return () => clearTimeout(id);
-  }, []);
   const engine = useEngine();
-  useEffect(() => {
-    const on = () => (scrollRef.current = Math.min(1.5, window.scrollY / window.innerHeight));
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
-  }, []);
-
   const live = useMemo(() => {
     const model = presetById("rover")!.build();
     const r = run(engine, model, { type: "pid", kp: 10.4, ki: 136, kd: 0, N: 500 });
@@ -77,118 +124,79 @@ export default function Hero() {
   }, [engine]);
 
   return (
-    <section id="intro" className="relative h-[100svh] min-h-[640px] overflow-hidden border-b border-line">
-      <div className="grid-lines pointer-events-none absolute inset-0" />
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 50% 45% at 50% 42%, rgb(0 130 251 / 0.13), transparent 70%)" }}
-      />
-      {/* Placeholder glow in the robot's spot until its first 3D frame is drawn. */}
-      <div
-        className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-700 ${robotReady ? "opacity-0" : "opacity-100"}`}
-        aria-hidden
-      >
-        <div className="-mt-[8vh] size-[min(46vw,420px)] animate-pulse rounded-[38%] border border-white/5 bg-[radial-gradient(circle_at_50%_45%,rgb(0_130_251/0.22),rgb(155_92_255/0.08)_45%,transparent_70%)]" />
-      </div>
-      <div className={`absolute inset-0 mx-auto max-w-[1440px] transition-[opacity,transform] duration-700 ease-out ${robotReady ? "scale-100 opacity-100" : "scale-[0.97] opacity-0"}`}>
-        <HeroRobot scrollRef={scrollRef} onReady={() => setRobotReady(true)} />
-      </div>
+    <section id="intro" className="relative overflow-hidden border-b border-line">
+      <div className="grid-lines pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_70%_55%_at_50%_30%,black,transparent)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[70vh]" style={{ background: "radial-gradient(ellipse 50% 60% at 50% 0%, rgb(0 130 251 / 0.12), transparent 70%)" }} />
 
-      {/* Fades the robot into the page at the bottom. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-void via-void/80 to-transparent" />
-
-      <div className="pointer-events-none relative mx-auto flex h-full max-w-[1440px] flex-col justify-between px-4 pt-20 pb-8 sm:px-6">
-        <motion.div
-          className="flex items-start justify-between"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.8 }}
-        >
-          <p className="mono-label hidden max-w-[16rem] text-mute sm:block">
-            <span className="text-fg">[RC-LAB]</span> Your idea → real parts → 3D simulation → Robo helps you fix it
-          </p>
-          <ul className="mono-label hidden space-y-1.5 text-right text-mute md:block">
-            {["Ages 10 to engineer", "Simple & Pro modes", "Real part physics", "C++ → WebAssembly", "Meta Muse Spark"].map((t, i) => (
-              <motion.li key={t} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.08 }}>
-                {t}
-              </motion.li>
-            ))}
-          </ul>
-        </motion.div>
-
-        <div className="grid items-end gap-8 lg:grid-cols-[1fr_auto]">
-          <div>
-            <motion.div className="mb-5 flex flex-wrap items-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-              <MetaBadge />
-              <span className="mono-label text-mute">·· No experience needed</span>
-            </motion.div>
-            <h1 className="text-[clamp(2.4rem,5.6vw,5.2rem)] leading-[0.95] font-medium tracking-[-0.035em] [text-shadow:0_4px_40px_rgb(4_5_6_/_0.9)]">
-              <motion.span className="block" initial={{ y: "110%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.9, ease, delay: 0.2 }}>
-                Build a robot.
-              </motion.span>
-              <motion.span
-                className="mt-2 flex flex-wrap items-center gap-x-[0.25em]"
-                initial={{ y: "110%", opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.9, ease, delay: 0.32 }}
-              >
-                Watch it
-                <span className="relative inline-block px-[0.18em]">
-                  <Crosshair className="-top-1.5 -left-1.5" />
-                  <Crosshair className="-right-1.5 -bottom-1.5" />
-                  <span className="absolute inset-0 border border-line-2" />
-                  <span className="font-pixel text-[0.86em] tracking-[-0.02em]">move</span>
-                </span>
-              </motion.span>
-            </h1>
-          </div>
-          <motion.div
-            className="pointer-events-auto max-w-sm lg:pb-3"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.7 }}
-          >
-            <p className="text-[15px] leading-relaxed text-mute [text-shadow:0_2px_18px_rgb(4_5_6_/_0.95)]">
-              Pick a robot car, arm, balancer or drone, or just say <span className="text-fg">“a robot that picks up my toys”</span>. Press
-              Simulate and watch it move. Robo explains what won&apos;t work and fixes it with you. Pro mode adds the graphs, maths and firmware.
-            </p>
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <LaunchButton label="Start building" href="/create" />
-              <HearRobo />
-              <a href="#loop" className="mono-label inline-flex h-9 items-center gap-2 px-3 text-mute transition-colors hover:text-fg">
-                How it works <ArrowDown className="size-3.5" />
-              </a>
-            </div>
+      <div className="relative mx-auto max-w-[1440px] px-4 pt-28 pb-16 sm:px-6 sm:pt-36 sm:pb-24">
+        <div className="mx-auto max-w-4xl text-center">
+          <motion.div className="flex justify-center" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.6 }}>
+            <MetaBadge />
+          </motion.div>
+          <h1 className="mt-7 text-[clamp(2.6rem,6.4vw,5.6rem)] leading-[0.98] font-medium tracking-[-0.04em]">
+            <motion.span className="block" initial={{ y: "60%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.9, ease, delay: 0.2 }}>
+              Describe a robot.
+            </motion.span>
+            <motion.span className="mt-2 flex flex-wrap items-center justify-center gap-x-[0.25em]" initial={{ y: "60%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.9, ease, delay: 0.32 }}>
+              Watch it
+              <span className="relative inline-block px-[0.18em]">
+                <Crosshair className="-top-1.5 -left-1.5" />
+                <Crosshair className="-right-1.5 -bottom-1.5" />
+                <span className="absolute inset-0 border border-line-2" />
+                <span className="font-pixel text-[0.86em] tracking-[-0.02em]">move</span>
+              </span>
+            </motion.span>
+          </h1>
+          <motion.p className="mx-auto mt-7 max-w-2xl text-[clamp(1rem,1.5vw,1.2rem)] leading-relaxed text-mute" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.7 }}>
+            Say what you want to build. Meta&apos;s Muse Spark designs it from real, buyable parts, our physics engine simulates it, and you get the wiring, firmware and parts list. Before you buy a single motor.
+          </motion.p>
+          <motion.div className="mt-9 flex flex-wrap items-center justify-center gap-3" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65, duration: 0.7 }}>
+            <Link href="/create" className="group inline-flex h-12 items-center gap-2 rounded-2xl bg-fg px-6 text-[15px] font-semibold text-void shadow-[0_12px_40px_-12px_rgb(0_130_251/0.55)] transition-transform hover:-translate-y-0.5">
+              Start building, free <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+            <Link href="/lab" className="inline-flex h-12 items-center gap-2 rounded-2xl border border-line-2 bg-panel/60 px-6 text-[15px] font-medium text-fg backdrop-blur transition-colors hover:bg-panel">
+              Explore the Control Lab
+            </Link>
           </motion.div>
         </div>
 
-        <motion.div
-          className="pointer-events-auto mt-8 grid grid-cols-2 border-t border-line pt-4 sm:grid-cols-[1.4fr_repeat(3,1fr)]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-        >
-          <div className="col-span-2 flex items-center gap-3 pb-3 sm:col-span-1 sm:pb-0">
-            <span className="relative flex size-2">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-60" />
-              <span className="relative inline-flex size-2 rounded-full bg-ok" />
-            </span>
-            <span className="mono-label text-mute">
-              Live · rover speed loop · <span className="text-fg">{live.backend === "wasm" ? "WASM" : "TS"} engine</span>
-            </span>
-            <MiniChart y={live.y} target={live.ref} className="hidden h-6 w-28 sm:block" height={24} />
-          </div>
-          {[
-            ["Overshoot", `${live.a.metrics.overshootPct.toFixed(1)}%`],
-            ["Settling", `${fmtNum(live.a.metrics.settlingTime)} s`],
-            ["Phase margin", `${fmtNum(live.a.pmDeg)}°`],
-          ].map(([k, v]) => (
-            <div key={k} className="flex items-baseline gap-2 sm:justify-end">
-              <span className="mono-label text-dim">{k}</span>
-              <span className="font-mono text-sm text-fg tabular-nums">{v}</span>
-            </div>
-          ))}
+        <motion.div className="mt-16 sm:mt-20" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 1 }}>
+          <Film />
         </motion.div>
+
+        {/* Proof: what it's built on, and the engine running live in this page. */}
+        <div className="mx-auto mt-14 flex max-w-[1120px] flex-col items-center gap-6 sm:mt-16">
+          <p className="mono-label text-dim">Built with</p>
+          <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-[15px] font-medium text-mute">
+            {["Meta Muse Spark", "Muse Image", "SAM 3.1", "C++ → WebAssembly", "Rapier physics"].map((t) => (
+              <li key={t} className="whitespace-nowrap">
+                {t}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="col-span-2 flex items-center gap-3 rounded-2xl border border-line bg-panel/60 px-4 py-3 sm:col-span-1">
+              <span className="relative flex size-2 shrink-0">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-60" />
+                <span className="relative inline-flex size-2 rounded-full bg-ok" />
+              </span>
+              <span className="min-w-0 text-[12.5px] leading-tight text-mute">
+                Live now: rover speed loop on the <span className="text-fg">{live.backend === "wasm" ? "WASM" : "TS"} engine</span>
+              </span>
+              <MiniChart y={live.y} target={live.ref} className="ml-auto hidden h-6 w-20 shrink-0 lg:block" height={24} />
+            </div>
+            {[
+              ["Overshoot", `${live.a.metrics.overshootPct.toFixed(1)}%`],
+              ["Settling time", `${fmtNum(live.a.metrics.settlingTime)} s`],
+              ["Phase margin", `${fmtNum(live.a.pmDeg)}°`],
+            ].map(([k, v]) => (
+              <div key={k} className="rounded-2xl border border-line bg-panel/60 px-4 py-3">
+                <p className="text-[12px] text-mute">{k}</p>
+                <p className="mt-0.5 font-mono text-[17px] text-fg tabular-nums">{v}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );

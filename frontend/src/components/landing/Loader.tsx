@@ -22,8 +22,8 @@ export default function Loader() {
       raf = requestAnimationFrame(() => setShow(false));
       return () => cancelAnimationFrame(raf);
     }
-    // Ends as soon as the hero robot has drawn its first frame (at least 0.6 s, at most 2.4 s),
-    // so the boot screen never hides a robot that is already there.
+    // Ends as soon as the hero film has its first frame (at least 0.6 s, at most 2.4 s), so the
+    // boot screen never hides a film that is already there.
     const t0 = performance.now();
     let ready = false;
     const onReady = () => (ready = true);
