@@ -72,8 +72,13 @@ export function Nav() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <LaunchButton className="hidden sm:inline-flex" />
+          <span className="hidden sm:block">
+            <ThemeToggle />
+          </span>
+          {/* Wrapped: the button's own inline-flex would override a hidden class on it. */}
+          <span className="hidden sm:block">
+            <LaunchButton />
+          </span>
           <button className="flex size-9 items-center justify-center text-mute md:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
@@ -92,8 +97,9 @@ export function Nav() {
                 {s.label} <ArrowUpRight className="size-3.5" />
               </a>
             ))}
-            <div className="p-4">
-              <LaunchButton className="w-full justify-center" />
+            <div className="flex items-center gap-3 p-4">
+              <ThemeToggle />
+              <LaunchButton className="flex-1 justify-center" />
             </div>
           </motion.nav>
         )}
