@@ -25,7 +25,8 @@ function M({ color, metal = 0, rough = 0.5, clear = 0, opacity = 1 }: { color: s
   return <meshPhysicalMaterial color={color} metalness={metal} roughness={rough} clearcoat={clear} transparent={opacity < 1} opacity={opacity} envMapIntensity={1.1} />;
 }
 
-const ALU = { color: "#c9ced6", metal: 1, rough: 0.32 };
+// Bead-blasted aluminium (servo brackets, horns): matte silver, so it reads from every angle.
+const ALU = { color: "#d6dbe1", metal: 0.7, rough: 0.42 };
 const DARK = { color: "#23272e", metal: 0.85, rough: 0.38 };
 
 // ---------------------------------------------------------------- servos
@@ -185,34 +186,172 @@ function MultiBracket({ L, H, W }: { L: number; H: number; W: number }) {
   );
 }
 
-function Plate({ w, t, d, material, holes = true }: { w: number; t: number; d: number; material: string; holes?: boolean }) {
-  const look =
+/** A rounded-rectangle outline, as a laser cutter would cut it. */
+function roundedRect(shape: THREE.Shape | THREE.Path, w: number, d: number, r: number) {
+  shape.moveTo(-w / 2 + r, -d / 2);
+  shape.lineTo(w / 2 - r, -d / 2);
+  shape.quadraticCurveTo(w / 2, -d / 2, w / 2, -d / 2 + r);
+  shape.lineTo(w / 2, d / 2 - r);
+  shape.quadraticCurveTo(w / 2, d / 2, w / 2 - r, d / 2);
+  shape.lineTo(-w / 2 + r, d / 2);
+  shape.quadraticCurveTo(-w / 2, d / 2, -w / 2, d / 2 - r);
+  shape.lineTo(-w / 2, -d / 2 + r);
+  shape.quadraticCurveTo(-w / 2, -d / 2, -w / 2 + r, -d / 2);
+}
+
+function hole(shape: THREE.Shape, x: number, z: number, r: number) {
+  const p = new THREE.Path();
+  p.absarc(x, z, r, 0, Math.PI * 2, true);
+  shape.holes.push(p);
+}
+
+function slot(shape: THREE.Shape, x: number, z: number, len: number, wid: number) {
+  const p = new THREE.Path();
+  roundedRect(p, len, wid, wid / 2 - 1e-5);
+  // roundedRect draws around the origin; shift by rebuilding the points
+  const pts = p.getPoints(12).map((v) => new THREE.Vector2(v.x + x, v.y + z));
+  shape.holes.push(new THREE.Path(pts.reverse()));
+}
+
+/**
+ * A laser-cut sheet: the real cut profile with M3 mounting holes along the edges and, on larger
+ * plates, lightening slots, extruded to the sheet thickness. Acrylic reads as clear tinted sheet with
+ * bright cut edges; plywood has laser-burnt edges.
+ */
+function Plate({ w, t, d, material }: { w: number; t: number; d: number; material: string }) {
+  const geo = useMemo(() => {
+    const shape = new THREE.Shape();
+    roundedRect(shape, w, d, Math.min(w, d) * 0.08);
+    const r = 1.6 * MM; // M3 clearance
+    const inset = 5 * MM;
+    // Mounting holes every ~25 mm around the edge.
+    const along = (len: number) => Math.max(2, Math.min(8, Math.round(len / (25 * MM)) + 1));
+    const nx = along(w - 2 * inset);
+    const nz = along(d - 2 * inset);
+    for (let i = 0; i < nx; i++) {
+      const x = -w / 2 + inset + ((w - 2 * inset) * i) / (nx - 1);
+      hole(shape, x, -d / 2 + inset, r);
+      hole(shape, x, d / 2 - inset, r);
+    }
+    for (let i = 1; i < nz - 1; i++) {
+      const z = -d / 2 + inset + ((d - 2 * inset) * i) / (nz - 1);
+      hole(shape, -w / 2 + inset, z, r);
+      hole(shape, w / 2 - inset, z, r);
+    }
+    // Cable / lightening slots on plates big enough to need them.
+    if (w > 90 * MM && d > 70 * MM) {
+      const sl = Math.min(w * 0.3, 50 * MM);
+      for (const z of [-d * 0.18, d * 0.18]) slot(shape, 0, z, sl, 6 * MM);
+    }
+    const g = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 10 });
+    g.rotateX(Math.PI / 2);
+    g.translate(0, t, 0);
+    return g;
+  }, [w, t, d]);
+  const face =
     material === "acrylic"
-      ? { color: "#bfe3ff", metal: 0, rough: 0.08, clear: 1, opacity: 0.55 }
+      ? { color: "#d8eeff", metal: 0, rough: 0.05, clear: 1, opacity: 0.5 }
       : material === "plywood"
-        ? { color: "#c79a62", metal: 0, rough: 0.75 }
+        ? { color: "#d2a873", metal: 0, rough: 0.78 }
         : material === "carbon_fiber"
           ? { color: "#1a1c20", metal: 0.3, rough: 0.35, clear: 0.8 }
           : { color: "#c9ced6", metal: 1, rough: 0.35 };
-  const r = Math.min(w, d) * 0.06;
+  const edge = material === "acrylic" ? { color: "#f2fbff", metal: 0, rough: 0.1, clear: 1, opacity: 0.85 } : material === "plywood" ? { color: "#3b2414", metal: 0, rough: 0.9 } : face;
+  return (
+    <mesh geometry={geo} castShadow receiveShadow>
+      {/* ExtrudeGeometry: group 0 = the sheet's faces, group 1 = the cut edges */}
+      <meshPhysicalMaterial attach="material-0" color={face.color} metalness={face.metal} roughness={face.rough} clearcoat={face.clear ?? 0} transparent={(face.opacity ?? 1) < 1} opacity={face.opacity ?? 1} />
+      <meshPhysicalMaterial attach="material-1" color={edge.color} metalness={edge.metal} roughness={edge.rough} clearcoat={edge.clear ?? 0} transparent={(edge.opacity ?? 1) < 1} opacity={edge.opacity ?? 1} />
+    </mesh>
+  );
+}
+
+/** FDM layer lines, as a bump map: one stripe every 0.2 mm layer (drawn coarser so it reads on screen). */
+let layerTex: THREE.CanvasTexture | null = null;
+function layerLines(): THREE.CanvasTexture | null {
+  if (typeof document === "undefined") return null;
+  if (layerTex) return layerTex;
+  const c = document.createElement("canvas");
+  c.width = 4;
+  c.height = 64;
+  const ctx = c.getContext("2d")!;
+  for (let y = 0; y < 64; y++) {
+    const v = 128 + Math.round(70 * Math.sin((y / 64) * Math.PI * 2 * 8));
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(0, y, 4, 1);
+  }
+  layerTex = new THREE.CanvasTexture(c);
+  layerTex.wrapS = layerTex.wrapT = THREE.RepeatWrapping;
+  return layerTex;
+}
+
+function PrintMat({ color, height }: { color: string; height: number }) {
+  const tex = useMemo(() => {
+    const t = layerLines()?.clone();
+    if (t) {
+      t.needsUpdate = true;
+      // 8 stripes per texture repeat; ~0.6 mm per stripe so the layers are visible.
+      t.repeat.set(1, Math.max(1, height / (8 * 0.6 * MM)));
+    }
+    return t ?? null;
+  }, [height]);
+  return <meshPhysicalMaterial color={color} roughness={0.62} metalness={0} bumpMap={tex ?? undefined} bumpScale={0.6} sheen={0.2} />;
+}
+
+/** A thin-walled 3D-printed enclosure: rounded shell, lid split line, screw holes, vent slots. */
+function PrintedShell({ a, b, c, color }: { a: number; b: number; c: number; color: string }) {
+  const lidY = b * 0.82;
   return (
     <group>
-      <RoundedBox args={[w, t, d]} radius={Math.min(r, t * 0.49)} smoothness={2} position={[0, t / 2, 0]} castShadow receiveShadow>
-        <M {...look} />
+      <RoundedBox args={[a, b, c]} radius={Math.min(a, b, c) * 0.12} smoothness={4} position={[0, b / 2, 0]} castShadow receiveShadow>
+        <PrintMat color={color} height={b} />
       </RoundedBox>
-      {holes &&
-        [
-          [1, 1],
-          [1, -1],
-          [-1, 1],
-          [-1, -1],
-        ].map(([sx, sz], i) => (
-          <mesh key={i} position={[sx * (w / 2 - 5 * MM), t + 0.05 * MM, sz * (d / 2 - 5 * MM)]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[1.6 * MM, 16]} />
-            <meshStandardMaterial color="#0b0d10" />
-          </mesh>
-        ))}
+      {/* lid split line */}
+      <mesh position={[0, lidY, 0]}>
+        <boxGeometry args={[a * 1.002, 0.6 * MM, c * 1.002]} />
+        <meshStandardMaterial color="#0d0f12" roughness={0.9} />
+      </mesh>
+      {/* lid screws */}
+      {[
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1],
+      ].map(([sx, sz], i) => (
+        <mesh key={i} position={[sx * (a / 2 - 5 * MM), b + 0.05 * MM, sz * (c / 2 - 5 * MM)]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[2.2 * MM, 16]} />
+          <meshStandardMaterial color="#2a2e35" metalness={0.8} roughness={0.3} />
+        </mesh>
+      ))}
+      {/* vent slots on the front */}
+      {Array.from({ length: Math.max(2, Math.min(6, Math.floor(a / (12 * MM)))) }).map((_, i, arr) => (
+        <mesh key={i} position={[(i - (arr.length - 1) / 2) * 8 * MM, b * 0.3, c / 2 + 0.05 * MM]}>
+          <planeGeometry args={[3 * MM, b * 0.25]} />
+          <meshStandardMaterial color="#0d0f12" roughness={0.9} />
+        </mesh>
+      ))}
     </group>
+  );
+}
+
+/** A long printed part as a real printed link: slotted profile with pivot holes and lightening cut-outs. */
+function PrintedLink({ len, thick, wid, color }: { len: number; thick: number; wid: number; color: string }) {
+  const geo = useMemo(() => {
+    const shape = new THREE.Shape();
+    roundedRect(shape, len, wid, wid / 2 - 1e-5);
+    const r = Math.min(wid * 0.18, 2.5 * MM);
+    hole(shape, -len / 2 + wid / 2, 0, r);
+    hole(shape, len / 2 - wid / 2, 0, r);
+    if (len > wid * 3.2) slot(shape, 0, 0, len - wid * 2.4, wid * 0.42);
+    const g = new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: true, bevelSize: thick * 0.12, bevelThickness: thick * 0.12, bevelSegments: 2, curveSegments: 12 });
+    g.rotateX(Math.PI / 2);
+    g.translate(0, thick, 0);
+    return g;
+  }, [len, thick, wid]);
+  return (
+    <mesh geometry={geo} castShadow receiveShadow>
+      <PrintMat color={color} height={thick} />
+    </mesh>
   );
 }
 
@@ -634,6 +773,45 @@ export function CatalogMesh({ part, color }: { part: CatalogPart; color?: string
   }
 }
 
+/** How a printed part reads: a long thin link, a thin-walled enclosure, or a small solid fitting. */
+export function printedForm(size: [number, number, number]): "link" | "shell" | "fitting" {
+  const s = [...size].sort((x, y) => y - x);
+  if (s[0] >= s[1] * 3 && s[2] <= 12 * MM) return "link";
+  if (s[2] > 12 * MM) return "shell";
+  return "fitting";
+}
+
+function Printed({ size, color }: { size: [number, number, number]; color: string }) {
+  const [a, b, c] = size;
+  const form = printedForm(size);
+  const basis = useMemo(() => {
+    // Build the link along x (length), y (thickness), z (width), then turn it so its length runs
+    // along the part's longest axis and its thickness along the shortest.
+    const axes = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)];
+    const order = [0, 1, 2].sort((i, k) => size[k] - size[i]);
+    const L = axes[order[0]];
+    const T = axes[order[2]];
+    const W = new THREE.Vector3().crossVectors(L, T);
+    return new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().makeBasis(L, T, W));
+  }, [size]);
+  if (form === "link") {
+    const s = [...size].sort((x, y) => y - x);
+    return (
+      <group position={[0, b / 2, 0]} rotation={basis}>
+        <group position={[0, -s[2] / 2, 0]}>
+          <PrintedLink len={s[0]} thick={s[2]} wid={s[1]} color={color} />
+        </group>
+      </group>
+    );
+  }
+  if (form === "shell") return <PrintedShell a={a} b={b} c={c} color={color} />;
+  return (
+    <RoundedBox args={[a, b, c]} radius={Math.min(a, b, c) * 0.2} smoothness={3} position={[0, b / 2, 0]} castShadow receiveShadow>
+      <PrintMat color={color} height={b} />
+    </RoundedBox>
+  );
+}
+
 /** Draws a fabricated part: laser-cut plate, 3D print, cut extrusion or rod. */
 export function FabMesh({ kind, size, material, color }: { kind: FabKind; size: [number, number, number]; material: string; color?: string }) {
   const [a, b, c] = size;
@@ -641,11 +819,7 @@ export function FabMesh({ kind, size, material, color }: { kind: FabKind; size: 
     case "plate":
       return <Plate w={a} t={b} d={c} material={material} />;
     case "printed":
-      return (
-        <RoundedBox args={[a, b, c]} radius={Math.min(a, b, c) * 0.12} smoothness={3} position={[0, b / 2, 0]} castShadow receiveShadow>
-          <M color={color || (material === "tpu" ? "#22262c" : "#f0f0ee")} rough={0.65} />
-        </RoundedBox>
-      );
+      return <Printed size={size} color={color || (material === "tpu" ? "#22262c" : "#f0f0ee")} />;
     case "extrusion":
       return <Extrusion2020 len={b} />;
     default:
