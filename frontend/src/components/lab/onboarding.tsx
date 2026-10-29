@@ -3,7 +3,7 @@
 // Getting started for everyone: a welcome flow that asks who you are and what you want to build,
 // a guided tour of the lab, and the plain-language pieces of Simple mode (report card and coach)
 // that replace the graphs and engineering terms.
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, GraduationCap, Rocket, Sparkles, Wand2, Wrench, X, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, GraduationCap, PenLine, Rocket, SlidersHorizontal, Wrench, X, XCircle } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useState } from "react";
 import RoboMark from "@/components/brand/RoboMark";
@@ -113,7 +113,7 @@ export function Welcome({ onDone, onClose }: { onDone: (mode: Mode, pick: RigKin
                 onClick={() => onDone(persona?.mode ?? "simple", "describe", true)}
                 className="mt-2.5 flex w-full items-center justify-center gap-2 border border-dashed border-line-2 px-4 py-3 text-[13px] text-mute transition-colors hover:border-spec-1/60 hover:text-fg rounded-xl"
               >
-                <Sparkles className="size-4 text-spec-1" /> Or describe my own idea in words (or say it out loud)
+                <PenLine className="size-4 text-spec-1" /> Or describe my own idea in words (or say it out loud)
               </button>
               <div className="mt-5 flex items-center justify-between">
                 <button onClick={() => setStep(0)} className="mono-label flex items-center gap-1.5 text-[10px] text-dim hover:text-fg">
@@ -335,7 +335,7 @@ export function ReportCard({ items, onImprove, busy }: { items: ReportItem[]; on
         ))}
         {!allOk && (
           <button onClick={onImprove} disabled={busy} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium text-void disabled:opacity-60" style={{ background: "var(--spectrum)" }}>
-            <Wand2 className="size-3.5" /> {busy ? "Working…" : "Make it better"}
+            <SlidersHorizontal className="size-3.5" /> {busy ? "Working…" : "Make it better"}
           </button>
         )}
       </div>
@@ -392,7 +392,7 @@ export function CoachPanel({
 
       {!motionOk && (
         <button onClick={onImprove} disabled={busy} className="flex w-full items-center justify-center gap-2 py-2.5 text-[13px] font-medium text-void disabled:opacity-60" style={{ background: "var(--spectrum)" }}>
-          <Wand2 className="size-4" /> {busy ? "Robo is tuning…" : "Make it better"}
+          <SlidersHorizontal className="size-4" /> {busy ? "Robo is tuning…" : "Make it better"}
         </button>
       )}
 
@@ -411,7 +411,7 @@ export function CoachPanel({
                     onClick={() => onBuild({ ...hw.build, parts: { ...hw.build.parts, ...c.fix!.parts }, geom: { ...hw.build.geom, ...c.fix!.geom } }, `fix: ${c.fix!.label}`)}
                     className="mono-label mt-1.5 ml-6 inline-flex items-center gap-1 border border-spec-1/40 px-1.5 py-1 text-[10px] text-spec-1 hover:bg-spec-1/10 rounded-xl"
                   >
-                    <Wand2 className="size-3" /> Fix it: {c.fix.label}
+                    <Wrench className="size-3" /> Fix it: {c.fix.label}
                   </button>
                 )}
               </li>

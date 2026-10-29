@@ -3,7 +3,7 @@
 // The lab's starting point: an empty 3D workspace, waiting for a machine to be described.
 import { Grid, OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { AlertTriangle, Bot, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { AlertTriangle, Bot, Loader2, PenLine, RefreshCw } from "lucide-react";
 
 export default function EmptyStage({
   busy,
@@ -50,7 +50,7 @@ export default function EmptyStage({
                   </button>
                 )}
                 <button onClick={onDescribe} className="inline-flex h-9 items-center gap-2 rounded-md border border-line-2 px-4 text-[13px] text-mute hover:text-fg">
-                  <Sparkles className="size-3.5" /> Edit the description
+                  <PenLine className="size-3.5" /> Edit the description
                 </button>
               </div>
             </>

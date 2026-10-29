@@ -4,7 +4,7 @@
 // safe, with every check and what was auto-fixed), Mechanics (each joint's load against its
 // actuator, with one-click upsizing to real parts), Electronics (bus voltage, current, battery,
 // protection, wiring) and Code (firmware generated from the simulated motion, plus exports).
-import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Cpu, Download, FileCode2, Info, Sparkles, Wand2, Wrench, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Cpu, Download, FileCode2, Gauge, Info, Wrench, XCircle } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import type { Design } from "@/lib/create/design";
 import { arduinoSketch, overview, ros2Node, upsizeActuators, type Check } from "@/lib/create/engineering";
@@ -31,7 +31,7 @@ function CheckRow({ c }: { c: Check }) {
         <span className="flex-1 text-[13px] leading-snug">{c.title}</span>
         {c.autoFixed && (
           <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full bg-accent-soft px-2 text-[10.5px] font-semibold text-accent">
-            <Wand2 className="size-3" /> auto-fixed
+            <Wrench className="size-3" /> auto-fixed
           </span>
         )}
         <ChevronDown className={cx("mt-0.5 size-3.5 shrink-0 text-dim transition-transform", !open && "-rotate-90")} />
@@ -110,7 +110,7 @@ export default function EngineeringPanel({ design, recording, onApply, onSelect 
         onChange={setView}
         className="w-full"
         options={[
-          { id: "overview", label: "Overview", icon: <Sparkles className="size-3.5" /> },
+          { id: "overview", label: "Overview", icon: <Gauge className="size-3.5" /> },
           { id: "mechanics", label: "Mechanics", icon: <Wrench className="size-3.5" /> },
           { id: "electronics", label: "Electronics", icon: <Cpu className="size-3.5" /> },
           { id: "code", label: "Code", icon: <FileCode2 className="size-3.5" /> },
@@ -128,7 +128,7 @@ export default function EngineeringPanel({ design, recording, onApply, onSelect 
               <span className="rounded-full bg-ok/12 px-2 py-0.5 text-[11px] font-semibold text-ok">{o.passed} passed</span>
               {o.autoFixes > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">
-                  <Wand2 className="size-3" /> {o.autoFixes} safety fix{o.autoFixes > 1 ? "es" : ""} applied
+                  <Wrench className="size-3" /> {o.autoFixes} safety fix{o.autoFixes > 1 ? "es" : ""} applied
                 </span>
               )}
               {fixable.length > 0 && (
@@ -243,7 +243,7 @@ export default function EngineeringPanel({ design, recording, onApply, onSelect 
               ))}
               {e.converters.map((c) => (
                 <li key={c} className="rounded-xl bg-accent-soft/60 px-3 py-2 text-accent">
-                  <Wand2 className="mr-1 inline size-3" /> {c}
+                  <Wrench className="mr-1 inline size-3" /> {c}
                 </li>
               ))}
             </ol>

@@ -2,10 +2,11 @@
 
 // Scroll-driven walkthrough of the product loop. Every number on screen comes from the real
 // engine and the offline advisor, run in the browser on the robot-arm preset.
-import { Check, FileSpreadsheet, Mic, Sparkles, TriangleAlert, X } from "lucide-react";
-import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
+import { Check, FileSpreadsheet, Lightbulb, Mic, TriangleAlert, X } from "lucide-react";
+import { AnimatePresence, motion, useMotionValueEvent, useReducedMotion, useScroll } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { offlineAdvice } from "@/lib/lab/advisor";
+import { defaultBuild, deriveHardware } from "@/lib/lab/hardware/build";
 import { fmtNum, polyToString, run } from "@/lib/lab/analysis";
 import { PRESETS, presetById } from "@/lib/lab/presets";
 import type { ControllerSpec, LabModel } from "@/lib/lab/types";
@@ -13,15 +14,17 @@ import { validateDesign } from "@/lib/lab/validate";
 import type { CheckResult } from "@/lib/lab/validate";
 import type { Engine } from "@/lib/sim/engine";
 import { useEngine } from "@/lib/sim/useEngine";
-import MiniChart, { pathFrom } from "./MiniChart";
+import { pathFrom } from "./MiniChart";
+
 
 const STEPS = [
   { k: "Describe", t: "Type it, say it, or upload data", d: "Plain language, your voice, or a CSV from a step test. No equations needed." },
   { k: "Model", t: "Physics in, transfer function out", d: "Muse Spark derives the equations, picks realistic parameters, and states every assumption." },
   { k: "Control", t: "A controller with starting gains", d: "PID for most loops, LQR state feedback for unstable multi-state systems like balancing robots." },
-  { k: "Simulate", t: "Watch the hardware move", d: "A C++ engine compiled to WebAssembly drives a live 3D rover, arm, balancing robot or drone, synced to the graphs: actuator limits, dead time, noise and disturbances included." },
+  { k: "Simulate", t: "Watch the hardware move", d: "A C++ engine compiled to WebAssembly drives the real machines in 3D. Here an arm and a balancing robot run their controllers side by side, with actuator limits, dead time and noise included." },
   { k: "Explain", t: "Why it overshoots, in plain words", d: "Pole locations, damping and margins turned into a diagnosis and concrete fixes. Iterate until it behaves." },
   { k: "Validate", t: "Checks before hardware", d: "Margins, robustness to model error, noise, load disturbances, and engine cross-checks." },
+  { k: "Build", t: "Real parts, ready to order", d: "Every machine is made of catalogue hardware: a priced parts list, the wiring, and firmware for the board. The robot on screen is the one you can build." },
 ];
 
 // The arm preset's first guess, then the copilot's hardware-aware auto-tune (inside the 2 A driver rating).
@@ -101,6 +104,59 @@ function LiveChecks({ engine, model, spec }: { engine: Engine; model: LabModel; 
   );
 }
 
+/**
+ * A machine in motion, drawn as a soft cloud of blurred colour following its simulated response: the arm's
+ * tip sweeps up its arc to the target angle, the balancer rolls to its target position. Plain
+ * CSS transforms on a few layers, so it costs next to nothing compared with a 3D canvas.
+ */
+function MotionBlur({ y, dt, target, kind, color, tint }: { y: ArrayLike<number>; dt: number; target: number; kind: "arm" | "balancer"; color: string; tint: string }) {
+  const still = useReducedMotion();
+  const path = useMemo(() => {
+    const n = 48;
+    const xs: string[] = [];
+    const ys: string[] = [];
+    for (let i = 0; i <= n; i++) {
+      const v = y[Math.min(y.length - 1, Math.round((i / n) * (y.length - 1)))] / (target || 1);
+      if (kind === "arm") {
+        // Pivot low on the left; 0 → arm level, 1 → the target angle (60°).
+        const th = ((10 + 60 * v) * Math.PI) / 180;
+        xs.push(`${28 + 46 * Math.cos(th)}%`);
+        ys.push(`${80 - 62 * Math.sin(th)}%`);
+      } else {
+        xs.push(`${18 + 58 * v}%`);
+        ys.push("58%");
+      }
+    }
+    return { xs, ys, duration: Math.min(4, Math.max(2, y.length * dt)) };
+  }, [y, dt, target, kind]);
+  const move = still
+    ? { left: path.xs[path.xs.length - 1], top: path.ys[path.ys.length - 1] }
+    : { left: path.xs, top: path.ys };
+  const loop = { duration: path.duration, ease: "linear" as const, repeat: Infinity, repeatDelay: 1.2 };
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      {/* A cloud of soft puffs, each trailing the motion a little behind the last. */}
+      {CLOUD.map((c, i) => (
+        <motion.span
+          key={i}
+          className="absolute rounded-full blur-3xl"
+          style={{ width: c.w, height: c.h, background: i % 2 ? tint : color, opacity: c.o, translate: `calc(-50% + ${c.dx}px) calc(-50% + ${c.dy}px)` }}
+          animate={move}
+          transition={still ? { duration: 0 } : { ...loop, delay: c.lag }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Puff sizes (px), offsets from the path, opacity and lag (s) behind the leading edge.
+const CLOUD = [
+  { w: 150, h: 120, dx: 0, dy: 0, o: 0.5, lag: 0 },
+  { w: 110, h: 90, dx: -34, dy: 14, o: 0.4, lag: 0.12 },
+  { w: 130, h: 100, dx: 26, dy: -18, o: 0.35, lag: 0.22 },
+  { w: 90, h: 80, dx: -10, dy: 30, o: 0.3, lag: 0.34 },
+];
+
 function Panel({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <div className="rounded-2xl relative h-full w-full border border-line bg-panel/80 backdrop-blur">
@@ -131,8 +187,13 @@ export default function LoopStory() {
   const model = useMemo(() => presetById("arm")!.build(), []);
   const before = useMemo(() => run(engine, model, BEFORE), [engine, model]);
   const after = useMemo(() => run(engine, model, AFTER), [engine, model]);
+  const balancer = useMemo(() => {
+    const m = presetById("balancer")!.build();
+    return { model: m, out: run(engine, m, m.controller) };
+  }, [engine]);
   const advice = useMemo(() => offlineAdvice(model, BEFORE, before.analysis), [model, before]);
   const tf = model.plant.kind === "tf" ? model.plant : null;
+  const hw = useMemo(() => deriveHardware(defaultBuild("arm")), []);
   const prompt = useTyped(PRESETS[0].prompt, step === 0);
 
   return (
@@ -303,14 +364,19 @@ export default function LoopStory() {
                 )}
                 {step === 3 && (
                   <Panel label={`04 · Simulate · ${engine.backend === "wasm" ? "C++/WASM" : "TS"} engine`}>
-                    <div className="relative">
-                      <MiniChart y={before.sim.y} target={model.sim.ref} className="h-52 w-full" height={200} />
-                      <motion.div
-                        className="absolute top-0 bottom-0 w-px bg-fg/40"
-                        initial={{ left: "0%" }}
-                        animate={{ left: "100%" }}
-                        transition={{ duration: 1.4, ease: [0.6, 0, 0.2, 1] }}
-                      />
+                    {/* Two demo machines running their controllers at the same time, on the same engine. */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { id: "arm" as const, y: before.sim.y, dt: before.sim.dt, target: model.sim.ref, color: "#8b7fff", tint: "#ff5ca8" },
+                        { id: "balancer" as const, y: balancer.out.sim.y, dt: balancer.out.sim.dt, target: balancer.model.sim.ref, color: "#2dd4ff", tint: "#8b7fff" },
+                      ].map((c) => (
+                        <div key={c.id} className="overflow-hidden rounded-xl border border-line bg-[radial-gradient(ellipse_60%_60%_at_50%_62%,var(--color-panel-2),transparent_75%)]">
+                          <div className="h-56 sm:h-64">
+                            <MotionBlur kind={c.id} y={c.y} dt={c.dt} target={c.target} color={c.color} tint={c.tint} />
+                          </div>
+                          <p className="mono-label border-t border-line px-3 py-2 text-mute">{presetById(c.id)!.name}</p>
+                        </div>
+                      ))}
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
                       {[
@@ -341,7 +407,7 @@ export default function LoopStory() {
                         style={{ borderImage: "var(--spectrum) 1" }}
                       >
                         <p className="mb-1 flex items-center gap-1.5 font-medium">
-                          <Sparkles className="size-3.5" /> {advice.headline}
+                          <Lightbulb className="size-3.5" /> {advice.headline}
                         </p>
                         <p className="text-mute">{advice.explanation}</p>
                       </motion.div>
@@ -379,6 +445,41 @@ export default function LoopStory() {
                 {step === 5 && (
                   <Panel label="06 · Validate">
                     <LiveChecks engine={engine} model={model} spec={AFTER} />
+                  </Panel>
+                )}
+                {step === 6 && (
+                  <Panel label="07 · Build · parts list">
+                    <ul className="divide-y divide-line">
+                      {hw.bom.map((l, i) => (
+                        <motion.li
+                          key={l.name}
+                          className="flex items-center justify-between gap-4 py-2.5 text-sm"
+                          initial={{ opacity: 0, x: -6 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.06 }}
+                        >
+                          <span>
+                            {l.qty > 1 && <span className="mr-1.5 font-mono text-mute">{l.qty}×</span>}
+                            {l.name}
+                          </span>
+                          <span className="font-mono text-[12px] text-mute tabular-nums">
+                            {l.mass > 0 ? `${fmtNum(l.mass * l.qty)} g · ` : ""}${(l.price * l.qty).toFixed(2)}
+                          </span>
+                        </motion.li>
+                      ))}
+                    </ul>
+                    <div className="mt-4 grid grid-cols-3 gap-px bg-line">
+                      {[
+                        ["Total", `$${hw.cost.toFixed(0)}`],
+                        ["Mass", `${hw.massKg.toFixed(2)} kg`],
+                        ["Board", hw.board.name],
+                      ].map(([k, v]) => (
+                        <div key={k} className="bg-panel p-3">
+                          <p className="mono-label text-dim">{k}</p>
+                          <p className="mt-1 truncate font-mono text-sm tabular-nums">{v}</p>
+                        </div>
+                      ))}
+                    </div>
                   </Panel>
                 )}
               </motion.div>

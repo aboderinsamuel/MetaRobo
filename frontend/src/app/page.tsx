@@ -20,9 +20,9 @@ export default function Home() {
         <Hero />
         <MetaStack />
         <LoopStory />
+        <Systems />
         <AgentTrace />
         <EngineSection />
-        <Systems />
         <Pricing />
         <HackathonLog />
       </main>

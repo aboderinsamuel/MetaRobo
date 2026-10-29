@@ -8,7 +8,9 @@ import { run } from "@/lib/lab/analysis";
 import { PRESETS } from "@/lib/lab/presets";
 import { RIGS } from "@/lib/lab/rig";
 import { useEngine } from "@/lib/sim/useEngine";
-import MiniChart from "./MiniChart";
+import dynamic from "next/dynamic";
+
+const RigShowcase = dynamic(() => import("./RigShowcase"), { ssr: false });
 
 export default function Systems() {
   const engine = useEngine();
@@ -18,7 +20,7 @@ export default function Systems() {
       PRESETS.map((p) => {
         const model = p.build();
         const r = run(engine, model, model.controller);
-        return { p, model, y: r.sim.y, stable: r.analysis.metrics.stable === 1, os: r.analysis.metrics.overshootPct };
+        return { p, model, stable: r.analysis.metrics.stable === 1, os: r.analysis.metrics.overshootPct };
       }),
     [engine],
   );
@@ -52,7 +54,7 @@ export default function Systems() {
         </div>
       </div>
       <div ref={strip} className="mx-auto flex max-w-[1440px] snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-6 [scrollbar-width:none] sm:px-6">
-        {cards.map(({ p, model, y, stable, os }, i) => (
+        {cards.map(({ p, model, stable, os }, i) => (
           <motion.article
             key={p.id}
             className="group flex w-[86vw] max-w-[380px] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border border-line bg-panel transition-shadow hover:shadow-[0_24px_60px_-30px_rgb(0_0_0/0.35)] sm:w-[380px]"
@@ -72,7 +74,10 @@ export default function Systems() {
               <p className="mono-label mt-1 text-mute">
                 3D {RIGS[p.rig].name} · {p.blurb}
               </p>
-              <MiniChart y={y} target={model.sim.ref} className="mt-5 h-24 w-full" height={96} />
+            </div>
+            {/* The robot itself, in 3D, doing what the lab simulates. */}
+            <div className="relative mt-2 h-60 bg-[radial-gradient(ellipse_55%_60%_at_50%_62%,var(--color-panel-2),transparent_75%)]">
+              <RigShowcase kind={p.rig} prompt={p.prompt} />
             </div>
             <ul className="mt-4 flex-1 space-y-1.5 px-5 pb-5 text-[13px] text-mute">
               {model.assumptions.slice(0, 2).map((a) => (

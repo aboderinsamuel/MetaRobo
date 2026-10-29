@@ -4,7 +4,7 @@
 // part to inspect or swap it; parts that fail a design check glow and show what's wrong.
 import { Grid, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { AlertTriangle, CheckCircle2, Info, Pause, Play, RotateCcw, ScanEye, Tag, Volume2, VolumeX, Wand2, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Pause, Play, RotateCcw, ScanEye, Tag, Volume2, VolumeX, Wrench, X, XCircle } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtNum } from "@/lib/lab/analysis";
@@ -27,7 +27,7 @@ import type { Assembly } from "@/lib/lab/assembly";
 import { behaviourIndex } from "@/lib/lab/behaviour";
 import { VERDICT_UI } from "./ReviewCard";
 import { bomTotal } from "@/lib/lab/review";
-import { ArmRig, BalancerRig, DroneRig, RoverRig } from "./hw3d/rigs";
+import { ArmRig, BalancerRig, DroneRig, RoverRig, rigCamera } from "./hw3d/rigs";
 import type { Motion } from "./hw3d/rigs";
 
 /** Calls `onFrame` from inside the render loop; the owner of the clock advances it there. */
@@ -36,29 +36,6 @@ function Driver({ onFrame }: { onFrame: (delta: number) => void }) {
   return null;
 }
 
-function camera(hw: DerivedHardware): { pos: [number, number, number]; target: [number, number, number] } {
-  const g = hw.build.geom;
-  switch (hw.build.kind) {
-    case "rover": {
-      const s = Math.max(g.chassisL, g.chassisW) * 1.35 + 0.08;
-      return { pos: [s * 0.75, s * 0.7, s * 1.35], target: [s * 0.12, 0.03, 0] };
-    }
-    case "arm": {
-      const R = g.upper + g.fore;
-      return { pos: [R * 1.5, g.shoulderH + R * 1.45, R * 2.6], target: [-0.03, g.shoulderH * 0.85, 0] };
-    }
-    case "balancer": {
-      const H = g.comH * 2 + g.wheelD;
-      return { pos: [H * 1.25 + 0.15, H * 0.95, H * 1.9 + 0.2], target: [0.12, H * 0.45, 0] };
-    }
-    default: {
-      const arm = hw.prop?.armM ?? 0.2;
-      const S = arm * 2 + 0.15;
-      const y0 = 0.05 + arm * 0.15 + 0.05;
-      return { pos: [S * 1.1, y0 + S * 0.55, S * 1.7], target: [0, y0, 0] };
-    }
-  }
-}
 
 const LEVEL_ICON: Record<CheckLevel, typeof Info> = { pass: CheckCircle2, info: Info, warn: AlertTriangle, error: XCircle };
 const LEVEL_CLS: Record<CheckLevel, string> = { pass: "text-ok", info: "text-spec-1", warn: "text-warn", error: "text-bad" };
@@ -195,7 +172,7 @@ export default function HardwareView({
   const [narrow] = useState(() => typeof window !== "undefined" && window.innerWidth < 640);
   const wide = !!run.pose;
   const cam = useMemo(() => {
-    const c = camera(hw);
+    const c = rigCamera(hw);
     const k = (narrow ? 1.6 : 1) * (wide ? 1.6 : 1);
     return { target: c.target, pos: c.pos.map((v, i) => c.target[i] + (v - c.target[i]) * k) as [number, number, number] };
   }, [hw, narrow, wide]);
@@ -293,9 +270,7 @@ export default function HardwareView({
             {machine ? machine.title : (title ?? RIGS[rig.kind].name)}
           </span>
           {machine && (
-            <span className="meta-ring mono-label inline-flex items-center rounded-full bg-void/80 px-2 py-1 text-[10px] backdrop-blur">
-              <span className="text-spectrum font-semibold">Designed by Muse Spark</span>
-            </span>
+            <span className="mono-label inline-flex items-center rounded-xl border border-line-2 bg-void/80 px-2 py-1 text-[10px] text-mute backdrop-blur">Custom build</span>
           )}
           {machine && model.review && (
             <span className={`mono-label inline-flex items-center gap-1.5 border bg-void/80 px-2 py-1 text-[10px] backdrop-blur ${VERDICT_UI[model.review.verdict].cls} rounded-xl`}>
@@ -738,7 +713,7 @@ function Inspector({
                       onClick={() => onBuild({ ...hw.build, parts: { ...hw.build.parts, ...c.fix!.parts }, geom: { ...hw.build.geom, ...c.fix!.geom } }, `fix: ${c.fix!.label}`)}
                       className="mono-label mt-1 ml-[18px] inline-flex items-center gap-1 border border-spec-1/40 px-1.5 py-0.5 text-[10px] text-spec-1 hover:bg-spec-1/10 rounded-xl"
                     >
-                      <Wand2 className="size-3" /> {c.fix.label}
+                      <Wrench className="size-3" /> {c.fix.label}
                     </button>
                   )}
                 </div>

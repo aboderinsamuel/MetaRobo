@@ -12,7 +12,7 @@ import { fmtNum } from "@/lib/lab/analysis";
 import type { DerivedHardware, Telemetry } from "@/lib/lab/hardware/build";
 import { ARM_ELBOW, ARM_GRIP, ARM_START, payloadSize, roverWheelWidth } from "@/lib/lab/hardware/build";
 import { batteryDims, boardDims, driverDims, motorDims } from "@/lib/lab/hardware/dims";
-import { BatteryMesh, BoardMesh, Dimension, DriverMesh, GearMotorMesh, Label, PartSlot, SensorMesh, Wheel, Wire, curve } from "./parts3d";
+import { BatteryMesh, BoardMesh, Dimension, DriverMesh, GearMotorMesh, Label, PartSlot, SensorMesh, Wheel, Wire, curve, useScene } from "./parts3d";
 
 type V3 = [number, number, number];
 
@@ -44,6 +44,31 @@ export interface RigProps {
   m: Motion;
   clock: React.RefObject<Clock>;
   tel: Telemetry;
+}
+
+/** A camera that frames each rig well: used by the Control Lab and the landing page showcase. */
+export function rigCamera(hw: DerivedHardware): { pos: [number, number, number]; target: [number, number, number] } {
+  const g = hw.build.geom;
+  switch (hw.build.kind) {
+    case "rover": {
+      const s = Math.max(g.chassisL, g.chassisW) * 1.35 + 0.08;
+      return { pos: [s * 0.75, s * 0.7, s * 1.35], target: [s * 0.12, 0.03, 0] };
+    }
+    case "arm": {
+      const R = g.upper + g.fore;
+      return { pos: [R * 1.5, g.shoulderH + R * 1.45, R * 2.6], target: [-0.03, g.shoulderH * 0.85, 0] };
+    }
+    case "balancer": {
+      const H = g.comH * 2 + g.wheelD;
+      return { pos: [H * 1.25 + 0.15, H * 0.95, H * 1.9 + 0.2], target: [0.12, H * 0.45, 0] };
+    }
+    default: {
+      const arm = hw.prop?.armM ?? 0.2;
+      const S = arm * 2 + 0.15;
+      const y0 = 0.05 + arm * 0.15 + 0.05;
+      return { pos: [S * 1.1, y0 + S * 0.55, S * 1.7], target: [0, y0, 0] };
+    }
+  }
 }
 
 export function sample(arr: ArrayLike<number>, dt: number, t: number): number {
@@ -147,6 +172,7 @@ function Crate({ s }: { s: number }) {
 
 /** Marks a centre of mass: the pink ball and a plumb line to the floor, as in the original studio. */
 function ComMarker({ y, bad }: { y: number; bad?: boolean }) {
+  if (useScene().showcase) return null;
   return (
     <group>
       <mesh position={[0, y, 0]}>
@@ -164,6 +190,7 @@ function ComMarker({ y, bad }: { y: number; bad?: boolean }) {
 
 export function RoverRig(p: RigProps) {
   const { hw, m, clock } = p;
+  const { showcase } = useScene();
   const g = hw.build.geom;
   const motor = hw.motor!;
   const L = g.chassisL,
@@ -231,10 +258,10 @@ export function RoverRig(p: RigProps) {
 
   return (
     <>
-      {!pose && <TrackMarks upto={Math.max(1.5, m.main[m.main.length - 1] ?? 1)} z={W / 2 + 0.07} />}
-      {m.plan && <Line points={m.plan.map(([x, z]) => [x, 0.0015, z] as V3)} color="#5fe0c8" lineWidth={1.6} dashed dashSize={0.02} gapSize={0.012} transparent opacity={0.85} />}
-      {m.path && <Line points={m.path.map(([x, z]) => [x, 0.002, z] as V3)} color="#9b5cff" lineWidth={1.2} transparent opacity={0.6} />}
-      {!pose && rampX < Infinity && slope > 0.001 && (
+      {!pose && !showcase && <TrackMarks upto={Math.max(1.5, m.main[m.main.length - 1] ?? 1)} z={W / 2 + 0.07} />}
+      {m.plan && !showcase && <Line points={m.plan.map(([x, z]) => [x, 0.0015, z] as V3)} color="#5fe0c8" lineWidth={1.6} dashed dashSize={0.02} gapSize={0.012} transparent opacity={0.85} />}
+      {m.path && !showcase && <Line points={m.path.map(([x, z]) => [x, 0.002, z] as V3)} color="#9b5cff" lineWidth={1.2} transparent opacity={0.6} />}
+      {!pose && !showcase && rampX < Infinity && slope > 0.001 && (
         <group position={[rampX, 0, 0]}>
           <mesh position={[0.6 * Math.cos(slope), 0.6 * Math.sin(slope) - 0.006, 0]} rotation={[0, 0, slope]} receiveShadow>
             <boxGeometry args={[1.2, 0.012, W + 0.16]} />
@@ -301,7 +328,7 @@ export function RoverRig(p: RigProps) {
         <group position={[L / 2 + 0.002, deckY + 0.014, 0]} rotation={[0, Math.PI / 2, 0]}>
           <SensorMesh sensor={{ ...hw.sensor, look: "sonar" }} />
         </group>
-        <mesh ref={beam} position={[L / 2 + 0.14, deckY + 0.014, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <mesh ref={beam} position={[L / 2 + 0.14, deckY + 0.014, 0]} rotation={[0, 0, Math.PI / 2]} visible={!showcase}>
           <coneGeometry args={[0.06, 0.26, 32, 1, true]} />
           <meshBasicMaterial color="#2dd4ff" transparent opacity={0.1} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
@@ -380,6 +407,7 @@ function ArmLinks({ hw, ghost = false, glow, jaw }: { hw: DerivedHardware; ghost
 
 export function ArmRig(p: RigProps) {
   const { hw, m, clock } = p;
+  const { showcase } = useScene();
   const g = hw.build.geom;
   const motor = hw.motor!;
   const md = motorDims(motor.look);
@@ -462,11 +490,12 @@ export function ArmRig(p: RigProps) {
   return (
     <>
       {/* Reach envelope: a dome around the shoulder, like the studio */}
-      <mesh position={[0, H, 0]}>
+      <mesh position={[0, H, 0]} visible={!showcase}>
         <sphereGeometry args={[reach, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshBasicMaterial color="#5fe0c8" transparent opacity={0.035} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
       <Line
+        visible={!showcase}
         points={Array.from({ length: 97 }, (_, i) => [Math.cos((i / 96) * Math.PI * 2) * reach, 0.001, Math.sin((i / 96) * Math.PI * 2) * reach] as V3)}
         color="#5fe0c8"
         lineWidth={1}
@@ -477,7 +506,7 @@ export function ArmRig(p: RigProps) {
         opacity={0.6}
       />
       {/* Pick pedestal and place shelf */}
-      {[
+      {!showcase && [
         { at: pick, label: "PICK" },
         { at: place, label: "PLACE" },
       ].map(({ at, label }) => {
@@ -576,7 +605,7 @@ export function ArmRig(p: RigProps) {
           <Crate s={box} />
         </group>
       ))}
-      <group position={[Math.max(0, hw.facts.comX), 0.016, 0]}>
+      <group position={[Math.max(0, hw.facts.comX), 0.016, 0]} visible={!showcase}>
         <ComMarker y={H * 0.55} bad={comBad} />
       </group>
       <Label text={`reach ${Math.round(reach * 1000)} mm`} position={[reach * 0.72, 0.012, reach * 0.72]} size={0.012} color="#5fe0c8" box={false} />
@@ -590,6 +619,7 @@ export function ArmRig(p: RigProps) {
 
 export function BalancerRig(p: RigProps) {
   const { hw, m, clock } = p;
+  const { showcase } = useScene();
   const g = hw.build.geom;
   const motor = hw.motor!;
   const md = motorDims(motor.look);
@@ -626,8 +656,8 @@ export function BalancerRig(p: RigProps) {
   const curNow = () => sample(p.tel.perMotor, m.dt, clock.current.t);
   return (
     <>
-      <TrackMarks upto={Math.max(0.8, ...m.targets.map((v) => v * 1.6))} from={Math.min(0, ...m.targets) - 0.3} z={bodyW / 2 + ww + 0.06} />
-      {m.targets.map((v) => (
+      {!showcase && <TrackMarks upto={Math.max(0.8, ...m.targets.map((v) => v * 1.6))} from={Math.min(0, ...m.targets) - 0.3} z={bodyW / 2 + ww + 0.06} />}
+      {!showcase && m.targets.map((v) => (
         <Flag key={v} x={v} label={`${v < 0 ? "" : "target "}${fmtNum(v)} m`} z={-(bodyW / 2 + 0.1)} />
       ))}
       <group ref={base}>
@@ -720,6 +750,7 @@ export function BalancerRig(p: RigProps) {
 
 export function DroneRig(p: RigProps) {
   const { hw, m, clock } = p;
+  const { showcase } = useScene();
   const g = hw.build.geom;
   const motor = hw.droneMotor!;
   const prop = hw.prop!;
@@ -778,17 +809,17 @@ export function DroneRig(p: RigProps) {
   const curNow = () => sample(p.tel.perMotor, m.dt, clock.current.t);
   return (
     <>
-      <mesh ref={shadow} position={[0, 0.0008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh ref={shadow} position={[0, 0.0008, 0]} rotation={[-Math.PI / 2, 0, 0]} visible={!showcase}>
         <circleGeometry args={[arm * 1.3, 40]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.4} />
       </mesh>
       {/* Landing pad */}
-      <mesh position={[0, 0.0006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh position={[0, 0.0006, 0]} rotation={[-Math.PI / 2, 0, 0]} visible={!showcase}>
         <ringGeometry args={[arm * 1.5, arm * 1.55, 64]} />
         <meshBasicMaterial color="#2dd4ff" transparent opacity={0.35} toneMapped={false} />
       </mesh>
       {/* Altitude ruler */}
-      {Array.from({ length: nTicks }).map((_, i) => (
+      {!showcase && Array.from({ length: nTicks }).map((_, i) => (
         <group key={i} position={[-(arm * 2.2), legH + i * tick, 0]}>
           <mesh>
             <boxGeometry args={[i % 2 ? 0.02 : 0.04, 0.002, 0.002]} />
@@ -797,12 +828,12 @@ export function DroneRig(p: RigProps) {
           {i % 2 === 0 && <Label text={`${(i * tick).toFixed(1)} m`} position={[-0.08, 0, 0]} size={0.035} color="#8b909c" box={false} />}
         </group>
       ))}
-      <mesh position={[-(arm * 2.2), legH + ((nTicks - 1) * tick) / 2, 0]}>
+      <mesh position={[-(arm * 2.2), legH + ((nTicks - 1) * tick) / 2, 0]} visible={!showcase}>
         <boxGeometry args={[0.002, (nTicks - 1) * tick, 0.002]} />
         <meshBasicMaterial color="#50555f" />
       </mesh>
       {/* Target altitude rings */}
-      {m.targets.map((v) => (
+      {!showcase && m.targets.map((v) => (
         <group key={v} position={[0, legH + v, 0]}>
           <mesh rotation={[Math.PI / 2, 0, 0]}>
             <torusGeometry args={[arm * 1.7, 0.003, 8, 96]} />
@@ -933,7 +964,7 @@ export function DroneRig(p: RigProps) {
         </PartSlot>
         {/* Sensing beam to the ground */}
         {hw.sensor.look !== "baro" && (
-          <mesh ref={beam} position={[plate * 0.25, -0.1, 0]}>
+          <mesh ref={beam} position={[plate * 0.25, -0.1, 0]} visible={!showcase}>
             {sonar ? <cylinderGeometry args={[0.008, 0.12, 1, 24, 1, true]} /> : <cylinderGeometry args={[0.0012, 0.0012, 1, 6]} />}
             <meshBasicMaterial color={sonar ? "#2dd4ff" : "#ff4d5e"} transparent opacity={sonar ? 0.07 : 0.7} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
           </mesh>

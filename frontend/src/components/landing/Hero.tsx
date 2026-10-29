@@ -10,7 +10,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtNum, run } from "@/lib/lab/analysis";
 import { presetById } from "@/lib/lab/presets";
 import { useEngine } from "@/lib/sim/useEngine";
-import { MetaBadge } from "./Chrome";
 import MiniChart from "./MiniChart";
 
 const ease = [0.6, 0, 0.2, 1] as const;
@@ -128,12 +127,9 @@ export default function Hero() {
       <div className="grid-lines pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_70%_55%_at_50%_30%,black,transparent)]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[70vh]" style={{ background: "radial-gradient(ellipse 50% 60% at 50% 0%, rgb(0 130 251 / 0.12), transparent 70%)" }} />
 
-      <div className="relative mx-auto max-w-[1440px] px-4 pt-28 pb-16 sm:px-6 sm:pt-36 sm:pb-24">
+      <div className="relative mx-auto max-w-[1440px] px-4 pt-24 pb-16 sm:px-6 sm:pt-28 sm:pb-24">
         <div className="mx-auto max-w-4xl text-center">
-          <motion.div className="flex justify-center" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.6 }}>
-            <MetaBadge />
-          </motion.div>
-          <h1 className="mt-7 text-[clamp(2.6rem,6.4vw,5.6rem)] leading-[0.98] font-medium tracking-[-0.04em]">
+          <h1 className="text-[clamp(2.6rem,6.4vw,5.6rem)] leading-[0.98] font-medium tracking-[-0.04em]">
             <motion.span className="block" initial={{ y: "60%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.9, ease, delay: 0.2 }}>
               Describe a robot.
             </motion.span>

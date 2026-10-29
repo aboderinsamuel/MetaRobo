@@ -5,7 +5,7 @@
 // seed a new design. SAM 3.1 then tracks the robot's moving part frame by frame, and the tracked
 // path is compared with the simulated hand path, so you can see where the digital model and the
 // real machine disagree.
-import { Crosshair, Eye, Film, Loader2, Sparkles, Upload } from "lucide-react";
+import { Box, Crosshair, Eye, Film, Loader2, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { SceneObservation } from "@/lib/create/ai";
@@ -220,7 +220,7 @@ export default function VideoPanel({ design, recording, busy, onBuild, onSpend }
           {scene.scaleReferences.length > 0 && <p className="text-[11.5px] text-dim">Scale judged from: {scene.scaleReferences.map((r) => r.object).join(", ")}</p>}
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" size="sm" disabled={busy} onClick={() => onBuild(scene.suggestedPrompt, observed)}>
-              <Sparkles className="size-4" /> Build this in 3D
+              <Box className="size-4" /> Build this in 3D
             </Button>
             <Button size="sm" disabled={!!work || !file || !/mp4|quicktime/.test(file.type)} onClick={() => void track()} title={file && !/mp4|quicktime/.test(file.type) ? "SAM 3.1 needs MP4 or MOV" : undefined}>
               {work === "track" ? <Loader2 className="size-4 animate-spin" /> : <Crosshair className="size-4" />} Track “{scene.trackPrompt}” with SAM 3.1

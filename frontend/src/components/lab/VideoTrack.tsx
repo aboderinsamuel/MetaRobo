@@ -107,7 +107,7 @@ export default function VideoTrack({
         Film side-on with the phone still. Start recording, then start the robot from rest with one fixed command.
       </p>
       {tooLong && <p className="mt-2 text-[11px] text-bad">Keep the clip under {MAX_SECONDS} seconds.</p>}
-      {!aiOn && <p className="mt-2 text-[11px] text-warn">Muse live mode is off, so only clips tracked before can be replayed.</p>}
+      {!aiOn && <p className="mt-2 text-[11px] text-warn">Tracking new clips is paused on this demo; clips tracked before still replay.</p>}
 
       <button
         onClick={() => duration && onTrack(opts, duration)}
