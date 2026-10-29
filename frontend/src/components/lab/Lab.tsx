@@ -37,6 +37,8 @@ import type { ChatMsg } from "./panels";
 import type { VideoTrackOptions } from "./VideoTrack";
 import { CodePanel, Copilot, DescribePanel, GhostButton, ModelCard, PIPELINE, SectionLabel, SpecStrip, TunerPanel, ValidatePanel, describeCtrl, diffCtrl } from "./panels";
 import EmptyStage from "./EmptyStage";
+import { MachineCoach, MachineReport, MachineScope } from "./MachineCoach";
+import { simulateMachine } from "@/lib/lab/actuation";
 import { loadUserParts } from "./PartsLibrary";
 import type { CatalogPart } from "@/lib/lab/catalog/parts";
 import MachinePanel from "./MachinePanel";
@@ -155,6 +157,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
 
   // ---- AI-designed machine: selection, edits, undo ---------------------------------------------
   const machine = model?.assembly ?? null;
+  const machineSim = useMemo(() => (machine ? simulateMachine(machine) : null), [machine]);
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
   const dataModelTitle = useRef<string | undefined>(undefined);
   const [undoStack, setUndoStack] = useState<Assembly[]>([]);
@@ -883,7 +886,7 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
                   settlingTime={m!.settlingTime}
                   resetKey={simKey}
                   playback={playback}
-                  programs={dataModel ? PROGRAMS[hw!.build.kind].slice(0, 1) : PROGRAMS[hw!.build.kind]}
+                  programs={machine ? [] : dataModel ? PROGRAMS[hw!.build.kind].slice(0, 1) : PROGRAMS[hw!.build.kind]}
                   program={program}
                   onProgram={setProgram}
                   selected={selected}
@@ -896,7 +899,13 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
                   }}
                   onTransformPart={transformPart}
                   dock={
-                    simple ? (
+                    machineSim ? (
+                      simple ? (
+                        <MachineReport sim={machineSim} />
+                      ) : (
+                        <MachineScope sim={machineSim} playback={playback} simKey={simKey} />
+                      )
+                    ) : simple ? (
                       <ReportCard items={reportItems} onImprove={() => void improve()} busy={busy === "tune"} />
                     ) : (
                     <div className="border-t border-line bg-void/80 backdrop-blur">
@@ -1041,7 +1050,8 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
             <>
               <SectionLabel>Robo · your coach</SectionLabel>
               <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
-                {hw && (
+                {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} />}
+                {hw && !machine && (
                   <CoachPanel
                     hw={hw}
                     items={reportItems}
@@ -1061,13 +1071,14 @@ export default function Lab({ initialPreset, onboard = false }: { initialPreset?
             value={rightTab}
             onChange={setRightTab}
             items={[
-              { id: "checks", label: `Design checks${issues ? ` · ${issues}` : ""}`, icon: ShieldCheck },
+              { id: "checks", label: `Design checks${(machineSim ? machineSim.checks.filter((c) => c.level === "error" || c.level === "warn").length : issues) ? ` · ${machineSim ? machineSim.checks.filter((c) => c.level === "error" || c.level === "warn").length : issues}` : ""}`, icon: ShieldCheck },
               { id: "copilot", label: "Copilot", icon: MessageSquare },
             ]}
             layoutId="right-tab"
           />
           <div className={`min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] ${rightTab === "checks" ? "" : "hidden"}`}>
-            {hw && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={(s) => { setSelected(s); setView("hardware"); }} />}
+            {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} />}
+            {hw && !machine && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={(s) => { setSelected(s); setView("hardware"); }} />}
           </div>
           <div className={`flex min-h-0 flex-1 flex-col ${rightTab === "copilot" ? "" : "hidden"}`}>
             <Copilot
