@@ -20,6 +20,7 @@
 
 <p align="center">
   <a href="https://robocraftlaunch.vercel.app"><b>Live demo</b></a> ·
+  <a href="#new-here-start-in-two-minutes"><b>Get started</b></a> ·
   <a href="https://robocraftlaunch.vercel.app/create">Create</a> ·
   <a href="https://robocraftlaunch.vercel.app/lab?preset=arm">Control Lab</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -74,6 +75,63 @@ any part by hand, or film the real robot and let SAM 3.1 compare it with the sim
     <td><sub><b>Same studio, light theme.</b> A pocket quadruped that trots to a ball. Every version of every project is kept, with its full prompt history.</sub></td>
   </tr>
 </table>
+
+## New here? Start in two minutes
+
+No account, no install, no maths needed. Pick the path that sounds like you.
+
+| You are… | Start here | You'll see |
+|---|---|---|
+| **New to robots** (makers, students, the curious) | [Guided tour](https://robocraftlaunch.vercel.app/lab?onboard=1) → *"I'm new to robots"* | **Simple mode**: plain words, a report card, one-click fixes |
+| **Learning engineering** | [Guided tour](https://robocraftlaunch.vercel.app/lab?onboard=1) → *"I'm learning engineering"* | **Pro mode**: the graphs, poles, Bode plots and maths behind every move |
+| **Already building robots** | [Control Lab](https://robocraftlaunch.vercel.app/lab?preset=arm) or [Create](https://robocraftlaunch.vercel.app/create) | The full lab: tuning, validation, firmware |
+
+### Path 1: drive a ready-made robot (works without AI)
+
+1. Open the **[guided tour](https://robocraftlaunch.vercel.app/lab?onboard=1)**. Robo, the in-app guide,
+   asks who you are and what you want to build: a rover, an arm, a self-balancing robot or a drone.
+2. A short tour points at each part of the screen. **Drag** to spin the robot, **scroll** to zoom,
+   and **click any part** (a motor, the battery, the board) to see what it does.
+3. Choose a mission (pick and place, a figure-8, a climb) and press **Simulate**. The motion
+   comes from real physics: the motors, the weight and the battery you chose.
+4. **Swap a part** in the Parts panel. Pick a weaker motor or a bigger battery and the robot,
+   its current draw, its cost and its checks all update at once.
+5. Read **Design checks**. Anything that wouldn't work on a real bench (an overloaded driver, an
+   over-volted servo) is explained in plain words, with a **one-click fix**. In Simple mode,
+   **Make it better** tunes the robot for you.
+6. Switch to **Pro** to see the scope, poles and Bode plots, the validation suite and the
+   **Firmware** for the real board. **Export** the parts list and code when you're happy.
+
+### Path 2: design your own robot from a sentence
+
+1. Open **[Create](https://robocraftlaunch.vercel.app/create)**. On your first visit Robo welcomes
+   you: open a **ready-made robot** (a laundry humanoid, a robot dog, a desk buddy or a water
+   carrier; they open instantly, with no AI call) and a short tour shows you around the studio.
+   Or describe your own robot and its job, typed or dictated with the microphone.
+2. Muse Spark designs it in 40 to 120 seconds: the body, the joints, the room it works in, and
+   the task. RoboCraft then simulates every step and shows which ones succeed.
+3. Make it yours:
+   - **Change**: say what to change ("make it 20% taller", "add a second table").
+     Every version is kept, and you can step back to any of them.
+   - **Edit**: click any part to resize it or change its material and colour.
+   - **Task**: watch each step of the job, scrub the timeline, change the speed.
+   - **Engineer**: joint loads, actuator sizing and one-click safety fixes.
+   - **Video**: upload a phone clip of a real robot to compare it with the simulation.
+4. Press **Open in Control Lab**. Your robot arrives with the body exactly as designed and real
+   hardware inside. Press **X-ray** to see the servos, the board, the battery and the wiring.
+   From here it's Path 1, steps 4 to 6.
+
+> [!TIP]
+> - The **?** button in Create and in the Control Lab replays the tour at any time.
+> - **Simple** and **Pro** switch in one click from the top bar.
+> - Projects are saved in your browser: open them again from **Projects** in Create.
+> - Light and dark themes are in the top-right corner.
+
+> [!NOTE]
+> Designing a *new* robot from a sentence needs a live Muse Spark call. If the hosted demo shows
+> "New designs are paused on this demo right now", live AI is switched off to protect the
+> hackathon's credit budget. The ready-made robots in Create, the four Control Lab demos, the
+> physics, the parts, the checks and the firmware all work without it.
 
 ## How it works
 
