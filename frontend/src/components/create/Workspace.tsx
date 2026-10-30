@@ -4,12 +4,14 @@
 // designs it; the canvas shows it in 3D and plays its physically simulated task; the side panel
 // changes it in plain words, edits parts directly, walks the task, and reports the engineering.
 // Every change is a version you can step back and forward through; projects save in the browser.
-import { Box, Boxes, ChevronLeft, ChevronRight, Copy, Cpu, FlaskConical, FolderOpen, ListChecks, Loader2, PanelLeftClose, PanelLeftOpen, PenLine, Plus, RotateCcw, ScanEye, SlidersHorizontal, Trash2, Video } from "lucide-react";
+import { ArrowRight, Box, Boxes, ChevronLeft, ChevronRight, CircleHelp, Copy, Cpu, FlaskConical, FolderOpen, ListChecks, Loader2, PanelLeftClose, PanelLeftOpen, PenLine, Plus, RotateCcw, ScanEye, SlidersHorizontal, Trash2, Video } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
+import { Tour } from "@/components/lab/onboarding";
+import { EXAMPLES as READY_MADE, loadExample } from "@/lib/create/examples";
 import { sendToLab } from "@/lib/create/handoff";
 import type { Design } from "@/lib/create/design";
 import { usePlayback } from "@/lib/create/playback";
@@ -22,6 +24,7 @@ import { Inspector, PromptBox, TaskPanel } from "./panels";
 import Timeline from "./Timeline";
 import { Button, IconButton, Segmented, ThemeToggle, cx } from "./ui";
 import VideoPanel from "./VideoPanel";
+import { CreateWelcome, TOURED_KEY, WELCOMED_KEY, createTour, markSeen, seen } from "./Welcome";
 import type { CameraPreset, ViewMode } from "./Viewport";
 
 const Viewport = dynamic(() => import("./Viewport"), { ssr: false, loading: () => <div className="size-full animate-pulse bg-canvas" /> });
@@ -36,6 +39,11 @@ const EXAMPLES = [
 const STAGES = ["Reading your request", "Designing the body and joints", "Choosing actuators and materials", "Building the environment", "Planning the task"];
 
 type Tab = "prompt" | "edit" | "task" | "engineer" | "video";
+
+function freshProject(design: Design, prompt: string): Project {
+  const at = Date.now();
+  return { id: newProjectId(), title: design.title, updated: at, versions: [{ design, prompt, at }], cursor: 0 };
+}
 
 function useStatus() {
   const [status, setStatus] = useState<{ ai: boolean; spent: number; budget: number } | null>(null);
@@ -226,6 +234,15 @@ export default function Workspace({ initial }: { initial?: Design }) {
   const [error, setError] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
   const [runKey, setRunKey] = useState(0);
+  const [welcome, setWelcome] = useState(false);
+  const [touring, setTouring] = useState(false);
+
+  // First visit: Robo's welcome (not over a design that's already open, like a test fixture).
+  useEffect(() => {
+    if (initial || seen(WELCOMED_KEY)) return;
+    const id = requestAnimationFrame(() => setWelcome(true));
+    return () => cancelAnimationFrame(id);
+  }, [initial]);
 
   const design = project ? project.versions[project.cursor].design : null;
   const sim = useSimulation(design, runKey);
@@ -282,6 +299,33 @@ export default function Workspace({ initial }: { initial?: Design }) {
     setTab("task");
   };
 
+  // A ready-made robot: a real Muse Spark design from public/examples, opened with no AI call.
+  // The first one a visitor opens comes with the studio tour.
+  const openExample = async (id: string) => {
+    const ex = READY_MADE.find((e) => e.id === id);
+    if (!ex) return;
+    setError(null);
+    setWelcome(false);
+    markSeen(WELCOMED_KEY);
+    try {
+      const d = await loadExample(id);
+      setSelected(null);
+      setPreset({ name: "iso" });
+      setPanelOpen(true);
+      commit(freshProject(d, ex.prompt));
+      setTab("task");
+      if (!seen(TOURED_KEY)) setTimeout(() => setTouring(true), 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const showAround = () => {
+    if (!design) return setWelcome(true);
+    setPanelOpen(true);
+    setTouring(true);
+  };
+
   const change = async (text: string) => {
     if (!design || !project) return;
     const history = project.versions.slice(1, project.cursor + 1).map((v) => v.prompt);
@@ -334,6 +378,9 @@ export default function Workspace({ initial }: { initial?: Design }) {
               {status.budget > 0 && <span className="tabular-nums">/ ${status.budget}</span>}
             </span>
           )}
+          <IconButton label="Show me around" onClick={showAround}>
+            <CircleHelp className="size-4" />
+          </IconButton>
           <ThemeToggle />
         </div>
       </header>
@@ -358,6 +405,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
                     </div>
                   </div>
                   <Button
+                    data-tour="lab"
                     size="sm"
                     variant="primary"
                     className="mt-3 w-full"
@@ -369,7 +417,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
                   >
                     <FlaskConical className="size-4" /> Open in Control Lab
                   </Button>
-                  <div className="mt-3 flex items-center gap-2">
+                  <div data-tour="versions" className="mt-3 flex items-center gap-2">
                     <IconButton label="Previous version" disabled={project.cursor === 0} onClick={() => goto(project.cursor - 1)}>
                       <ChevronLeft className="size-4" />
                     </IconButton>
@@ -389,7 +437,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
                   </p>
                 </div>
               )}
-              <div className="px-4 pt-3">
+              <div data-tour="tabs" className="px-4 pt-3">
                 <Segmented value={tab} onChange={setTab} size="sm" className="w-full" options={tabs.filter((t) => design || t.id === "prompt" || t.id === "video").map((t) => ({ id: t.id, label: t.label, icon: t.icon }))} />
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 [scrollbar-width:thin]">
@@ -444,17 +492,19 @@ export default function Workspace({ initial }: { initial?: Design }) {
                   <IconButton label={panelOpen ? "Hide panel" : "Show panel"} onClick={() => setPanelOpen((o) => !o)} className="hidden bg-surface/85 backdrop-blur lg:inline-flex">
                     {panelOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
                   </IconButton>
-                  <Segmented
-                    size="sm"
-                    value={mode}
-                    onChange={setMode}
-                    className="bg-surface/85 backdrop-blur"
-                    options={[
-                      { id: "skin", label: "Skin", icon: <Box className="size-3.5" /> },
-                      { id: "skeleton", label: "Skeleton", icon: <ScanEye className="size-3.5" /> },
-                      { id: "both", label: "Skin + Rig", icon: <Boxes className="size-3.5" /> },
-                    ]}
-                  />
+                  <div data-tour="views">
+                    <Segmented
+                      size="sm"
+                      value={mode}
+                      onChange={setMode}
+                      className="bg-surface/85 backdrop-blur"
+                      options={[
+                        { id: "skin", label: "Skin", icon: <Box className="size-3.5" /> },
+                        { id: "skeleton", label: "Skeleton", icon: <ScanEye className="size-3.5" /> },
+                        { id: "both", label: "Skin + Rig", icon: <Boxes className="size-3.5" /> },
+                      ]}
+                    />
+                  </div>
                 </div>
                 <div className="pointer-events-auto flex items-center gap-2">
                   {counts && (
@@ -462,16 +512,18 @@ export default function Workspace({ initial }: { initial?: Design }) {
                       <span className="text-fg tabular-nums">{counts.joints}</span>&nbsp;joints ·&nbsp;<span className="text-fg tabular-nums">{counts.parts}</span>&nbsp;parts ·&nbsp;<span className="text-fg tabular-nums">{counts.objects}</span>&nbsp;scene objects
                     </span>
                   )}
-                  <Segmented
-                    size="sm"
-                    value={preset.name}
-                    onChange={(name) => setPreset({ name })}
-                    className="bg-surface/85 backdrop-blur"
-                    options={(["iso", "front", "side", "top", "scene"] as const).map((id) => ({ id, label: id === "iso" ? "Robot" : id[0].toUpperCase() + id.slice(1), title: id === "scene" ? "Frame the whole scene" : undefined }))}
-                  />
+                  <div data-tour="cameras">
+                    <Segmented
+                      size="sm"
+                      value={preset.name}
+                      onChange={(name) => setPreset({ name })}
+                      className="bg-surface/85 backdrop-blur"
+                      options={(["iso", "front", "side", "top", "scene"] as const).map((id) => ({ id, label: id === "iso" ? "Robot" : id[0].toUpperCase() + id.slice(1), title: id === "scene" ? "Frame the whole scene" : undefined }))}
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="relative min-h-0 flex-1">
+              <div data-tour="viewport" className="relative min-h-0 flex-1">
                 <Viewport design={design} recording={sim.recording} selected={selected} onSelect={(id) => (setSelected(id), id && setTab("edit"))} mode={mode} preset={preset} theme={theme} />
                 {sim.error && <p className="absolute bottom-3 left-3 rounded-xl bg-bad/10 px-3 py-2 text-[12px] text-bad backdrop-blur">Simulation failed: {sim.error}</p>}
                 <div className="pointer-events-none absolute bottom-3 left-3 hidden gap-1.5 sm:flex">
@@ -483,7 +535,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
                   </span>
                 </div>
               </div>
-              <div className="border-t border-line bg-surface/90 backdrop-blur">
+              <div data-tour="timeline" className="border-t border-line bg-surface/90 backdrop-blur">
                 <Timeline recording={sim.recording} running={sim.running} progress={sim.progress} />
               </div>
             </>
@@ -499,6 +551,22 @@ export default function Workspace({ initial }: { initial?: Design }) {
                 <div className="mt-6">
                   <PromptBox large autoFocus placeholder="A home humanoid that loads the washing machine and folds the laundry…" busy={!!busy} onSubmit={(t) => void create(t)} submitLabel="Create" examples={EXAMPLES} />
                 </div>
+                <div className="mt-7">
+                  <p className="text-[13px] font-medium">
+                    Or open a ready-made robot <span className="font-normal text-mute">· opens instantly</span>
+                  </p>
+                  <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
+                    {READY_MADE.map((e) => (
+                      <button key={e.id} onClick={() => void openExample(e.id)} className="group flex items-center gap-3 rounded-2xl bg-surface/80 px-3.5 py-3 text-left shadow-[0_0_0_1px_var(--color-line)] backdrop-blur transition-shadow hover:shadow-[0_0_0_1px_var(--color-line-2)]">
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13.5px] font-medium">{e.title}</span>
+                          <span className="block truncate text-[12px] text-mute">{e.blurb}</span>
+                        </span>
+                        <ArrowRight className="size-4 shrink-0 text-dim transition-transform group-hover:translate-x-0.5 group-hover:text-fg" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <button onClick={() => setTab("video")} className="mt-5 inline-flex items-center gap-2 text-[13px] text-mute hover:text-fg">
                   <Video className="size-4" /> Or start from a video of a real robot
                 </button>
@@ -508,6 +576,32 @@ export default function Workspace({ initial }: { initial?: Design }) {
           <AnimatePresence>{busy && <Generating startedAt={busy.at} change={busy.kind === "change"} />}</AnimatePresence>
         </main>
       </div>
+      <AnimatePresence>
+        {welcome && (
+          <CreateWelcome
+            live={live}
+            onExample={(id) => void openExample(id)}
+            onDescribe={() => {
+              setWelcome(false);
+              markSeen(WELCOMED_KEY);
+              setTimeout(() => document.querySelector<HTMLTextAreaElement>("main textarea")?.focus(), 50);
+            }}
+            onClose={() => {
+              setWelcome(false);
+              markSeen(WELCOMED_KEY);
+            }}
+          />
+        )}
+      </AnimatePresence>
+      {touring && design && (
+        <Tour
+          steps={createTour()}
+          onClose={() => {
+            setTouring(false);
+            markSeen(TOURED_KEY);
+          }}
+        />
+      )}
     </div>
   );
 }
