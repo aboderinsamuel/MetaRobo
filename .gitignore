@@ -16,3 +16,6 @@ engine/tests/*.exe
 
 # Local SQLite database for the backend
 *.db
+
+# Local editor / assistant settings
+.claude/
