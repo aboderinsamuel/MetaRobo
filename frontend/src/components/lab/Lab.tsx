@@ -8,7 +8,9 @@ import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppNav from "@/components/AppNav";
-import { ThemeToggle } from "@/components/create/ui";
+import { Segmented, ThemeToggle } from "@/components/create/ui";
+import { applyActions, assistContext, type AssistAction, type AssistResult } from "@/lib/lab/assist";
+import { MODEL_CHOICES, pickModel, type ModelChoice } from "@/lib/meta/models";
 import { designCost } from "@/lib/lab/advisor";
 import { checkSpecs, fmtNum, run, simConfig, specToPlant, toCtrl } from "@/lib/lab/analysis";
 import { arduinoCode, suggestSampleTime } from "@/lib/lab/codegen";
@@ -37,9 +39,9 @@ import { BodePlot, PoleMap, TimeChart } from "./charts";
 import { ChecksPanel, GeometryPanel, PartsPanel, RigPicker, WiringDiagram } from "./hwpanels";
 import { CoachPanel, FRIENDLY, ReportCard, SLOT_HELP, Tour, Welcome, report, tourSteps } from "./onboarding";
 import type { Mode } from "./onboarding";
-import type { ChatMsg } from "./panels";
+import type { AssistSnapshot, ChatMsg } from "./panels";
 import type { VideoTrackOptions } from "./VideoTrack";
-import { CodePanel, Copilot, DescribePanel, GhostButton, ModelCard, PIPELINE, SectionLabel, SpecStrip, TunerPanel, ValidatePanel, describeCtrl, diffCtrl } from "./panels";
+import { Assistant, CodePanel, DescribePanel, GhostButton, ModelCard, PIPELINE, SectionLabel, SpecStrip, TunerPanel, ValidatePanel, describeCtrl, diffCtrl } from "./panels";
 import EmptyStage from "./EmptyStage";
 import { MachineCoach, MachineReport, MachineScope } from "./MachineCoach";
 import { simulateMachine } from "@/lib/lab/actuation";
@@ -54,7 +56,7 @@ const HardwareView = dynamic(() => import("./HardwareView"), {
 
 type View = "hardware" | "scope" | "analysis" | "wiring" | "validate" | "code";
 type LeftTab = "hardware" | "control" | "describe";
-type RightTab = "checks" | "copilot";
+type RightTab = "checks" | "assistant";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Scenario {
@@ -101,6 +103,25 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
   const [selected, setSelected] = useState<SlotId | null>(null);
   const [dockOpen, setDockOpen] = useState(true);
   const [aiOn, setAiOn] = useState<boolean | null>(null);
+  // Which Meta model does the lab's AI work: Muse Spark (default) or Muse Wonder. Shared with Create.
+  const [llm, setLlm] = useState<ModelChoice>("muse-spark-1.3");
+  useEffect(() => {
+    let saved: ModelChoice = "muse-spark-1.3";
+    try {
+      saved = pickModel(localStorage.getItem("rc-design-model"), saved);
+    } catch {}
+    if (saved === "muse-spark-1.3") return;
+    const id = setTimeout(() => setLlm(saved), 0);
+    return () => clearTimeout(id);
+  }, []);
+  const chooseLlm = useCallback((m: ModelChoice) => {
+    setLlm(m);
+    try {
+      localStorage.setItem("rc-design-model", m);
+    } catch {}
+  }, []);
+  const llmName = MODEL_CHOICES.find((m) => m.id === llm)?.name ?? "Muse Spark";
+  const [simpleTab, setSimpleTab] = useState<"coach" | "assistant">("coach");
   // Today's Meta spend against the daily cap; bumped locally after each live call.
   const [spend, setSpend] = useState<{ usd: number; budgetUsd: number } | null>(null);
   const addSpend = useCallback((u?: CallUsage) => {
@@ -291,7 +312,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
         const res = await fetch("/api/lab/explain", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ model: eff, controller: c, history, question, offline: !live }),
+          body: JSON.stringify({ model: eff, controller: c, history, question, offline: !live, llm }),
         });
         const advice = (await res.json()) as Advice & { notice?: string; error?: string };
         if (!res.ok || advice.error) throw new Error(advice.error ?? `HTTP ${res.status}`);
@@ -308,7 +329,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
         return null;
       }
     },
-    [engine, scenario, iterations, addSpend],
+    [engine, scenario, iterations, addSpend, llm],
   );
 
   // ---- Loading a design ----------------------------------------------------------------------
@@ -378,15 +399,15 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
       // A description becomes the realistic design (shells, proportions, joints) with real hardware
       // inside, the same as Create. Measured step data still goes through the model-fitting path.
       if (!data) {
-        const req = fetch("/api/create", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: text }) });
+        const req = fetch("/api/create", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: text, model: llm }) });
         await sleep(400);
         setPipeline(1);
         const res = await req;
         const out = (await res.json()) as { design?: Design; usage?: CallUsage; error?: string };
-        if (!res.ok || !out.design) throw new Error(out.error ?? "Muse Spark didn't return a design. Try again.");
+        if (!res.ok || !out.design) throw new Error(out.error ?? `${llmName} didn't return a design. Try again.`);
         addSpend(out.usage);
         if (performance.now() - t0 < 900) await sleep(400);
-        await adoptDesign(sanitizeDesign(out.design, 1), `Muse Spark designed "${out.design.title}": the body as designed, with a real actuator on every joint and its controller, power and wiring inside (X-ray to see them). Click any part to edit or swap it, or press Simulate.`);
+        await adoptDesign(sanitizeDesign(out.design, 1), `${llmName} designed "${out.design.title}": the body as designed, with a real actuator on every joint and its controller, power and wiring inside (X-ray to see them). Click any part to edit or swap it, or press Simulate.`);
         return;
       }
       const res = fetch("/api/lab/model", {
@@ -423,7 +444,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
     } finally {
       setBusy(null);
     }
-  }, [text, data, engine, adopt, adoptDesign, addSpend, refreshSpend, userParts]);
+  }, [text, data, engine, adopt, adoptDesign, addSpend, refreshSpend, userParts, llm, llmName]);
 
   const loadRig = useCallback(
     async (kind: RigKind, prompt?: string) => {
@@ -581,6 +602,91 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
     [ctrl, dataModel, pushIteration],
   );
 
+  // ---- The assistant: ask the chosen model, or have it change the machine ------------------------
+  // Slots and sizes are editable on the demos and on designed machines with a drivetrain; other
+  // designed machines change by swapping their catalogue parts.
+  const slotsEditable = !!build && (!machine || aiRig);
+  /** Applies validated actions to the live machine; returns what changed and how to undo it. */
+  const applyNow = useCallback(
+    (actions: AssistAction[]) => {
+      const snap: AssistSnapshot = { build, machine, ctrl };
+      const r = applyActions(actions, { build, slots: slotsEditable, checks: allChecks, machine: slotsEditable ? null : machine, ctrl });
+      const note = r.done.join("; ");
+      if (r.build && build && JSON.stringify(r.build) !== JSON.stringify(build)) onBuild(r.build, `${llmName}: ${note}`);
+      if (r.machine && r.machine !== machine) editAssembly(r.machine);
+      if (r.ctrl && ctrl && JSON.stringify(r.ctrl) !== JSON.stringify(ctrl)) {
+        setCtrl(r.ctrl);
+        if (model) pushIteration(model, r.ctrl, `${llmName} gains`);
+      }
+      if (r.done.length) setValidation({ results: [], running: false });
+      return { done: r.done, skipped: r.skipped, snap: r.done.length ? snap : undefined };
+    },
+    [build, machine, ctrl, slotsEditable, allChecks, onBuild, editAssembly, model, pushIteration, llmName],
+  );
+  const assist = useCallback(
+    async (q: string) => {
+      if (!model) return;
+      setMessages((prev) => [...prev, { kind: "user", text: q }]);
+      setBusy("assist");
+      const context = assistContext({
+        title: machine?.title ?? model.title,
+        build,
+        slots: slotsEditable,
+        checks: allChecks,
+        machine: slotsEditable ? null : machine,
+        machineChecks: machineSim?.checks ?? [],
+        ctrl,
+        metrics: result ? { stable: result.analysis.metrics.stable === 1, overshootPct: result.analysis.metrics.overshootPct, settlingTime: result.analysis.metrics.settlingTime, riseTime: result.analysis.metrics.riseTime } : null,
+        specs: checks.map((c) => ({ label: c.label, pass: c.pass })),
+      });
+      const history = messages
+        .filter((m): m is Extract<ChatMsg, { kind: "user" | "assist" }> => m.kind === "user" || m.kind === "assist")
+        .slice(-6)
+        .map((m) => (m.kind === "user" ? { role: "user" as const, text: m.text } : { role: "assistant" as const, text: [m.reply, ...m.done].join(" ").slice(0, 1500) }));
+      try {
+        const res = await fetch("/api/lab/assist", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: q, context, history, model: llm }) });
+        const out = (await res.json()) as AssistResult & { usage?: CallUsage; error?: string };
+        if (!res.ok || out.error) throw new Error(out.error ?? `HTTP ${res.status}`);
+        addSpend(out.usage);
+        const now = out.mode === "applied" && out.actions.length ? applyNow(out.actions) : { done: [], skipped: [], snap: undefined };
+        setMessages((prev) => [
+          ...prev,
+          { kind: "assist", reply: out.reply, mode: out.mode, done: now.done, skipped: now.skipped, snap: now.snap, suggestions: out.mode === "suggested" ? out.actions : [], applied: [], model: llmName, usage: out.usage },
+        ]);
+      } catch (err) {
+        setMessages((prev) => [...prev, { kind: "event", text: `${llmName} couldn't answer: ${err instanceof Error ? err.message : String(err)}` }]);
+        refreshSpend();
+      } finally {
+        setBusy(null);
+      }
+    },
+    [model, machine, build, slotsEditable, allChecks, machineSim, ctrl, result, checks, messages, llm, llmName, addSpend, applyNow, refreshSpend],
+  );
+  const undoAssist = useCallback(
+    (i: number) => {
+      const m = messages[i];
+      if (m?.kind !== "assist" || !m.snap || m.undone) return;
+      const { snap } = m;
+      if (snap.build && build && JSON.stringify(snap.build) !== JSON.stringify(build)) onBuild(snap.build, `undid ${llmName}'s change`);
+      if (snap.machine && snap.machine !== machine) editAssembly(snap.machine);
+      if (snap.ctrl && ctrl && JSON.stringify(snap.ctrl) !== JSON.stringify(ctrl)) setCtrl(snap.ctrl);
+      setMessages((prev) => prev.map((x, k) => (k === i && x.kind === "assist" ? { ...x, undone: true } : x)));
+    },
+    [messages, build, machine, ctrl, onBuild, editAssembly, llmName],
+  );
+  const applySuggestion = useCallback(
+    (i: number, j: number) => {
+      const m = messages[i];
+      if (m?.kind !== "assist" || !m.suggestions[j] || m.applied.includes(j)) return;
+      const now = applyNow([m.suggestions[j]]);
+      setMessages((prev) => [
+        ...prev.map((x, k) => (k === i && x.kind === "assist" ? { ...x, applied: [...x.applied, j] } : x)),
+        { kind: "assist", reply: now.done.length ? "Applied." : "That change couldn't be applied.", mode: "applied", done: now.done, skipped: now.skipped, snap: now.snap, suggestions: [], applied: [], model: llmName },
+      ]);
+    },
+    [messages, applyNow, llmName],
+  );
+
   // ---- Iterating -----------------------------------------------------------------------------
   const apply = useCallback(
     (c: ControllerSpec, label: string) => {
@@ -613,7 +719,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
   const tune = useCallback(async () => {
     if (!model || !ctrl || !effModel) return;
     setBusy("tune");
-    if (mode === "pro") setRightTab("copilot");
+    if (mode === "pro") setRightTab("assistant");
     setMessages((prev) => [...prev, { kind: "event", text: "auto-tuning with the simulator in the loop…" }]);
     try {
       const tuned = await tuneAsync(effModel, ctrl);
@@ -734,6 +840,30 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
   ];
   const ready = !!(model && ctrl && result && effModel && hw && tel && prun && ptel);
   const issues = allChecks.filter((c) => c.level === "error" || c.level === "warn").length;
+  const assistantPanel = (isSimple: boolean) => (
+    <Assistant
+      messages={messages}
+      iterations={iterations}
+      current={ctrl}
+      busy={busy}
+      ready={!!model}
+      specOk={specOk}
+      aiOn={!!aiOn}
+      modelName={llmName}
+      simple={isSimple}
+      onAsk={(q) => void ask(q)}
+      onAssist={(q) => void assist(q)}
+      onUndo={undoAssist}
+      onApplySuggestion={applySuggestion}
+      onApply={apply}
+      onAuto={() => void autoIterate()}
+      onTune={() => void tune()}
+      onRestore={(it) => {
+        setCtrl(it.controller);
+        setSimKey((k) => k + 1);
+      }}
+    />
+  );
 
   const outputSeries = ready
     ? [
@@ -779,6 +909,15 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
               </button>
             ))}
           </div>
+          {aiOn && (
+            <Segmented
+              size="sm"
+              className="hidden md:inline-flex"
+              value={llm}
+              onChange={chooseLlm}
+              options={MODEL_CHOICES.map((m) => ({ id: m.id, label: m.name, title: `${m.name} designs, explains and changes your machine` }))}
+            />
+          )}
           <button onClick={() => setTouring(true)} className="flex size-8 items-center justify-center rounded-xl text-mute hover:bg-surface-2 hover:text-fg" aria-label="Show me around" title="Show me around">
             <CircleHelp className="size-4" />
           </button>
@@ -900,7 +1039,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
                     </GhostButton>
                     <GhostButton
                       onClick={() => {
-                        setRightTab("copilot");
+                        setRightTab("assistant");
                         void autoIterate();
                       }}
                       disabled={!!busy}
@@ -915,6 +1054,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
             )}
             {leftTab === "describe" && (
               <DescribePanel
+              modelName={llmName}
                 text={text}
                 setText={setText}
                 onBuild={() => void buildFromText()}
@@ -1137,8 +1277,16 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
         <aside data-tour="coach" className="flex min-h-[560px] flex-col overflow-hidden rounded-3xl bg-surface shadow-[0_0_0_1px_var(--color-line)] lg:min-h-0">
           {simple ? (
             <>
-              <SectionLabel>Robo · your coach</SectionLabel>
-              <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
+              <Tabs
+                value={simpleTab}
+                onChange={setSimpleTab}
+                items={[
+                  { id: "coach", label: "Robo · coach", icon: ShieldCheck },
+                  { id: "assistant", label: `Ask ${llmName}`, icon: MessageSquare },
+                ]}
+                layoutId="right-tab-simple"
+              />
+              <div className={`min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] ${simpleTab === "coach" ? "" : "hidden"}`}>
                 {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} />}
                 {hw && aiRig && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={locateSlot} />}
                 {hw && !machine && (
@@ -1154,6 +1302,9 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
                   />
                 )}
               </div>
+              <div className={`flex min-h-0 flex-1 flex-col ${simpleTab === "assistant" ? "" : "hidden"}`}>
+                {assistantPanel(true)}
+              </div>
             </>
           ) : (
           <>
@@ -1162,7 +1313,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
             onChange={setRightTab}
             items={[
               { id: "checks", label: `Design checks${(machineSim ? machineSim.checks.filter((c) => c.level === "error" || c.level === "warn").length : issues) ? ` · ${machineSim ? machineSim.checks.filter((c) => c.level === "error" || c.level === "warn").length : issues}` : ""}`, icon: ShieldCheck },
-              { id: "copilot", label: "Copilot", icon: MessageSquare },
+              { id: "assistant", label: `Ask ${llmName}`, icon: MessageSquare },
             ]}
             layoutId="right-tab"
           />
@@ -1170,25 +1321,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
             {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} />}
             {hw && (!machine || aiRig) && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={(s) => { setSelected(s); setView("hardware"); }} />}
           </div>
-          <div className={`flex min-h-0 flex-1 flex-col ${rightTab === "copilot" ? "" : "hidden"}`}>
-            <Copilot
-              messages={messages}
-              iterations={iterations}
-              current={ctrl}
-              busy={busy}
-              ready={!!model}
-              specOk={specOk}
-              aiOn={!!aiOn}
-              onAsk={(q) => void ask(q)}
-              onApply={apply}
-              onAuto={() => void autoIterate()}
-              onTune={() => void tune()}
-              onRestore={(it) => {
-                setCtrl(it.controller);
-                setSimKey((k) => k + 1);
-              }}
-            />
-          </div>
+          <div className={`flex min-h-0 flex-1 flex-col ${rightTab === "assistant" ? "" : "hidden"}`}>{assistantPanel(false)}</div>
           </>
           )}
         </aside>
