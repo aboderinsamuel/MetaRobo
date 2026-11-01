@@ -251,6 +251,13 @@ export default function Workspace({ initial, example }: { initial?: Design; exam
   // Which Meta model designs and revises robots: Muse Spark by default, or Muse Wonder. Kept per browser.
   const [designModel, setDesignModel] = useState<ModelChoice>("muse-spark-1.3");
   useEffect(() => {
+    if (initial || example) return;
+    const saved = loadProjects()[0];
+    if (!saved) return;
+    const id = requestAnimationFrame(() => setProject(saved));
+    return () => cancelAnimationFrame(id);
+  }, [initial, example]);
+  useEffect(() => {
     let saved: ModelChoice = "muse-spark-1.3";
     try {
       saved = pickModel(localStorage.getItem(MODEL_KEY), saved);

@@ -2,7 +2,7 @@
 
 // Coach panel, report card and live scope for AI-designed machines. Everything here comes from the
 // machine's own parts and per-actuator simulation, never from the preset robots' scaffold.
-import { Activity, AlertTriangle, CheckCircle2, ChevronDown, Info, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, ChevronDown, Info, Sparkles, XCircle } from "lucide-react";
 import { useState } from "react";
 import type { MachineCheck, MachineSim } from "@/lib/lab/actuation";
 import { behaviourIndex, type BehaviourSim } from "@/lib/lab/behaviour";
@@ -35,7 +35,7 @@ function areas(checks: MachineCheck[]) {
   ] as const;
 }
 
-export function MachineCoach({ assembly, sim, onSelect }: { assembly: Assembly; sim: MachineSim; onSelect: (id: string) => void }) {
+export function MachineCoach({ assembly, sim, onSelect, onFix }: { assembly: Assembly; sim: MachineSim; onSelect: (id: string) => void; onFix?: (check: MachineCheck) => void }) {
   const errors = sim.checks.filter((c) => c.level === "error");
   const warns = sim.checks.filter((c) => c.level === "warn");
   const runtime = sim.checks.find((c) => c.id === "runtime");
@@ -71,6 +71,11 @@ export function MachineCoach({ assembly, sim, onSelect }: { assembly: Assembly; 
                 <span className="text-fg">{c.title}</span>
               </button>
               <p className="pl-5 leading-snug text-dim">{c.detail}</p>
+              {c.level !== "pass" && onFix && (
+                <button onClick={() => onFix(c)} className="ml-5 mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-line-2 px-2 py-1 text-[11px] text-fg hover:bg-surface-2">
+                  <Sparkles className="size-3" /> Ask Robo Copilot to fix
+                </button>
+              )}
             </li>
           );
         })}

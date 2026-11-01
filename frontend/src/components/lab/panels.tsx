@@ -120,6 +120,7 @@ export function DescribePanel({
   userParts,
   onUserParts,
   modelName = "Muse Spark",
+  promptHistory = [],
 }: {
   text: string;
   setText: (s: string) => void;
@@ -138,6 +139,7 @@ export function DescribePanel({
   onUserParts: (p: CatalogPart[]) => void;
   /** The Meta model chosen in the top bar. */
   modelName?: string;
+  promptHistory?: string[];
 }) {
   const [clip, setClip] = useState<File | null>(null);
   const [clipError, setClipError] = useState<string | null>(null);
@@ -154,8 +156,16 @@ export function DescribePanel({
   return (
     <div>
       <SectionLabel right={<MetaMeter aiOn={aiOn} spend={spend} modelName={modelName} />}>
-        01 · Describe the system
+        01 · Modeler · {modelName}
       </SectionLabel>
+      {promptHistory.length > 0 && (
+        <div className="border-b border-line px-4 pb-3">
+          <p className="mono-label mb-1.5 text-[9px] text-dim">Prompt history</p>
+          <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:thin]">
+            {promptHistory.slice(-6).map((prompt, i) => <span key={`${prompt}-${i}`} title={prompt} className="max-w-[220px] shrink-0 truncate rounded-lg bg-surface-2 px-2 py-1 text-[11px] text-mute">{prompt}</span>)}
+          </div>
+        </div>
+      )}
       <div
         className={`p-4 transition-colors ${drag ? "bg-panel-2" : ""}`}
         onDragOver={(e) => {
@@ -281,7 +291,7 @@ export function DescribePanel({
                       p.who === "meta" && aiOn ? "text-spectrum" : "text-mute"
                     }`}
                   >
-                    {p.who === "engine" ? "PlantSim" : aiOn ? "Muse Spark" : "Library"}
+                    {p.who === "engine" ? "PlantSim" : aiOn ? modelName : "Physics library"}
                   </span>
                 </li>
               ))}
@@ -615,7 +625,7 @@ export function Assistant({
   }, [messages.length]);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <SectionLabel right={busy && <Loader2 className="size-3.5 animate-spin text-mute" />}>Ask {modelName}</SectionLabel>
+      <SectionLabel right={busy && <Loader2 className="size-3.5 animate-spin text-mute" />}>Robo Copilot · {modelName}</SectionLabel>
       {!simple && iterations.length > 0 && (
         <div className="flex gap-1.5 overflow-x-auto border-b border-line px-4 py-2.5 [scrollbar-width:none]">
           {iterations.map((it) => {
@@ -644,7 +654,7 @@ export function Assistant({
         {!messages.some((m) => m.kind === "user" || m.kind === "assist") && (
           <div className="space-y-2 text-[13px] leading-relaxed text-mute">
             <p>
-              Ask about this machine, or tell {modelName} what to change. It sees every part, check and number in the lab, makes the change for you, and the
+              Ask Robo Copilot about this machine, or tell it what to change. It sees every part, check and number in the lab, makes the change for you, and the
               simulation re-checks it.
             </p>
             {ready && aiOn && (

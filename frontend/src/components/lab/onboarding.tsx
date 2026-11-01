@@ -71,7 +71,7 @@ export function Welcome({ onDone, onClose }: { onDone: (mode: Mode, pick: RigKin
         <AnimatePresence mode="wait">
           {step === 0 ? (
             <motion.div key="who" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} className="mt-6">
-              <p className="text-[14px] text-mute">You pick a machine, choose its parts and press Simulate to watch it move. If something won&apos;t work, I&apos;ll tell you why and how to fix it. First, who are you?</p>
+              <p className="text-[14px] text-mute">You pick a machine, choose its parts and press Simulate to watch it move. Muse Spark and Muse Wonder are the model choices in the top bar; Robo Copilot is the helper that explains, edits and repairs the live lab. If something won&apos;t work, it will tell you why and how to fix it. First, who are you?</p>
               <div className="mt-5 grid gap-2.5">
                 {PERSONAS.map((p) => (
                   <button
@@ -119,7 +119,7 @@ export function Welcome({ onDone, onClose }: { onDone: (mode: Mode, pick: RigKin
                 <button onClick={() => setStep(0)} className="mono-label flex items-center gap-1.5 text-[10px] text-dim hover:text-fg">
                   <ArrowLeft className="size-3" /> Back
                 </button>
-                <span className="text-[11.5px] text-dim">You can switch between Simple and Pro any time.</span>
+                <span className="text-[11.5px] text-dim">You can switch between Simple and Pro any time. Your work is saved in this browser.</span>
               </div>
             </motion.div>
           )}
@@ -148,12 +148,12 @@ export function tourSteps(mode: Mode, kind: RigKind): TourStep[] {
     {
       target: "parts",
       title: "Change the parts",
-      body: mode === "simple" ? "Swap motors and batteries, or change the size and the load. The robot updates instantly." : "Swap parts, change dimensions, and tune the controller in the Control tab.",
+      body: mode === "simple" ? "Swap motors and batteries, or change the size and the load. The robot updates instantly. Edit, Task and Agent are also available beside the workspace." : "Swap parts, change dimensions, and use the Edit, Task, Engineer and Agent panels for live changes without leaving the lab.",
     },
     {
       target: "coach",
       title: mode === "simple" ? "Robo checks your design" : "Design checks",
-      body: mode === "simple" ? "If a part is too weak or a battery too big, I'll say so in plain words and fix it in one click. 'Make it better' tunes the robot for you." : "Electrical and mechanical rules with one-click fixes, plus the copilot that explains the response.",
+      body: mode === "simple" ? "If a part is too weak or a battery too big, I'll say so in plain words and fix it in one click. Hardware warnings also have an 'Ask Robo Copilot to fix' action." : "Electrical and mechanical rules with one-click fixes, plus Robo Copilot, the clearly named helper that explains, suggests and applies repairs.",
     },
     {
       target: "mode",

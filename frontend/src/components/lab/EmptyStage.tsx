@@ -8,6 +8,7 @@ import { AlertTriangle, Bot, Loader2, PenLine, RefreshCw } from "lucide-react";
 export default function EmptyStage({
   busy,
   step,
+  modelName,
   error,
   onRetry,
   onDescribe,
@@ -15,6 +16,7 @@ export default function EmptyStage({
 }: {
   busy: boolean;
   step: string | null;
+  modelName: string;
   /** Why the last build failed; shown with a retry instead of loading anything else. */
   error?: string | null;
   onRetry?: () => void;
@@ -36,7 +38,7 @@ export default function EmptyStage({
             <>
               <Loader2 className="mx-auto size-6 animate-spin text-spec-2" />
               <p className="mt-4 text-[15px] font-medium">{step ?? "Working…"}</p>
-              <p className="mt-1 text-[12px] text-mute">Muse Spark is engineering your machine: physics first, then every part. This takes about a minute.</p>
+              <p className="mt-1 text-[12px] text-mute">{modelName} is engineering your machine: physics first, then every part. This takes about a minute.</p>
             </>
           ) : error ? (
             <>
@@ -57,8 +59,8 @@ export default function EmptyStage({
           ) : (
             <>
               <p className="mono-label text-[10px] text-dim">Empty workspace</p>
-              <p className="mt-3 text-[18px] leading-snug font-semibold tracking-tight">Describe a machine and Muse Spark will engineer it here.</p>
-              <p className="mt-2 text-[13px] text-mute">Every part is real and editable. Simulate it, change it, test it again.</p>
+              <p className="mt-3 text-[18px] leading-snug font-semibold tracking-tight">Describe a machine and {modelName} will engineer it here.</p>
+              <p className="mt-2 text-[13px] text-mute">Every part is real and editable. Simulate it, change it, test it again with Robo Copilot.</p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
                 <button onClick={onDemos} className="inline-flex h-9 items-center gap-2 rounded-md border border-line-2 px-4 text-[13px] text-mute hover:text-fg">
                   <Bot className="size-3.5" /> Demo robots

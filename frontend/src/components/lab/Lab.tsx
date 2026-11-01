@@ -55,8 +55,9 @@ const HardwareView = dynamic(() => import("./HardwareView"), {
 });
 
 type View = "hardware" | "scope" | "analysis" | "wiring" | "validate" | "code";
-type LeftTab = "hardware" | "control" | "describe";
+type LeftTab = "hardware" | "control" | "describe" | "edit" | "task" | "engineer" | "agent";
 type RightTab = "checks" | "assistant";
+const LAB_STATE_KEY = "rc-control-lab-state";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Scenario {
@@ -95,6 +96,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
   const [scenario, setScenario] = useState<Scenario>({ disturbance: true, noise: false, limits: true });
   const [iterations, setIterations] = useState<Iteration[]>([]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [promptHistory, setPromptHistory] = useState<string[]>([]);
   const [pipeline, setPipeline] = useState(-1);
   const [busy, setBusy] = useState<string | null>(null);
   const [view, setView] = useState<View>("hardware");
@@ -172,6 +174,38 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
     return () => cancelAnimationFrame(id);
   }, [onboard, fromCreate]);
   const iterSeq = useRef(0);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (fromCreate || initialPreset) {
+      setHydrated(true);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(LAB_STATE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { text?: string; build?: HardwareBuild | null; dataModel?: LabModel | null; ctrl?: ControllerSpec | null; messages?: ChatMsg[]; iterations?: Iteration[]; promptHistory?: string[] };
+      if (saved.text) setText(saved.text);
+      if (saved.build) setBuild(saved.build);
+      if (saved.dataModel) setDataModel(saved.dataModel);
+      if (saved.ctrl) setCtrl(saved.ctrl);
+      if (saved.messages) setMessages(saved.messages);
+      if (saved.iterations) setIterations(saved.iterations);
+      if (saved.promptHistory) setPromptHistory(saved.promptHistory);
+    } catch {
+      localStorage.removeItem(LAB_STATE_KEY);
+    }
+    setHydrated(true);
+  }, [fromCreate, initialPreset]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(LAB_STATE_KEY, JSON.stringify({ text, build, dataModel, ctrl, messages, iterations, promptHistory }));
+    } catch {
+      setNotice("Your lab is open, but this browser could not save the latest state.");
+    }
+  }, [hydrated, text, build, dataModel, ctrl, messages, iterations, promptHistory]);
 
   useEffect(() => {
     fetch("/api/lab/status")
@@ -391,6 +425,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
 
   const buildFromText = useCallback(async () => {
     if (!text.trim()) return;
+    setPromptHistory((history) => [...history.filter((p) => p !== text.trim()), text.trim()]);
     setBuildError(null);
     setBusy("model");
     setPipeline(0);
@@ -449,7 +484,10 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
   const loadRig = useCallback(
     async (kind: RigKind, prompt?: string) => {
       setBusy("model");
-      if (prompt) setText(prompt);
+      if (prompt) {
+        setText(prompt);
+        setPromptHistory((history) => [...history.filter((p) => p !== prompt), prompt]);
+      }
       setData(null);
       setPipeline(0);
       await sleep(300);
@@ -573,6 +611,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
       const h = takeHandoff();
       if (h) {
         setText(h.prompts.join("\n"));
+        setPromptHistory(h.prompts);
         void adoptDesign(sanitizeDesign(h.design, h.design.version ?? 1), `"${h.title}" from your Create project: the body exactly as designed, with real hardware inside (X-ray to see it).`);
         return;
       }
@@ -864,6 +903,10 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
       }}
     />
   );
+  const askToFixMachineCheck = (check: { title: string; detail: string }) => {
+    setRightTab("assistant");
+    void assist(`Fix this hardware issue: ${check.title}. ${check.detail}`);
+  };
 
   const outputSeries = ready
     ? [
@@ -909,15 +952,13 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
               </button>
             ))}
           </div>
-          {aiOn && (
-            <Segmented
-              size="sm"
-              className="hidden md:inline-flex"
-              value={llm}
-              onChange={chooseLlm}
-              options={MODEL_CHOICES.map((m) => ({ id: m.id, label: m.name, title: `${m.name} designs, explains and changes your machine` }))}
-            />
-          )}
+          <Segmented
+            size="sm"
+            className="inline-flex"
+            value={llm}
+            onChange={chooseLlm}
+            options={MODEL_CHOICES.map((m) => ({ id: m.id, label: m.name, title: `${m.name} designs, explains and changes your machine` }))}
+          />
           <button onClick={() => setTouring(true)} className="flex size-8 items-center justify-center rounded-xl text-mute hover:bg-surface-2 hover:text-fg" aria-label="Show me around" title="Show me around">
             <CircleHelp className="size-4" />
           </button>
@@ -946,22 +987,53 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
                 ? [
                     { id: "hardware", label: machine ? "Parts" : "Demos", icon: Cpu },
                     { id: "describe", label: "Describe", icon: PenLine },
+                    { id: "edit", label: "Edit", icon: PenLine },
+                    { id: "task", label: "Task", icon: Activity },
+                    { id: "agent", label: "Agent", icon: MessageSquare },
                   ]
                 : [
                     { id: "hardware", label: machine ? "Parts" : "Demos", icon: Cpu },
                     { id: "control", label: "Control", icon: SlidersHorizontal },
                     { id: "describe", label: "Describe", icon: PenLine },
+                    { id: "edit", label: "Edit", icon: PenLine },
+                    { id: "task", label: "Task", icon: Activity },
+                    { id: "engineer", label: "Engineer", icon: Cpu },
+                    { id: "agent", label: "Agent", icon: MessageSquare },
                   ]
             }
             layoutId="left-tab"
           />
           <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
+            {leftTab === "edit" && machine && (
+              <MachinePanel assembly={machine} selected={selectedPart} onSelect={setSelectedPart} onChange={editAssembly} canUndo={undoStack.length > 0} onUndo={undo} onUpdatePhysics={() => void rederivePhysics()} busy={!!busy} aiOn={!!aiOn} review={model?.review} />
+            )}
+            {leftTab === "task" && (
+              <div>
+                <SectionLabel>Task & test conditions</SectionLabel>
+                <ScenarioToggles scenario={scenario} setScenario={setScenario} model={model} />
+                <div className="border-t border-line p-4">
+                  <GhostButton onClick={() => { setView("hardware"); setSimKey((k) => k + 1); }} disabled={!ready}>
+                    <Activity className="size-3.5" /> Simulate again
+                  </GhostButton>
+                </div>
+              </div>
+            )}
+            {leftTab === "engineer" && (
+              <div className="space-y-2 p-4">
+                <SectionLabel>Engineer live</SectionLabel>
+                <p className="text-[12px] leading-relaxed text-mute">Tune, validate, and repair the current machine without leaving the lab.</p>
+                <GhostButton className="w-full justify-center" onClick={() => void autoIterate()} disabled={!ready || !!busy}><SlidersHorizontal className="size-3.5" /> Auto-tune controller</GhostButton>
+                <GhostButton className="w-full justify-center" onClick={() => void runValidation()} disabled={!ready || validation.running}><ShieldCheck className="size-3.5" /> Run validation</GhostButton>
+                <GhostButton className="w-full justify-center" onClick={() => { setRightTab("assistant"); setLeftTab("agent"); }} disabled={!model}><MessageSquare className="size-3.5" /> Open repair copilot</GhostButton>
+              </div>
+            )}
+            {leftTab === "agent" && <div className="h-full min-h-[420px]">{assistantPanel(simple)}</div>}
             {(leftTab === "hardware" || (simple && leftTab === "control")) && machine && (
               <>
                 {notice && <p className="border-b border-line bg-panel/60 px-4 py-2.5 text-[11.5px] leading-relaxed text-mute">{notice}</p>}
                 {aiRig && hw && (
                   <>
-                    <SectionLabel>{simple ? "Drivetrain · what makes it move" : "Drivetrain · chosen by Muse Spark"}</SectionLabel>
+                    <SectionLabel>{simple ? "Drivetrain · what makes it move" : `Drivetrain · chosen by ${llmName}`}</SectionLabel>
                     <PartsPanel hw={hw} checks={allChecks} selected={selected} onSelect={locateSlot} onBuild={onBuild} help={simple ? SLOT_HELP : undefined} />
                     <GeometryPanel hw={hw} onBuild={onBuild} groups={simple ? ["Mission", "Mass & payload"] : undefined} />
                     <SectionLabel>Every part</SectionLabel>
@@ -1054,7 +1126,8 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
             )}
             {leftTab === "describe" && (
               <DescribePanel
-              modelName={llmName}
+                modelName={llmName}
+                promptHistory={promptHistory}
                 text={text}
                 setText={setText}
                 onBuild={() => void buildFromText()}
@@ -1094,6 +1167,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
             <EmptyStage
               busy={!!busy}
               step={pipeline >= 0 ? (PIPELINE[pipeline]?.label ?? null) : null}
+              modelName={llmName}
               error={buildError}
               onRetry={text.trim() ? () => void buildFromText() : undefined}
               onDescribe={() => setLeftTab("describe")}
@@ -1287,7 +1361,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
                 layoutId="right-tab-simple"
               />
               <div className={`min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] ${simpleTab === "coach" ? "" : "hidden"}`}>
-                {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} />}
+                {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} onFix={askToFixMachineCheck} />}
                 {hw && aiRig && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={locateSlot} />}
                 {hw && !machine && (
                   <CoachPanel
@@ -1318,7 +1392,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
             layoutId="right-tab"
           />
           <div className={`min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] ${rightTab === "checks" ? "" : "hidden"}`}>
-            {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} />}
+            {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} onFix={askToFixMachineCheck} />}
             {hw && (!machine || aiRig) && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={(s) => { setSelected(s); setView("hardware"); }} />}
           </div>
           <div className={`flex min-h-0 flex-1 flex-col ${rightTab === "assistant" ? "" : "hidden"}`}>{assistantPanel(false)}</div>
