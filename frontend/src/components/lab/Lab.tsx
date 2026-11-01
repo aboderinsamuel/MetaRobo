@@ -709,7 +709,12 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
   );
   const assist = useCallback(
     async (q: string) => {
-      if (!model) return;
+      if (!model) {
+        setNotice("Build or load a machine first, then Robo Copilot can diagnose and fix it.");
+        setSimpleTab("assistant");
+        setRightTab("assistant");
+        return;
+      }
       setMessages((prev) => [...prev, { kind: "user", text: q }]);
       setBusy("assist");
       const context = assistContext({
@@ -949,6 +954,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
     />
   );
   const askToFixMachineCheck = (check: { id: string; title: string; detail: string; part?: string }) => {
+    setSimpleTab("assistant");
     setRightTab("assistant");
     void assist(
       `Diagnose and fix hardware check "${check.id}"${check.part ? ` (affected part id: ${check.part})` : ""} now: ${check.title}. ${check.detail} Use a valid catalogue change when one can solve it; otherwise give the smallest concrete redesign recommendation with the measurement and why.`,

@@ -66,13 +66,13 @@ export function MachineCoach({ assembly, sim, onSelect, onFix }: { assembly: Ass
           const Icon = ICON[c.level];
           return (
             <li key={c.id} className="text-[12px]">
-              <button disabled={!c.part} onClick={() => c.part && onSelect(c.part)} className={`flex items-start gap-1.5 text-left ${CLS[c.level]} ${c.part ? "hover:underline" : ""}`}>
+              <button disabled={!c.part} onClick={() => c.part && onSelect(c.part)} className={`flex items-start gap-1.5 text-left ${CLS[c.level]} ${c.part ? "cursor-pointer hover:underline" : "cursor-default"}`}>
                 <Icon className="mt-0.5 size-3.5 shrink-0" />
                 <span className="text-fg">{c.title}</span>
               </button>
               <p className="pl-5 leading-snug text-dim">{c.detail}</p>
               {c.level !== "pass" && onFix && (
-                <button onClick={() => onFix(c)} className="ml-5 mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-line-2 px-2 py-1 text-[11px] text-fg hover:bg-surface-2">
+                <button type="button" onClick={() => onFix(c)} className="ml-5 mt-1.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line-2 px-2 py-1 text-[11px] text-fg hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
                   <Sparkles className="size-3" /> Diagnose & fix with Robo Copilot
                 </button>
               )}
