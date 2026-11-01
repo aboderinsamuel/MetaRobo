@@ -143,8 +143,9 @@ export default function Hero() {
               </span>
             </motion.span>
           </h1>
-          <motion.p className="mx-auto mt-7 max-w-2xl text-[clamp(1rem,1.5vw,1.2rem)] leading-relaxed text-mute" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.7 }}>
-            Say what you want to build. Meta&apos;s Muse Spark designs it from real, buyable parts, our physics engine simulates it, and you get the wiring, firmware and parts list. Before you buy a single motor.
+          <motion.p className="mx-auto mt-7 max-w-2xl text-[clamp(1rem,1.5vw,1.2rem)] leading-relaxed text-balance text-mute" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.7 }}>
+            Type it, say it or film it. Meta&apos;s Muse models design the machine from real, buyable parts, physics puts it through the job, and you leave with the parts list, the wiring and the firmware.
+            <span className="mt-2 block text-fg">All before you buy a single motor.</span>
           </motion.p>
           <motion.div className="mt-9 flex flex-wrap items-center justify-center gap-3" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65, duration: 0.7 }}>
             <Link href="/create" className="group inline-flex h-12 items-center gap-2 rounded-2xl bg-fg px-6 text-[15px] font-semibold text-void shadow-[0_12px_40px_-12px_rgb(0_130_251/0.55)] transition-transform hover:-translate-y-0.5">
@@ -164,7 +165,7 @@ export default function Hero() {
         <div className="mx-auto mt-14 flex max-w-[1120px] flex-col items-center gap-6 sm:mt-16">
           <p className="mono-label text-dim">Built with</p>
           <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-[15px] font-medium text-mute">
-            {["Meta Muse Spark", "Muse Image", "SAM 3.1", "C++ → WebAssembly", "Rapier physics"].map((t) => (
+            {["Meta Muse Spark", "Muse Wonder", "SAM 3.1", "Muse Image", "C++ → WebAssembly", "Rapier physics"].map((t) => (
               <li key={t} className="whitespace-nowrap">
                 {t}
               </li>

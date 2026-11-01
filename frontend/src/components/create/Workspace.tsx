@@ -4,10 +4,10 @@
 // designs it; the canvas shows it in 3D and plays its physically simulated task; the side panel
 // changes it in plain words, edits parts directly, walks the task, and reports the engineering.
 // Every change is a version you can step back and forward through; projects save in the browser.
-import { ArrowRight, Box, Boxes, ChevronLeft, ChevronRight, CircleHelp, Copy, Cpu, FlaskConical, FolderOpen, ListChecks, Loader2, PanelLeftClose, PanelLeftOpen, PenLine, Plus, RotateCcw, ScanEye, SlidersHorizontal, Trash2, Video } from "lucide-react";
+import { ArrowRight, Bot, Box, Boxes, ChevronLeft, ChevronRight, CircleHelp, Copy, Cpu, FlaskConical, FolderOpen, ListChecks, Loader2, PanelLeftClose, PanelLeftOpen, PenLine, Plus, RotateCcw, ScanEye, SlidersHorizontal, Trash2, Video } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
 import { Tour } from "@/components/lab/onboarding";
@@ -18,7 +18,9 @@ import { usePlayback } from "@/lib/create/playback";
 import { deleteProject, loadProjects, newProjectId, saveProject, type Project } from "@/lib/create/projects";
 import { useSimulation } from "@/lib/create/useSimulation";
 import type { CallUsage } from "@/lib/lab/types";
+import { MODEL_CHOICES, pickModel, type ModelChoice } from "@/lib/meta/models";
 import { useTheme } from "@/lib/theme";
+import AgentPanel from "./AgentPanel";
 import EngineeringPanel from "./EngineeringPanel";
 import { Inspector, PromptBox, TaskPanel } from "./panels";
 import Timeline from "./Timeline";
@@ -38,7 +40,7 @@ const EXAMPLES = [
 
 const STAGES = ["Reading your request", "Designing the body and joints", "Choosing actuators and materials", "Building the environment", "Planning the task"];
 
-type Tab = "prompt" | "edit" | "task" | "engineer" | "video";
+type Tab = "prompt" | "edit" | "task" | "engineer" | "agent" | "video";
 
 function freshProject(design: Design, prompt: string): Project {
   const at = Date.now();
@@ -57,14 +59,22 @@ function useStatus() {
   return [status, refresh] as const;
 }
 
-function Generating({ startedAt, change }: { startedAt: number; change: boolean }) {
+// Measured design times (one design, the server not busy with others): Muse Spark ≈ 35 s, Muse
+// Wonder ≈ 50 s. The stages pace themselves to that.
+const TYPICAL: Record<string, { s: number; hint: string }> = {
+  "muse-spark-1.3": { s: 35, hint: "usually 30–60 s" },
+  "muse-wonder-1.0": { s: 50, hint: "usually 45–90 s" },
+};
+
+function Generating({ startedAt, change, model }: { startedAt: number; change: boolean; model: string }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(id);
   }, []);
   const s = (now - startedAt) / 1000;
-  const stage = change ? Math.min(2, Math.floor(s / 12)) : Math.min(STAGES.length - 1, Math.floor(s / 14));
+  const typical = TYPICAL[model] ?? TYPICAL["muse-spark-1.3"];
+  const stage = change ? Math.min(2, Math.floor(s / (typical.s / 3))) : Math.min(STAGES.length - 1, Math.floor(s / (typical.s / STAGES.length)));
   const stages = change ? ["Reading your change", "Revising the design", "Checking it still fits together"] : STAGES;
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-20 flex items-center justify-center bg-canvas/60 backdrop-blur-sm">
@@ -76,7 +86,7 @@ function Generating({ startedAt, change }: { startedAt: number; change: boolean 
           </span>
           <div>
             <p className="text-[15px] font-semibold">{change ? "Changing" : "Designing"} your robot</p>
-            <p className="text-[12.5px] text-mute tabular-nums">{Math.floor(s)} s · usually 40–120 s</p>
+            <p className="text-[12.5px] text-mute tabular-nums">{MODEL_CHOICES.find((m) => m.id === model)?.name} · {Math.floor(s)} s · {typical.hint}</p>
           </div>
         </div>
         <ol className="mt-5 space-y-2.5">
@@ -221,7 +231,9 @@ function History({ project, onOpen }: { project: Project; onOpen: (i: number) =>
   );
 }
 
-export default function Workspace({ initial }: { initial?: Design }) {
+const MODEL_KEY = "rc-design-model";
+
+export default function Workspace({ initial, example }: { initial?: Design; example?: string }) {
   const theme = useTheme();
   const router = useRouter();
   const [status, refreshStatus] = useStatus();
@@ -236,13 +248,31 @@ export default function Workspace({ initial }: { initial?: Design }) {
   const [runKey, setRunKey] = useState(0);
   const [welcome, setWelcome] = useState(false);
   const [touring, setTouring] = useState(false);
+  // Which Meta model designs and revises robots: Muse Spark by default, or Muse Wonder. Kept per browser.
+  const [designModel, setDesignModel] = useState<ModelChoice>("muse-spark-1.3");
+  useEffect(() => {
+    let saved: ModelChoice = "muse-spark-1.3";
+    try {
+      saved = pickModel(localStorage.getItem(MODEL_KEY), saved);
+    } catch {}
+    if (saved === "muse-spark-1.3") return;
+    const id = setTimeout(() => setDesignModel(saved), 0);
+    return () => clearTimeout(id);
+  }, []);
+  const chooseModel = (m: ModelChoice) => {
+    setDesignModel(m);
+    try {
+      localStorage.setItem(MODEL_KEY, m);
+    } catch {}
+  };
+  const modelName = MODEL_CHOICES.find((m) => m.id === designModel)?.name ?? "Muse Spark";
 
   // First visit: Robo's welcome (not over a design that's already open, like a test fixture).
   useEffect(() => {
-    if (initial || seen(WELCOMED_KEY)) return;
+    if (initial || example || seen(WELCOMED_KEY)) return;
     const id = requestAnimationFrame(() => setWelcome(true));
     return () => cancelAnimationFrame(id);
-  }, [initial]);
+  }, [initial, example]);
 
   const design = project ? project.versions[project.cursor].design : null;
   const sim = useSimulation(design, runKey);
@@ -277,7 +307,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
     setBusy({ kind, at: Date.now() });
     setError(null);
     try {
-      const res = await fetch("/api/create", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const res = await fetch("/api/create", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...body, model: designModel }) });
       const out = (await res.json()) as { design?: Design; usage?: CallUsage; error?: string };
       if (!res.ok || !out.design) throw new Error(out.error ?? `HTTP ${res.status}`);
       return out.design;
@@ -320,6 +350,20 @@ export default function Workspace({ initial }: { initial?: Design }) {
     }
   };
 
+  // ?example=<id> (from the landing page) opens that ready-made robot straight away, once.
+  const openedExample = useRef(false);
+  useEffect(() => {
+    if (!example || openedExample.current) return;
+    // A timer, not an animation frame: it must also fire in a background tab.
+    const id = setTimeout(() => {
+      openedExample.current = true;
+      void openExample(example);
+    }, 0);
+    return () => clearTimeout(id);
+    // openExample is recreated each render; this runs once per example.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [example]);
+
   const showAround = () => {
     if (!design) return setWelcome(true);
     setPanelOpen(true);
@@ -346,6 +390,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
     { id: "edit", label: "Edit", icon: <SlidersHorizontal className="size-3.5" /> },
     { id: "task", label: "Task", icon: <ListChecks className="size-3.5" /> },
     { id: "engineer", label: "Engineer", icon: <Cpu className="size-3.5" /> },
+    { id: "agent", label: "Agent", icon: <Bot className="size-3.5" /> },
     { id: "video", label: "Video", icon: <Video className="size-3.5" /> },
   ];
 
@@ -371,10 +416,11 @@ export default function Workspace({ initial }: { initial?: Design }) {
           />
         </div>
         <div className="flex items-center gap-2">
+          <Segmented size="sm" className="hidden sm:inline-flex" value={designModel} onChange={chooseModel} options={MODEL_CHOICES.map((m) => ({ id: m.id, label: m.name, title: `${m.name} designs and revises your robots` }))} />
           {status && live && (
             <span title="Meta Muse spend today, against the daily cap" className="hidden h-8 items-center gap-2 rounded-xl bg-surface-2 px-3 text-[12px] text-mute sm:inline-flex">
               <span className="size-1.5 rounded-full bg-ok" />
-              Muse Spark · <span className="text-fg tabular-nums">${status.spent.toFixed(2)}</span>
+              Spent today <span className="text-fg tabular-nums">${status.spent.toFixed(2)}</span>
               {status.budget > 0 && <span className="tabular-nums">/ ${status.budget}</span>}
             </span>
           )}
@@ -438,19 +484,19 @@ export default function Workspace({ initial }: { initial?: Design }) {
                 </div>
               )}
               <div data-tour="tabs" className="px-4 pt-3">
-                <Segmented value={tab} onChange={setTab} size="sm" className="w-full" options={tabs.filter((t) => design || t.id === "prompt" || t.id === "video").map((t) => ({ id: t.id, label: t.label, icon: t.icon }))} />
+                <Segmented value={tab} onChange={setTab} size="sm" className="w-full" options={tabs.filter((t) => design || t.id === "prompt" || t.id === "video").map((t) => ({ id: t.id, label: t.id === tab || !design ? t.label : "", icon: t.icon, title: t.label }))} />
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 [scrollbar-width:thin]">
                 {tab === "prompt" &&
                   (design ? (
                     <div className="space-y-4">
-                      <p className="text-[13px] leading-relaxed text-mute">Say what to change: add an environment, swap a gripper for a hand, make it taller, give it a new task. Muse Spark revises this version and keeps everything else.</p>
+                      <p className="text-[13px] leading-relaxed text-mute">Say what to change: add an environment, swap a gripper for a hand, make it taller, give it a new task. {modelName} revises this version and keeps everything else.</p>
                       <PromptBox placeholder="e.g. Add a laundry basket by the washing machine and fold two towels too" busy={!!busy} onSubmit={(t) => void change(t)} submitLabel="Change" examples={["Make it 20% taller with longer arms", "Swap the grippers for five-finger hands", "Add a second table and stack the folded clothes on it"]} />
                       {project && <History project={project} onOpen={goto} />}
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <p className="text-[13px] leading-relaxed text-mute">Describe any robot or machine and the job it should do. Muse Spark designs its body, joints, hands and the space it works in, then it&apos;s simulated with real physics.</p>
+                      <p className="text-[13px] leading-relaxed text-mute">Describe any robot or machine and the job it should do. {modelName} designs its body, joints, hands and the space it works in, then it&apos;s simulated with real physics.</p>
                       <PromptBox placeholder="Describe the robot and its task…" busy={!!busy} onSubmit={(t) => void create(t)} submitLabel="Create" examples={EXAMPLES.slice(0, 3)} />
                     </div>
                   ))}
@@ -474,6 +520,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
                     <TaskPanel design={design} recording={sim.recording} />
                   </div>
                 )}
+                {tab === "agent" && design && <AgentPanel design={design} live={live} onDesign={(d, what) => addVersion(d, what)} />}
                 {tab === "engineer" && design && <EngineeringPanel design={design} recording={sim.recording} onApply={(d, what) => addVersion(d, what)} onSelect={(id) => (setSelected(id), setTab("edit"))} />}
                 {tab === "video" && <VideoPanel design={design} recording={sim.recording} busy={!!busy} onBuild={(p, o) => void create(p, o)} onSpend={refreshStatus} />}
                 {error && <p className="mt-4 rounded-xl bg-bad/10 px-3 py-2.5 text-[12.5px] leading-relaxed text-bad">{error}</p>}
@@ -573,7 +620,7 @@ export default function Workspace({ initial }: { initial?: Design }) {
               </div>
             </div>
           )}
-          <AnimatePresence>{busy && <Generating startedAt={busy.at} change={busy.kind === "change"} />}</AnimatePresence>
+          <AnimatePresence>{busy && <Generating startedAt={busy.at} change={busy.kind === "change"} model={designModel} />}</AnimatePresence>
         </main>
       </div>
       <AnimatePresence>

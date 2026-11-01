@@ -3,8 +3,9 @@
 import { useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
 
-// The signature motif: a closed control loop drawn as ∞. A light pulse travels the path and lights
-// up each stage as it passes (sense → think → check → act), the way a feedback loop runs.
+// The signature motif: a closed control loop drawn as ∞, a shaded ribbon in Meta's blues that
+// twists over itself at the centre. A light pulse travels the path and lights up each stage as it
+// passes (sense → think → check → act), the way a feedback loop runs.
 
 const W = 800;
 const H = 340;
@@ -22,8 +23,8 @@ export interface LoopStage {
 }
 
 export const LOOP_STAGES: LoopStage[] = [
-  { key: "sense", label: "Sense", models: "SAM 3.1 · Voice Transcribe", at: 0.125, side: "top" },
-  { key: "think", label: "Think", models: "Muse Spark 1.3", at: 0.375, side: "bottom" },
+  { key: "sense", label: "Sense", models: "SAM 3.1 · Muse Spark vision", at: 0.125, side: "top" },
+  { key: "think", label: "Think", models: "Muse Spark · Muse Wonder", at: 0.375, side: "bottom" },
   { key: "check", label: "Check", models: "PlantSim C++ → WASM", at: 0.625, side: "top" },
   { key: "act", label: "Act", models: "Firmware · your robot", at: 0.875, side: "bottom" },
 ];
@@ -38,6 +39,9 @@ export default function ControlLoop({ className = "", onStage }: { className?: s
   const tailRef = useRef<SVGPathElement>(null);
   const headRef = useRef<SVGGElement>(null);
   const [nodes, setNodes] = useState<{ x: number; y: number }[]>([]);
+  // The strand that crosses on top at the centre (bottom-left to top-right: the loop's end and
+  // start), traced from the path itself and drawn again over the other strand: the twist.
+  const [cross, setCross] = useState("");
   const [active, setActive] = useState("think");
   const activeRef = useRef("think");
   const onStageRef = useRef(onStage);
@@ -50,6 +54,14 @@ export default function ControlLoop({ className = "", onStage }: { className?: s
     if (!path) return;
     const len = path.getTotalLength();
     setNodes(LOOP_STAGES.map((s) => path.getPointAtLength(s.at * len)));
+    const span = 0.045 * len;
+    const pts: string[] = [];
+    for (let k = 0; k <= 16; k++) {
+      const d = -span + (2 * span * k) / 16;
+      const p = path.getPointAtLength(d < 0 ? len + d : d);
+      pts.push(`${p.x.toFixed(1)} ${p.y.toFixed(1)}`);
+    }
+    setCross(`M${pts.join(" L")}`);
 
     const place = (t: number) => {
       const p = path.getPointAtLength(t * len);
@@ -85,34 +97,57 @@ export default function ControlLoop({ className = "", onStage }: { className?: s
     <div className={`relative ${className}`}>
       <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full overflow-visible" role="img" aria-label="Control loop: sense, think, check, act">
         <defs>
-          <linearGradient id={`lg${id}`} x1="120" y1="0" x2="680" y2="0" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="var(--color-spec-1)" />
-            <stop offset="0.35" stopColor="var(--color-spec-2)" />
-            <stop offset="0.65" stopColor="var(--color-spec-3)" />
-            <stop offset="1" stopColor="var(--color-spec-5)" />
+          {/* Meta blues, deep on the left to bright on the right. */}
+          <linearGradient id={`lg${id}`} x1="110" y1="0" x2="690" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#0052CC" />
+            <stop offset="0.38" stopColor="#0068E6" />
+            <stop offset="0.7" stopColor="#0082FB" />
+            <stop offset="1" stopColor="#21B5FF" />
+          </linearGradient>
+          {/* Light from above: the ribbon reads as a rounded band, not a flat line. */}
+          <linearGradient id={`sh${id}`} x1="0" y1="60" x2="0" y2="280" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#fff" stopOpacity="0.28" />
+            <stop offset="0.45" stopColor="#fff" stopOpacity="0" />
+            <stop offset="1" stopColor="#001a4d" stopOpacity="0.35" />
           </linearGradient>
           <filter id={`gl${id}`} x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="6" />
           </filter>
+          <filter id={`sd${id}`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5" />
+          </filter>
         </defs>
-        {/* Base track */}
-        <path d={PATH} fill="none" stroke={`url(#lg${id})`} strokeOpacity="0.22" strokeWidth="14" strokeLinecap="round" />
-        <path ref={pathRef} d={PATH} fill="none" stroke={`url(#lg${id})`} strokeOpacity="0.55" strokeWidth="1.5" />
-        <path d={PATH} fill="none" stroke="rgb(255 255 255 / 0.12)" strokeWidth="1" className="flow-dash" />
+        {/* Soft glow under the ribbon */}
+        <path d={PATH} fill="none" stroke="#0082FB" strokeOpacity="0.28" strokeWidth="44" strokeLinecap="round" filter={`url(#gl${id})`} />
+        {/* The ribbon: colour, shading, and a highlight along its upper edge */}
+        <path ref={pathRef} d={PATH} fill="none" stroke={`url(#lg${id})`} strokeWidth="30" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={PATH} fill="none" stroke={`url(#sh${id})`} strokeWidth="30" strokeLinecap="round" />
+        <path d={PATH} fill="none" stroke="#fff" strokeOpacity="0.22" strokeWidth="4" strokeLinecap="round" transform="translate(0 -7)" />
+        {/* The twist: one strand passes over the other at the centre, casting a shadow on it. */}
+        {cross && (
+          <>
+        <path d={cross} fill="none" stroke="#001433" strokeOpacity="0.55" strokeWidth="34" strokeLinecap="butt" filter={`url(#sd${id})`} />
+        <path d={cross} fill="none" stroke={`url(#lg${id})`} strokeWidth="30" strokeLinecap="butt" />
+        <path d={cross} fill="none" stroke={`url(#sh${id})`} strokeWidth="30" strokeLinecap="butt" />
+        <path d={cross} fill="none" stroke="#fff" strokeOpacity="0.22" strokeWidth="4" strokeLinecap="butt" transform="translate(0 -7)" />
+          </>
+        )}
+        {/* A current running round the loop */}
+        <path d={PATH} fill="none" stroke="rgb(255 255 255 / 0.18)" strokeWidth="1.5" className="flow-dash" />
         {/* Comet tail: a blurred glow plus a crisp core */}
-        <path ref={tailRef} d={PATH} fill="none" stroke={`url(#lg${id})`} strokeWidth="10" strokeLinecap="round" filter={`url(#gl${id})`} />
+        <path ref={tailRef} d={PATH} fill="none" stroke="#bfe6ff" strokeWidth="12" strokeLinecap="round" filter={`url(#gl${id})`} />
         {nodes.map((n, i) => {
           const on = LOOP_STAGES[i].key === active;
           return (
             <g key={LOOP_STAGES[i].key} transform={`translate(${n.x} ${n.y})`}>
-              <circle r={on ? 20 : 14} fill="var(--color-void)" stroke={on ? "#fff" : "rgb(255 255 255 / 0.25)"} strokeWidth="1.5" style={{ transition: "all .35s" }} />
-              <circle r={on ? 7 : 4} fill={on ? "#fff" : `url(#lg${id})`} style={{ transition: "all .35s" }} />
+              <circle r={on ? 19 : 12} fill={on ? "#fff" : "#0a1f44"} stroke="#fff" strokeOpacity={on ? 1 : 0.55} strokeWidth="2" style={{ transition: "all .35s" }} />
+              <circle r={on ? 7 : 4} fill={on ? "#0082FB" : "#fff"} style={{ transition: "all .35s" }} />
             </g>
           );
         })}
         <g ref={headRef}>
-          <circle r="16" fill="#fff" opacity="0.35" filter={`url(#gl${id})`} />
-          <circle r="5" fill="#fff" />
+          <circle r="18" fill="#cfeaff" opacity="0.55" filter={`url(#gl${id})`} />
+          <circle r="6" fill="#fff" />
         </g>
       </svg>
 

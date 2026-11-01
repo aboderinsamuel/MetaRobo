@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Lab from "@/components/lab/Lab";
 
 export const metadata: Metadata = {
-  title: "Control Lab · RoboCraft",
+  title: "Control Lab",
   description: "Build a robot from real parts, watch it move in 3D, and let Robo help you fix it. Simple mode for beginners, Pro mode for engineers.",
 };
 
