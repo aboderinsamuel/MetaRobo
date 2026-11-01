@@ -49,6 +49,7 @@ Rules for actions:
 - apply_fix: target = the id of a failing check that has a fix.
 - swap_machine_part: target = a part id from machineParts, value = an option id from that part's options.
 - set_gains: PID only; give kp, ki, kd.
+Machine checks include an id and, when possible, the affected part id. Never claim a machine check was fixed unless you return a valid swap_machine_part action or another valid action. If no listed part can solve the measured requirement, say that plainly and give a concrete redesign suggestion with the relevant measurement; do not repeat a generic refusal.
 Never invent ids, parts or keys. If nothing listed can do what's asked, say so plainly and return no actions.`;
 
 /** What the assistant is told about the machine: compact, and only what it can act on or explain. */
@@ -113,8 +114,23 @@ export function assistContext(opts: {
     out.machineParts = [...seen.values()];
     out.machineChecks = opts.machineChecks
       .filter((c) => c.level !== "pass")
-      .slice(0, 14)
-      .map((c) => ({ level: c.level, title: c.title, detail: c.detail }));
+      .map((c) => {
+        const current = c.part ? opts.machine!.parts.find((p) => p.id === c.part) : undefined;
+        const currentCat = current ? catalogOf(current) : undefined;
+        return {
+          id: c.id,
+          level: c.level,
+          title: c.title,
+          detail: c.detail,
+          part: c.part ?? "",
+          options: currentCat
+            ? CATALOG.filter((p) => p.category === currentCat.category && p.id !== currentCat.id)
+                .slice(0, 18)
+                .map((p) => ({ id: p.id, name: p.name, spec: p.spec, price: p.priceUsd }))
+            : [],
+          repair: c.part ? "Use swap_machine_part with target set to part, or suggest a redesign if no catalogue option can meet the measured requirement." : "Suggest a concrete redesign or wiring change when no direct part action exists.",
+        };
+      });
   }
   if (opts.ctrl) out.controller = opts.ctrl;
   if (opts.metrics) out.performance = { ...opts.metrics, overshootPct: round(opts.metrics.overshootPct), settlingTime: round(opts.metrics.settlingTime), riseTime: round(opts.metrics.riseTime) };

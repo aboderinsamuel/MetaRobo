@@ -659,7 +659,7 @@ export function Assistant({
             </p>
             {ready && aiOn && (
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {["Fix the problems", "Make it cheaper", "Why is it failing?"].map((p) => (
+                {["Fix the problems", "Fix hardware issues", "Make it cheaper", "Why is it failing?"].map((p) => (
                   <button key={p} onClick={() => onAssist(p)} disabled={!!busy} className="rounded-full border border-line-2 px-2.5 py-1 text-[12px] text-fg transition-colors hover:bg-panel-2 disabled:opacity-40">
                     {p}
                   </button>

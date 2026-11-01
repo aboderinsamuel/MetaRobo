@@ -3,7 +3,7 @@
 // RoboCraft Control Lab: describe → build the hardware → model → control → simulate → explain →
 // iterate → validate. The hardware build is the source of truth: parts and dimensions give the
 // plant, the actuator limits and the design checks.
-import { Activity, Box, Cable, ChevronDown, CircleHelp, Code2, Cpu, Download, MessageSquare, PenLine, ShieldCheck, SlidersHorizontal, Waves } from "lucide-react";
+import { Activity, Box, Cable, ChevronDown, CircleHelp, Code2, Cpu, Download, MessageSquare, PenLine, Plus, ShieldCheck, SlidersHorizontal, Waves } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -58,6 +58,8 @@ type View = "hardware" | "scope" | "analysis" | "wiring" | "validate" | "code";
 type LeftTab = "hardware" | "control" | "describe" | "edit" | "task" | "engineer" | "agent";
 type RightTab = "checks" | "assistant";
 const LAB_STATE_KEY = "rc-control-lab-state";
+const PREVIOUS_LAB_STATE_KEY = "rc-control-lab-previous";
+type SavedLabState = { text?: string; build?: HardwareBuild | null; dataModel?: LabModel | null; ctrl?: ControllerSpec | null; messages?: ChatMsg[]; iterations?: Iteration[]; promptHistory?: string[] };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Scenario {
@@ -104,6 +106,10 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
   const [rightTab, setRightTab] = useState<RightTab>("checks");
   const [selected, setSelected] = useState<SlotId | null>(null);
   const [dockOpen, setDockOpen] = useState(true);
+  const [leftWidth, setLeftWidth] = useState(310);
+  const [rightWidth, setRightWidth] = useState(350);
+  const [resizing, setResizing] = useState<"left" | "right" | null>(null);
+  const [hasPreviousLab, setHasPreviousLab] = useState(false);
   const [aiOn, setAiOn] = useState<boolean | null>(null);
   // Which Meta model does the lab's AI work: Muse Spark (default) or Muse Wonder. Shared with Create.
   const [llm, setLlm] = useState<ModelChoice>("muse-spark-1.3");
@@ -183,8 +189,11 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
     }
     try {
       const raw = localStorage.getItem(LAB_STATE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as { text?: string; build?: HardwareBuild | null; dataModel?: LabModel | null; ctrl?: ControllerSpec | null; messages?: ChatMsg[]; iterations?: Iteration[]; promptHistory?: string[] };
+      if (!raw) {
+        setHydrated(true);
+        return;
+      }
+      const saved = JSON.parse(raw) as SavedLabState;
       if (saved.text) setText(saved.text);
       if (saved.build) setBuild(saved.build);
       if (saved.dataModel) setDataModel(saved.dataModel);
@@ -195,6 +204,9 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
     } catch {
       localStorage.removeItem(LAB_STATE_KEY);
     }
+    try {
+      setHasPreviousLab(!!localStorage.getItem(PREVIOUS_LAB_STATE_KEY));
+    } catch {}
     setHydrated(true);
   }, [fromCreate, initialPreset]);
 
@@ -206,6 +218,39 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
       setNotice("Your lab is open, but this browser could not save the latest state.");
     }
   }, [hydrated, text, build, dataModel, ctrl, messages, iterations, promptHistory]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("rc-control-lab-panels") ?? "{}") as { left?: number; right?: number };
+      if (typeof saved.left === "number") setLeftWidth(Math.min(460, Math.max(260, saved.left)));
+      if (typeof saved.right === "number") setRightWidth(Math.min(460, Math.max(280, saved.right)));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!resizing) return;
+    const move = (event: PointerEvent) => {
+      if (resizing === "left") setLeftWidth(Math.min(460, Math.max(260, event.clientX)));
+      else setRightWidth(Math.min(460, Math.max(280, window.innerWidth - event.clientX)));
+    };
+    const stop = () => setResizing(null);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop, { once: true });
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [resizing]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("rc-control-lab-panels", JSON.stringify({ left: leftWidth, right: rightWidth }));
+    } catch {}
+  }, [leftWidth, rightWidth]);
 
   useEffect(() => {
     fetch("/api/lab/status")
@@ -649,7 +694,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
   const applyNow = useCallback(
     (actions: AssistAction[]) => {
       const snap: AssistSnapshot = { build, machine, ctrl };
-      const r = applyActions(actions, { build, slots: slotsEditable, checks: allChecks, machine: slotsEditable ? null : machine, ctrl });
+      const r = applyActions(actions, { build, slots: slotsEditable, checks: allChecks, machine, ctrl });
       const note = r.done.join("; ");
       if (r.build && build && JSON.stringify(r.build) !== JSON.stringify(build)) onBuild(r.build, `${llmName}: ${note}`);
       if (r.machine && r.machine !== machine) editAssembly(r.machine);
@@ -672,7 +717,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
         build,
         slots: slotsEditable,
         checks: allChecks,
-        machine: slotsEditable ? null : machine,
+        machine,
         machineChecks: machineSim?.checks ?? [],
         ctrl,
         metrics: result ? { stable: result.analysis.metrics.stable === 1, overshootPct: result.analysis.metrics.overshootPct, settlingTime: result.analysis.metrics.settlingTime, riseTime: result.analysis.metrics.riseTime } : null,
@@ -903,9 +948,60 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
       }}
     />
   );
-  const askToFixMachineCheck = (check: { title: string; detail: string }) => {
+  const askToFixMachineCheck = (check: { id: string; title: string; detail: string; part?: string }) => {
     setRightTab("assistant");
-    void assist(`Fix this hardware issue: ${check.title}. ${check.detail}`);
+    void assist(
+      `Diagnose and fix hardware check "${check.id}"${check.part ? ` (affected part id: ${check.part})` : ""} now: ${check.title}. ${check.detail} Use a valid catalogue change when one can solve it; otherwise give the smallest concrete redesign recommendation with the measurement and why.`,
+    );
+  };
+
+  const restoreLab = (saved: SavedLabState) => {
+    setText(saved.text ?? "");
+    setBuild(saved.build ?? null);
+    setDataModel(saved.dataModel ?? null);
+    setCtrl(saved.ctrl ?? null);
+    setMessages(saved.messages ?? []);
+    setIterations(saved.iterations ?? []);
+    setPromptHistory(saved.promptHistory ?? []);
+    setData(null);
+    setValidation({ results: [], running: false });
+    setView("hardware");
+    setLeftTab(saved.dataModel ? "hardware" : "describe");
+    setRightTab("checks");
+    setSelected(null);
+    setSimKey((key) => key + 1);
+  };
+
+  const restorePreviousLab = () => {
+    try {
+      const raw = localStorage.getItem(PREVIOUS_LAB_STATE_KEY);
+      if (!raw) return;
+      restoreLab(JSON.parse(raw) as SavedLabState);
+      localStorage.removeItem(PREVIOUS_LAB_STATE_KEY);
+      setHasPreviousLab(false);
+    } catch {
+      setNotice("The previous lab could not be restored.");
+    }
+  };
+
+  const startNewLab = () => {
+    if ((text || model || messages.length > 0) && !window.confirm("Start a new lab? You can restore this lab once from the button beside New lab.")) return;
+    try {
+      const current = localStorage.getItem(LAB_STATE_KEY);
+      if (current) localStorage.setItem(PREVIOUS_LAB_STATE_KEY, current);
+      localStorage.removeItem(LAB_STATE_KEY);
+      setHasPreviousLab(!!current);
+    } catch {}
+    restoreLab({});
+    setPipeline(-1);
+    setBusy(null);
+    setBuildError(null);
+    setNotice(null);
+    setSelected(null);
+    setView("hardware");
+    setLeftTab("describe");
+    setRightTab("checks");
+    setSimKey((key) => key + 1);
   };
 
   const outputSeries = ready
@@ -922,6 +1018,14 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
           <AppNav />
           <span className="hidden text-dim lg:inline">/</span>
           <span className="hidden truncate text-[13px] font-medium lg:inline">{machine ? machine.title : simple && hw ? `Your ${FRIENDLY[hw.build.kind].name.toLowerCase()}` : model ? model.title : "Control lab"}</span>
+          <button onClick={startNewLab} className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-mute hover:bg-surface-2 hover:text-fg" title="Start a fresh Control Lab project">
+            <Plus className="size-3.5" /> <span className="hidden sm:inline">New lab</span>
+          </button>
+          {hasPreviousLab && (
+            <button onClick={restorePreviousLab} className="hidden shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium text-accent hover:bg-accent-soft sm:inline" title="Restore the lab you had open before starting this one">
+              Restore previous
+            </button>
+          )}
           {hw && !machine && (
             <span
               className={`mono-label hidden rounded-full px-1.5 py-0.5 text-[10px] md:inline ${allChecks.some((c) => c.level === "error") ? "bg-bad/10 text-bad" : issues ? "bg-warn/10 text-warn" : "bg-ok/10 text-ok"}`}
@@ -976,9 +1080,12 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3 px-3 pb-3 lg:grid-cols-[310px_minmax(0,1fr)_350px]">
+      <div
+        className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3 px-3 pb-3 lg:grid-cols-[var(--lab-left)_minmax(0,1fr)_var(--lab-right)]"
+        style={{ "--lab-left": `${leftWidth}px`, "--lab-right": `${rightWidth}px` } as React.CSSProperties}
+      >
         {/* Left: hardware / control / describe */}
-        <aside data-tour="parts" className="flex max-h-[85vh] min-h-0 flex-col overflow-hidden rounded-3xl bg-surface shadow-[0_0_0_1px_var(--color-line)] lg:max-h-none">
+        <aside data-tour="parts" className="relative flex max-h-[85vh] min-h-0 flex-col overflow-hidden rounded-3xl bg-surface shadow-[0_0_0_1px_var(--color-line)] lg:max-h-none">
           <Tabs
             value={simple && leftTab === "control" ? "hardware" : leftTab}
             onChange={setLeftTab}
@@ -1003,7 +1110,8 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
             }
             layoutId="left-tab"
           />
-          <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
+          <div role="separator" aria-label="Resize left panel" onPointerDown={() => setResizing("left")} className="absolute top-0 right-[-7px] z-10 hidden h-full w-3 cursor-col-resize lg:block" />
+          <div className="rc-scroll min-h-0 flex-1 overflow-y-auto">
             {leftTab === "edit" && machine && (
               <MachinePanel assembly={machine} selected={selectedPart} onSelect={setSelectedPart} onChange={editAssembly} canUndo={undoStack.length > 0} onUndo={undo} onUpdatePhysics={() => void rederivePhysics()} busy={!!busy} aiOn={!!aiOn} review={model?.review} />
             )}
@@ -1261,7 +1369,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
                 />
               )}
               {!simple && view === "scope" && (
-                <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
+                <div className="rc-scroll min-h-0 flex-1 overflow-y-auto">
                   <SpecStrip checks={checks} metrics={m!} pm={result!.analysis.pmDeg} unit={effModel!.input.unit} />
                   <div className="relative px-2 pt-3">
                     <TimeChart
@@ -1300,7 +1408,7 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
                 </div>
               )}
               {!simple && view === "analysis" && (
-                <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
+                <div className="rc-scroll min-h-0 flex-1 overflow-y-auto">
                   <SpecStrip checks={checks} metrics={m!} pm={result!.analysis.pmDeg} unit={effModel!.input.unit} />
                   <div className="grid gap-px bg-line md:grid-cols-2">
                     <div className="bg-void">
@@ -1334,12 +1442,12 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
               )}
               {!simple && view === "wiring" && <WiringDiagram wiring={hw!.wiring} />}
               {!simple && view === "validate" && (
-                <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
+                <div className="rc-scroll min-h-0 flex-1 overflow-y-auto">
                   <ValidatePanel results={validation.results} running={validation.running} total={CHECK_COUNT} onRun={() => void runValidation()} refValue={effModel!.sim.ref} />
                 </div>
               )}
               {!simple && view === "code" && code && (
-                <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
+                <div className="rc-scroll min-h-0 flex-1 overflow-y-auto">
                   <CodePanel code={code.text} ts={code.ts} filename={code.filename} machine={!!machine && !aiRig} />
                 </div>
               )}
@@ -1348,7 +1456,8 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
         </main>
 
         {/* Right: checks / copilot */}
-        <aside data-tour="coach" className="flex min-h-[560px] flex-col overflow-hidden rounded-3xl bg-surface shadow-[0_0_0_1px_var(--color-line)] lg:min-h-0">
+        <aside data-tour="coach" className="relative flex min-h-[560px] flex-col overflow-hidden rounded-3xl bg-surface shadow-[0_0_0_1px_var(--color-line)] lg:min-h-0">
+          <div role="separator" aria-label="Resize right panel" onPointerDown={() => setResizing("right")} className="absolute top-0 left-[-7px] z-10 hidden h-full w-3 cursor-col-resize lg:block" />
           {simple ? (
             <>
               <Tabs
@@ -1356,11 +1465,11 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
                 onChange={setSimpleTab}
                 items={[
                   { id: "coach", label: "Robo · coach", icon: ShieldCheck },
-                  { id: "assistant", label: `Ask ${llmName}`, icon: MessageSquare },
+                  { id: "assistant", label: "Robo Copilot", icon: MessageSquare },
                 ]}
                 layoutId="right-tab-simple"
               />
-              <div className={`min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] ${simpleTab === "coach" ? "" : "hidden"}`}>
+              <div className={`rc-scroll min-h-0 flex-1 overflow-y-auto ${simpleTab === "coach" ? "" : "hidden"}`}>
                 {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} onFix={askToFixMachineCheck} />}
                 {hw && aiRig && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={locateSlot} />}
                 {hw && !machine && (
@@ -1387,11 +1496,11 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
             onChange={setRightTab}
             items={[
               { id: "checks", label: `Design checks${(machineSim ? machineSim.checks.filter((c) => c.level === "error" || c.level === "warn").length : issues) ? ` · ${machineSim ? machineSim.checks.filter((c) => c.level === "error" || c.level === "warn").length : issues}` : ""}`, icon: ShieldCheck },
-              { id: "assistant", label: `Ask ${llmName}`, icon: MessageSquare },
+              { id: "assistant", label: "Robo Copilot", icon: MessageSquare },
             ]}
             layoutId="right-tab"
           />
-          <div className={`min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] ${rightTab === "checks" ? "" : "hidden"}`}>
+          <div className={`rc-scroll min-h-0 flex-1 overflow-y-auto ${rightTab === "checks" ? "" : "hidden"}`}>
             {machine && machineSim && <MachineCoach assembly={machine} sim={machineSim} onSelect={(id) => { setSelectedPart(id); setLeftTab("hardware"); }} onFix={askToFixMachineCheck} />}
             {hw && (!machine || aiRig) && <ChecksPanel hw={hw} checks={allChecks} onBuild={onBuild} onSelect={(s) => { setSelected(s); setView("hardware"); }} />}
           </div>
@@ -1434,12 +1543,12 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
 
 function Tabs<T extends string>({ value, onChange, items, layoutId }: { value: T; onChange: (v: T) => void; items: { id: T; label: string; icon: typeof Activity }[]; layoutId: string }) {
   return (
-    <div className="flex shrink-0 border-b border-line">
+    <div className="rc-scroll flex shrink-0 overflow-x-auto border-b border-line">
       {items.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
           onClick={() => onChange(id)}
-          className={`mono-label relative flex h-10 flex-1 items-center justify-center gap-1.5 px-2 text-[10.5px] transition-colors ${value === id ? "text-fg" : "text-dim hover:text-mute"}`}
+          className={`mono-label relative flex h-9 min-w-[84px] flex-1 shrink-0 items-center justify-center gap-1.5 px-2 text-[10.5px] transition-colors ${value === id ? "text-fg" : "text-dim hover:text-mute"}`}
         >
           <Icon className="size-3.5" /> {label}
           {value === id && <motion.span layoutId={layoutId} className="absolute inset-x-3 bottom-0 h-px" style={{ background: "var(--spectrum)" }} />}

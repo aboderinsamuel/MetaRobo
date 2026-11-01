@@ -56,6 +56,25 @@ describe("the lab assistant's actions", () => {
     expect(ctx.sizes.find((g: { key: string }) => g.key === "upper").unit).toBe("mm");
   });
 
+  it("keeps machine check ids and affected parts so repairs can target the live assembly", () => {
+    const ctx = JSON.parse(
+      assistContext({
+        title: "Designed arm",
+        build: null,
+        slots: false,
+        checks: [],
+        machine: { title: "Designed arm", parts: [], joints: [], program: [], connections: [], signals: [], rules: [], timeScale: 1, simSeconds: 1 },
+        machineChecks: [{ id: "torque-j1", level: "error", title: "Servo is too weak", detail: "Needs 20 kg·cm.", part: "servo-1" }],
+        ctrl: null,
+        metrics: null,
+        specs: [],
+      }),
+    );
+    expect(ctx.machineChecks).toEqual([
+      expect.objectContaining({ id: "torque-j1", part: "servo-1", repair: expect.stringContaining("swap_machine_part") }),
+    ]);
+  });
+
   it("has a strict response schema", () => {
     expect(AssistOut.safeParse({ reply: "ok", mode: "answer", actions: [] }).success).toBe(true);
     expect(AssistOut.safeParse({ reply: "ok", mode: "whatever", actions: [] }).success).toBe(false);

@@ -73,7 +73,7 @@ export function MachineCoach({ assembly, sim, onSelect, onFix }: { assembly: Ass
               <p className="pl-5 leading-snug text-dim">{c.detail}</p>
               {c.level !== "pass" && onFix && (
                 <button onClick={() => onFix(c)} className="ml-5 mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-line-2 px-2 py-1 text-[11px] text-fg hover:bg-surface-2">
-                  <Sparkles className="size-3" /> Ask Robo Copilot to fix
+                  <Sparkles className="size-3" /> Diagnose & fix with Robo Copilot
                 </button>
               )}
             </li>

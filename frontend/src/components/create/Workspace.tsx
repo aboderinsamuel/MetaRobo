@@ -136,7 +136,7 @@ function ProjectsMenu({ current, onOpen, onNew }: { current: string | null; onOp
                 <Plus className="size-4" /> New project
               </button>
               {list.length === 0 && <p className="px-3 py-3 text-[12.5px] text-mute">Projects you create are saved here, in this browser.</p>}
-              <ul className="max-h-80 overflow-y-auto">
+              <ul className="rc-scroll max-h-80 overflow-y-auto">
                 {list.map((p) => (
                   <li key={p.id} className={cx("group flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-surface-2", p.id === current && "bg-surface-2")}>
                     <button
@@ -493,7 +493,7 @@ export default function Workspace({ initial, example }: { initial?: Design; exam
               <div data-tour="tabs" className="px-4 pt-3">
                 <Segmented value={tab} onChange={setTab} size="sm" className="w-full" options={tabs.filter((t) => design || t.id === "prompt" || t.id === "video").map((t) => ({ id: t.id, label: t.id === tab || !design ? t.label : "", icon: t.icon, title: t.label }))} />
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 [scrollbar-width:thin]">
+              <div className="rc-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 {tab === "prompt" &&
                   (design ? (
                     <div className="space-y-4">
@@ -594,7 +594,7 @@ export default function Workspace({ initial, example }: { initial?: Design; exam
               </div>
             </>
           ) : (
-            <div className="relative flex flex-1 items-center justify-center overflow-y-auto p-6">
+            <div className="rc-scroll relative flex flex-1 items-center justify-center overflow-y-auto p-6">
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(var(--color-line)_1px,transparent_1px),linear-gradient(90deg,var(--color-line)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)] bg-[size:32px_32px]" />
               <div className="relative w-full max-w-2xl">
                 <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1 text-[12px] font-medium text-accent">
