@@ -21,6 +21,7 @@ COORDINATES: metres, y up, floor at y = 0. The robot starts at the origin facing
 
 BUILD QUALITY (this is what makes it look real):
 - Structure + covers: a structural link per segment (brushed_aluminium / carbon_fiber / painted_metal) with shells over it (gloss_plastic, soft_touch or painted_metal with bevel, or lathe profiles for rounded forms). Use lathe for heads, domes, torsos, cans and smooth limbs; extrude for brackets, plates, fingers and panels with real outlines; box with bevel for housings; tube for cables, hoses and handles.
+- Every shape is centred on its offset, lathes included: a lathe profile 0.44 m tall that should start at its pivot gets offset [0, 0.22, 0].
 - Orientation: cylinders, capsules and lathes run along their local y; set orient to turn them (orient [0, 0, 90] → along x, [90, 0, 0] → along z): wheels, portholes, round doors, drums' axes and joint housings must point the right way.
 - A cylindrical joint_housing (actuator) at every joint, its axis along the joint axis, sized to its torque (humanoid shoulder ≈ Ø0.09 m, elbow Ø0.07, wrist Ø0.045, finger Ø0.012).
 - Details that sell it: a face screen or visor (screen material, emissive eyes), camera / depth-sensor modules, cable runs (tube), rubber foot pads and finger pads, vents, panel seams, an accent colour.
@@ -47,6 +48,8 @@ MOBILITY: fixed, wheels, legs, tracks or flying, with a realistic speed (humanoi
 
 SCENE: build the environment the task needs, at real sizes and laid out like a real room: furniture and appliances as static objects composed of several shapes (a washing machine: a white box body, a drum inside its front opening, a round glass door as a child object hinged on a vertical axis with its pivot at the hinge edge, a control panel); containers as bin (baskets, boxes, trays) or drum shapes; things the robot moves as rigid objects with real masses; garments, towels and sheets as cloth with their flat size (t-shirt ≈ 0.5 × 0.7 m) dropped a few cm above where they lie. Put work surfaces at real heights (table 0.75 m, counter 0.9 m). Leave walking space (≥ 0.6 m) between stations. Legged robots crouch to reach low things, but nothing the robot must reach should be lower than 0.25 m unless it has the legs to get down there. Colours matter when the task is about them.
 
+GROUNDED AND PLAUSIBLE: it must work the way a real machine would. Its base stands on the floor, or sits upright on top of a surface or mount that exists in the scene (clamped onto a desk top, bolted to a stand); never floating, never hanging off an edge, never upside down unless it is a real ceiling-mounted design with its mount in the scene. Its work is in front of it (+z), within comfortable reach, at a height it can get to. Pick the simplest machine a real engineer would build for the job (pressing a game controller's buttons: a small desk arm or a button-pressing rig beside the controller, not a humanoid). Proportions follow real products. Arms hang clear of the body: shoulders wider than the hips, so the hands never sit inside the thighs or hips.
+
 TASK: an executable plan, 8-40 steps, using only these actions with ids from your design: move_to (always with the target object you're going to; the robot stands in front of it, facing it), reach, grasp, lift, place, release, fold, open, close, pose, wait. Pick and place is reach → grasp → lift → place → release. Move to a station before working there. Open a door before putting things through it. Handle each item explicitly (no "repeat"). Labels describe the action in plain words. Durations realistic (1-4 s per motion).
 
 NOTES: honest engineering caveats: what would be hard to build, what the simulation can't show. No marketing.
@@ -56,9 +59,11 @@ REAL HARDWARE: everything you design is built with real, buyable parts inside it
 HARDWARE ENGINE (hardware): if the robot is a wheeled car / rover, a single powered arm joint, a two-wheel self-balancer or a multirotor, also pick its drivetrain electronics from this list (kind, then one part id per slot, matched to each other, plus geometry / mass / mission values in SI units within the ranges). Any other robot: kind "none".
 ${hardwareGuide()}`;
 
+// Low reasoning effort first: most of a design's wait is the model thinking before it writes, and
+// both Muse Spark and Muse Wonder design well at low effort (the physics checks the result anyway).
 const DESIGN_ATTEMPTS = [
-  { maxTokens: 40000, effort: "medium" as const },
   { maxTokens: 40000, effort: "low" as const },
+  { maxTokens: 40000, effort: "minimal" as const },
 ];
 const REVISE_ATTEMPTS = [
   { maxTokens: 40000, effort: "low" as const },
@@ -82,7 +87,7 @@ async function withRetry<T>(attempts: number, fn: (attempt: number) => Promise<T
 }
 
 /** Design a new machine from a description (and, optionally, what Muse Spark saw in a video). */
-export async function designFromPrompt(prompt: string, observed?: string): Promise<{ design: Design; usage: CallUsage }> {
+export async function designFromPrompt(prompt: string, observed?: string, model?: string): Promise<{ design: Design; usage: CallUsage }> {
   return withRetry(DESIGN_ATTEMPTS.length, async (a) => {
     const res = await metaJson({
       schema: DesignOut,
@@ -90,13 +95,14 @@ export async function designFromPrompt(prompt: string, observed?: string): Promi
       system: DESIGNER_GUIDE,
       user: [`Design this: ${prompt}`, observed ? `\nWhat the camera saw (use it for the scene layout, sizes and the robot's form):\n${observed}` : ""].join(""),
       ...DESIGN_ATTEMPTS[a],
+      model,
     });
     return { design: sanitizeDesign(res.data, 1), usage: callUsage(res) };
   });
 }
 
 /** Revise a design from a plain-language change; ids stay stable so versions can be compared. */
-export async function reviseDesign(current: Design, change: string, history: string[]): Promise<{ design: Design; usage: CallUsage }> {
+export async function reviseDesign(current: Design, change: string, history: string[], model?: string): Promise<{ design: Design; usage: CallUsage }> {
   const { version, ...ai } = current;
   return withRetry(REVISE_ATTEMPTS.length, async (a) => {
     const res = await metaJson({
@@ -105,6 +111,7 @@ export async function reviseDesign(current: Design, change: string, history: str
       system: `${DESIGNER_GUIDE}\n\nREVISING: you are given the current design as JSON. Apply the requested change and return the COMPLETE revised design. Keep every node, object and step that the change doesn't affect exactly as it is, with the same ids. If the change adds things (an environment, a second arm, a new task), integrate them properly: positions, joints, task steps.`,
       user: [history.length ? `Earlier changes, oldest first:\n${history.map((h) => `- ${h}`).join("\n")}\n` : "", `Current design:\n${JSON.stringify(ai)}\n\nChange: ${change}`].join("\n"),
       ...REVISE_ATTEMPTS[a],
+      model,
     });
     return { design: sanitizeDesign(res.data, version + 1), usage: callUsage(res) };
   });

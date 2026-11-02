@@ -6,6 +6,7 @@ import { aiEnabled, describeError, explain, offlineExplain } from "@/lib/lab/ai"
 import { autoTune } from "@/lib/lab/advisor";
 import { run } from "@/lib/lab/analysis";
 import type { ControllerSpec, LabModel } from "@/lib/lab/types";
+import { pickModel } from "@/lib/meta/models";
 import { tsEngine } from "@/lib/sim/engine";
 
 export const maxDuration = 120;
@@ -17,6 +18,8 @@ export async function POST(req: Request) {
     history?: { label: string; controller: ControllerSpec; summary: string }[];
     question?: string;
     offline?: boolean;
+    /** Which Meta model explains: Muse Spark (default) or Muse Wonder. */
+    llm?: string;
   } | null;
   if (!body?.model || !body.controller) return Response.json({ error: "model and controller are required" }, { status: 400 });
   const { model, controller } = body;
@@ -28,10 +31,10 @@ export async function POST(req: Request) {
   }
   if (aiEnabled() && !body.offline) {
     try {
-      return Response.json(await explain(model, controller, analysis, (body.history ?? []).slice(-6), body.question?.slice(0, 2000)));
+      return Response.json(await explain(model, controller, analysis, (body.history ?? []).slice(-6), body.question?.slice(0, 2000), pickModel(body.llm, "muse-spark-1.3")));
     } catch (err) {
       const advice = offlineExplain(model, controller, analysis);
-      return Response.json({ ...advice, notice: `Muse Spark was unavailable (${describeError(err)}); this explanation comes from the offline advisor.` });
+      return Response.json({ ...advice, notice: `The Meta model was unavailable (${describeError(err)}); this explanation comes from the offline advisor.` });
     }
   }
   const advice = offlineExplain(model, controller, analysis);

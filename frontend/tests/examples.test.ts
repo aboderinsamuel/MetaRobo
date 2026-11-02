@@ -8,7 +8,7 @@ const DIR = path.join(__dirname, "..", "public", "examples");
 
 describe("ready-made examples", () => {
   it("has a file for every example and no stray files", () => {
-    expect(readdirSync(DIR).sort()).toEqual(EXAMPLES.map((e) => `${e.id}.json`).sort());
+    expect(readdirSync(DIR).filter((f) => f.endsWith(".json")).sort()).toEqual(EXAMPLES.map((e) => `${e.id}.json`).sort());
   });
 
   for (const e of EXAMPLES) {

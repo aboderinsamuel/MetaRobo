@@ -19,6 +19,7 @@ import { materialFor } from "@/lib/create/materials";
 import { sample, sampleCloth, usePlayback } from "@/lib/create/playback";
 import { STAGE } from "@/lib/stage";
 import type { Recording } from "@/lib/create/sim";
+import { bringWithinReach } from "@/lib/create/layout";
 
 const DEG = Math.PI / 180;
 
@@ -153,7 +154,8 @@ function build(design: Design): Built {
 }
 
 function Scene({ design, recording, selected, onSelect, mode, preset, theme }: ViewportProps) {
-  const built = useMemo(() => build(design), [design]);
+  // The layout the simulation used (loose items a fixed arm can't reach are set out within reach).
+  const built = useMemo(() => build(bringWithinReach(design).design), [design]);
   const { camera, controls } = useThree() as unknown as { camera: THREE.PerspectiveCamera; controls: OrbitControlsImpl | null };
   const helper = useRef<THREE.BoxHelper | null>(null);
 

@@ -7,10 +7,10 @@ import ControlLoop from "./ControlLoop";
 // Which Meta model does what, mapped onto the control loop. Status is honest: "Live" means it runs
 // in the app today; "In build" means it is being built during the hackathon.
 const MODELS: { stage: string; name: string; id: string; role: string; meta: boolean; live: boolean }[] = [
-  { stage: "sense", name: "SAM 3.1", id: "sam-3.1", role: "Tracks your real robot frame by frame in a phone video, so we can measure how it actually moves.", meta: true, live: false },
-  { stage: "sense", name: "Muse Voice Transcribe", id: "muse-voice-transcribe-1.0", role: "Describe your machine out loud instead of typing.", meta: true, live: false },
-  { stage: "think", name: "Muse Spark 1.3", id: "muse-spark-1.3", role: "Turns a sentence into a physics model and a starting controller, then explains every simulation and proposes fixes.", meta: true, live: true },
-  { stage: "think", name: "Muse Spark · vision", id: "muse-spark-1.3", role: "Reads the video scene: what kind of robot, a known-size object for scale, which part moves.", meta: true, live: false },
+  { stage: "sense", name: "SAM 3.1", id: "sam-3.1", role: "Tracks your real robot frame by frame in a video and lays its path over the simulation, so you see where the two disagree.", meta: true, live: true },
+  { stage: "sense", name: "Muse Spark · vision", id: "muse-spark-1.3", role: "Reads a video of a real robot or its workspace: the robot, its moving parts, every object and its size. Then builds it in 3D.", meta: true, live: true },
+  { stage: "think", name: "Muse Spark 1.3", id: "muse-spark-1.3", role: "Designs the whole robot, its room and its task from a sentence, revises it on request, and explains every simulation. The default.", meta: true, live: true },
+  { stage: "think", name: "Muse Wonder", id: "muse-wonder-1.0", role: "Deeper reasoning when you choose it, and the engineering agent: it simulates, diagnoses and revises until the physics passes.", meta: true, live: true },
   { stage: "check", name: "PlantSim engine", id: "C++17 → WebAssembly", role: "Our physics engine. Every AI suggestion is simulated and must pass the specs before you ever see it.", meta: false, live: true },
   { stage: "act", name: "Firmware generator", id: "Arduino · ESP32", role: "Writes the controller with the verified gains, ready to flash onto your robot.", meta: false, live: true },
 ];

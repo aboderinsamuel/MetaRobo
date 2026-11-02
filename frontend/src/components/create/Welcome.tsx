@@ -111,6 +111,6 @@ export function createTour(): TourStep[] {
     { target: "timeline", title: "Watch it do the job", body: "Every step of the task is simulated with real physics. Each mark on the timeline is a step: scrub through it, replay it, or slow it down." },
     { target: "tabs", title: "Make it yours", body: "Change it by describing what you want, Edit any part by hand, follow each step in Task, and see joint loads and motors in Engineer." },
     { target: "versions", title: "Nothing gets lost", body: "Every change is a new version. Step back and forth, and see the full history of what you asked for." },
-    { target: "lab", title: "Build it for real", body: "Open it in the Control Lab: the same body with real motors, a board and a battery inside, checked against their ratings, with wiring and firmware." },
+    { target: "lab", title: "Build it for real", body: "Open it in the Control Lab: the same body with real motors, a board and a battery inside. Use X-ray there to see the hardware and wiring inside the body, then check it against real ratings." },
   ];
 }

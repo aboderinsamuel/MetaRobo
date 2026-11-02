@@ -20,10 +20,18 @@ const pixel = Silkscreen({
   subsets: ["latin"],
 });
 
+const SITE = "https://robocraftlabs.vercel.app";
+const TITLE = "RoboCraft: describe a robot, see if it works";
+const DESCRIPTION = "Describe any robot in a sentence. Meta Muse Spark engineers the body, joints and task; RoboCraft builds it in 3D with real motors, boards and batteries inside, then physics checks every part and every step.";
+
 export const metadata: Metadata = {
-  title: "RoboCraft - describe a machine, get a controller",
-  description:
-    "Describe a physical system in plain words or upload step data. RoboCraft builds the model, designs a PID or state-feedback controller, simulates it in a C++/WebAssembly engine and explains how to fix it.",
+  metadataBase: new URL(SITE),
+  title: { default: TITLE, template: "%s · RoboCraft" },
+  description: DESCRIPTION,
+  applicationName: "RoboCraft",
+  keywords: ["AI robot design", "robotics simulation", "Meta Muse Spark", "SAM 3.1", "physics simulation", "WebAssembly", "robot engineering"],
+  openGraph: { type: "website", url: SITE, siteName: "RoboCraft", title: TITLE, description: DESCRIPTION, images: [{ url: "/og.png", width: 1200, height: 630, alt: "RoboCraft: describe a robot, see if it works" }] },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: ["/og.png"] },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

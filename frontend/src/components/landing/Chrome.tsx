@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Menu, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -10,24 +10,24 @@ import { ThemeToggle } from "@/components/create/ui";
 // `nav` marks the sections linked from the top bar; the side rail shows them all.
 export const SECTIONS = [
   { id: "intro", label: "Intro" },
-  { id: "meta", label: "Meta stack", nav: true },
-  { id: "loop", label: "The loop", nav: true },
+  { id: "meta", label: "Meta models", nav: true },
+  { id: "loop", label: "How it works", nav: true },
   { id: "systems", label: "Systems" },
   { id: "trace", label: "Agent", nav: true },
   { id: "engine", label: "Engine", nav: true },
   { id: "validation", label: "Validation" },
   { id: "pricing", label: "Pricing", nav: true },
-  { id: "log", label: "Hackathon", nav: true },
+  { id: "log", label: "Build log", nav: true },
   { id: "builder", label: "Builder" },
 ];
 
-export function LaunchButton({ className = "", label = "Open studio", href = "/create" }: { className?: string; label?: string; href?: string }) {
+export function LaunchButton({ className = "", label = "Start building", href = "/create" }: { className?: string; label?: string; href?: string }) {
   return (
     <Link
       href={href}
-      className={`spectrum-border group inline-flex h-9 items-center gap-2 rounded-xl bg-void px-4 font-mono text-[11px] tracking-[0.08em] text-fg uppercase transition-colors hover:bg-panel-2 ${className}`}
+      className={`group inline-flex h-9 items-center gap-1.5 rounded-xl bg-fg px-4 text-[13.5px] font-semibold text-void shadow-[0_8px_24px_-12px_rgb(0_130_251/0.6)] transition-transform hover:-translate-y-px ${className}`}
     >
-      <span className="text-mute transition-colors group-hover:text-fg">··</span> {label}
+      {label} <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
 }
@@ -48,12 +48,11 @@ export function Nav() {
       <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5">
           <RoboMark className="size-7" />
-          <span className="text-[15px] font-medium tracking-tight">RoboCraft</span>
-          <span className="mono-label hidden rounded-full border border-line-2 px-1.5 py-0.5 text-[9px] text-mute sm:inline">Control lab</span>
+          <span className="text-[16px] font-semibold tracking-[-0.02em]">RoboCraft</span>
         </Link>
-        <nav className="hidden items-center gap-6 md:flex">
+        <nav className="hidden items-center gap-7 lg:flex">
           {SECTIONS.filter((s) => s.nav).map((s) => (
-            <a key={s.id} href={`#${s.id}`} className="mono-label text-mute transition-colors hover:text-fg">
+            <a key={s.id} href={`#${s.id}`} className="text-[13.5px] font-medium text-mute transition-colors hover:text-fg">
               {s.label}
             </a>
           ))}
@@ -62,11 +61,14 @@ export function Nav() {
           <span className="hidden sm:block">
             <ThemeToggle />
           </span>
+          <Link href="/lab" className="hidden px-2 text-[13.5px] font-medium text-mute transition-colors hover:text-fg md:block">
+            Control Lab
+          </Link>
           {/* Wrapped: the button's own inline-flex would override a hidden class on it. */}
           <span className="hidden sm:block">
             <LaunchButton />
           </span>
-          <button className="flex size-9 items-center justify-center text-mute md:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
+          <button className="flex size-9 items-center justify-center text-mute lg:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
         </div>
@@ -77,16 +79,19 @@ export function Nav() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t border-line bg-void md:hidden"
+            className="overflow-hidden border-t border-line bg-void lg:hidden"
           >
             {SECTIONS.filter((s) => s.nav).map((s) => (
-              <a key={s.id} href={`#${s.id}`} onClick={() => setOpen(false)} className="mono-label flex items-center justify-between border-b border-line px-4 py-4 text-mute">
+              <a key={s.id} href={`#${s.id}`} onClick={() => setOpen(false)} className="flex items-center justify-between border-b border-line px-4 py-4 text-[15px] font-medium text-mute">
                 {s.label} <ArrowUpRight className="size-3.5" />
               </a>
             ))}
+            <Link href="/lab" onClick={() => setOpen(false)} className="flex items-center justify-between border-b border-line px-4 py-4 text-[15px] font-medium text-mute">
+              Control Lab <ArrowUpRight className="size-3.5" />
+            </Link>
             <div className="flex items-center gap-3 p-4">
               <ThemeToggle />
-              <LaunchButton className="flex-1 justify-center" />
+              <LaunchButton className="h-10 flex-1 justify-center" />
             </div>
           </motion.nav>
         )}

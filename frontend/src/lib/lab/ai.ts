@@ -267,8 +267,8 @@ export function offlineModel(description: string, presetId?: string): ModelResul
     notice: aiEnabled()
       ? undefined
       : confident
-        ? `Offline modeler: matched "${preset.name}" from the physics library. Turn on Muse Spark to model any system you describe.`
-        : `Offline modeler couldn't match that description, so it loaded "${preset.name}". Turn on Muse Spark to model any system you describe.`,
+        ? `Live AI is paused, so this is the closest ready-made machine: "${preset.name}". With live AI on, Muse Spark or Muse Wonder models any system you describe.`
+        : `Live AI is paused and no ready-made machine matched that description, so it loaded "${preset.name}". With live AI on, Muse Spark or Muse Wonder models any system you describe.`,
   };
 }
 
@@ -340,6 +340,7 @@ export async function explain(
   analysis: Analysis,
   history: { label: string; controller: ControllerSpec; summary: string }[],
   question?: string,
+  llm?: string,
 ): Promise<Advice> {
   const nStates = model.plant.kind === "ss" ? model.plant.B.length : model.plant.den.length - 1;
   const modelDigest = {
@@ -366,6 +367,7 @@ export async function explain(
       .join("\n\n"),
     maxTokens: 4000,
     effort: "low",
+    model: llm,
   });
   const out = res.data;
   return {
@@ -386,9 +388,9 @@ export function offlineExplain(model: LabModel, controller: ControllerSpec, anal
 export function describeError(err: unknown): string {
   if (err instanceof MetaError) {
     if (err.status === 401 || err.status === 403) return "The Meta API key was rejected.";
-    if (err.status === 429) return err.message.startsWith("Daily") ? err.message : "Muse Spark is rate-limited right now.";
+    if (err.status === 429) return err.message.startsWith("Daily") ? err.message : "The Meta model is rate-limited right now.";
     return err.message;
   }
-  if (err instanceof z.ZodError) return "Muse Spark returned data that failed validation.";
+  if (err instanceof z.ZodError) return "The Meta model returned data that failed validation.";
   return err instanceof Error ? err.message : String(err);
 }

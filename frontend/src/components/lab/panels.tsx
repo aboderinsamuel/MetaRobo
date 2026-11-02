@@ -1,5 +1,8 @@
 "use client";
 
+import type { AssistAction, AssistResult } from "@/lib/lab/assist";
+import type { Assembly } from "@/lib/lab/assembly";
+import type { HardwareBuild } from "@/lib/lab/hardware/build";
 import {
   ArrowRight,
   Check,
@@ -75,13 +78,13 @@ export const PIPELINE: { label: string; who: "meta" | "engine" }[] = [
 ];
 
 /** Today's Meta spend against the daily cap. */
-function MetaMeter({ aiOn, spend }: { aiOn: boolean | null; spend: { usd: number; budgetUsd: number } | null }) {
+function MetaMeter({ aiOn, spend, modelName }: { aiOn: boolean | null; spend: { usd: number; budgetUsd: number } | null; modelName: string }) {
   if (aiOn === null) return <span className="mono-label text-dim">…</span>;
-  if (!aiOn) return <span className="mono-label text-warn">Offline modeler</span>;
+  if (!aiOn) return <span className="mono-label text-warn" title="Live AI is switched off on this server; ready-made machines, checks and tuning still work">Live AI paused</span>;
   const pct = spend ? Math.min(100, (spend.usd / spend.budgetUsd) * 100) : 0;
   return (
     <span className="mono-label flex items-center gap-2 text-[10px] text-mute" title="Estimated Meta API spend today, against the daily cap">
-      <span className="text-spectrum font-semibold">Muse Spark</span>
+      <span className="text-spectrum font-semibold">{modelName}</span>
       {spend && (
         <>
           <span className="relative h-1 w-10 overflow-hidden rounded-full bg-line-2">
@@ -116,6 +119,8 @@ export function DescribePanel({
   error,
   userParts,
   onUserParts,
+  modelName = "Muse Spark",
+  promptHistory = [],
 }: {
   text: string;
   setText: (s: string) => void;
@@ -132,6 +137,9 @@ export function DescribePanel({
   error?: string | null;
   userParts: CatalogPart[];
   onUserParts: (p: CatalogPart[]) => void;
+  /** The Meta model chosen in the top bar. */
+  modelName?: string;
+  promptHistory?: string[];
 }) {
   const [clip, setClip] = useState<File | null>(null);
   const [clipError, setClipError] = useState<string | null>(null);
@@ -147,9 +155,17 @@ export function DescribePanel({
 
   return (
     <div>
-      <SectionLabel right={<MetaMeter aiOn={aiOn} spend={spend} />}>
-        01 · Describe the system
+      <SectionLabel right={<MetaMeter aiOn={aiOn} spend={spend} modelName={modelName} />}>
+        01 · Modeler · {modelName}
       </SectionLabel>
+      {promptHistory.length > 0 && (
+        <div className="border-b border-line px-4 pb-3">
+          <p className="mono-label mb-1.5 text-[9px] text-dim">Prompt history</p>
+          <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:thin]">
+            {promptHistory.slice(-6).map((prompt, i) => <span key={`${prompt}-${i}`} title={prompt} className="max-w-[220px] shrink-0 truncate rounded-lg bg-surface-2 px-2 py-1 text-[11px] text-mute">{prompt}</span>)}
+          </div>
+        </div>
+      )}
       <div
         className={`p-4 transition-colors ${drag ? "bg-panel-2" : ""}`}
         onDragOver={(e) => {
@@ -275,7 +291,7 @@ export function DescribePanel({
                       p.who === "meta" && aiOn ? "text-spectrum" : "text-mute"
                     }`}
                   >
-                    {p.who === "engine" ? "PlantSim" : aiOn ? "Muse Spark" : "Library"}
+                    {p.who === "engine" ? "PlantSim" : aiOn ? modelName : "Physics library"}
                   </span>
                 </li>
               ))}
@@ -516,11 +532,33 @@ export function SpecStrip({ checks, metrics, pm, unit }: { checks: SpecCheck[]; 
 }
 
 // ---------------------------------------------------------------------------
-// Copilot (explanations, proposals, history)
+// Assistant: ask the chosen Meta model, or tell it what to change (plus explain, tune, history)
 // ---------------------------------------------------------------------------
+
+/** The state before an assistant change, so it can be undone. */
+export interface AssistSnapshot {
+  build: HardwareBuild | null;
+  machine: Assembly | null;
+  ctrl: ControllerSpec | null;
+}
 
 export type ChatMsg =
   | { kind: "user"; text: string }
+  | {
+      kind: "assist";
+      reply: string;
+      mode: AssistResult["mode"];
+      /** Changes made, in plain words; `snap` undoes them. */
+      done: string[];
+      skipped: string[];
+      snap?: AssistSnapshot;
+      undone?: boolean;
+      /** Suggested changes, and which have been applied. */
+      suggestions: AssistAction[];
+      applied: number[];
+      model: string;
+      usage?: CallUsage;
+    }
   | { kind: "advice"; advice: Advice & { notice?: string }; previews: { metrics: Metrics; cost: number }[]; forIteration: number; base: ControllerSpec }
   | { kind: "event"; text: string };
 
@@ -540,7 +578,7 @@ export function diffCtrl(a: ControllerSpec, b: ControllerSpec): string {
   return describeCtrl(b);
 }
 
-export function Copilot({
+export function Assistant({
   messages,
   iterations,
   current,
@@ -553,6 +591,11 @@ export function Copilot({
   ready,
   specOk,
   aiOn = false,
+  modelName,
+  simple = false,
+  onAssist,
+  onUndo,
+  onApplySuggestion,
 }: {
   messages: ChatMsg[];
   iterations: Iteration[];
@@ -565,8 +608,15 @@ export function Copilot({
   onRestore: (it: Iteration) => void;
   ready: boolean;
   specOk: boolean;
-  /** Muse Spark is live, so Explain / questions / Iterate spend credit. */
+  /** Live AI is on, so Explain and questions spend credit. */
   aiOn?: boolean;
+  /** The Meta model chosen in the top bar (Muse Spark or Muse Wonder). */
+  modelName: string;
+  /** Simple mode: just the conversation, no tuning tools. */
+  simple?: boolean;
+  onAssist: (q: string) => void;
+  onUndo: (index: number) => void;
+  onApplySuggestion: (index: number, action: number) => void;
 }) {
   const [q, setQ] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -575,8 +625,8 @@ export function Copilot({
   }, [messages.length]);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <SectionLabel right={busy && <Loader2 className="size-3.5 animate-spin text-mute" />}>04 · Explain & iterate</SectionLabel>
-      {iterations.length > 0 && (
+      <SectionLabel right={busy && <Loader2 className="size-3.5 animate-spin text-mute" />}>Robo Copilot · {modelName}</SectionLabel>
+      {!simple && iterations.length > 0 && (
         <div className="flex gap-1.5 overflow-x-auto border-b border-line px-4 py-2.5 [scrollbar-width:none]">
           {iterations.map((it) => {
             const ok = it.analysis.metrics.stable === 1;
@@ -601,16 +651,78 @@ export function Copilot({
         </div>
       )}
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 [scrollbar-width:thin]">
-        {!messages.length && (
-          <p className="text-[13px] leading-relaxed text-mute">
-            Build a model to start. The copilot explains every response from its poles, damping and margins, and proposes fixes you can apply with one
-            click.
-          </p>
+        {!messages.some((m) => m.kind === "user" || m.kind === "assist") && (
+          <div className="space-y-2 text-[13px] leading-relaxed text-mute">
+            <p>
+              Ask Robo Copilot about this machine, or tell it what to change. It sees every part, check and number in the lab, makes the change for you, and the
+              simulation re-checks it.
+            </p>
+            {ready && aiOn && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {["Fix the problems", "Fix hardware issues", "Make it cheaper", "Why is it failing?"].map((p) => (
+                  <button key={p} onClick={() => onAssist(p)} disabled={!!busy} className="rounded-full border border-line-2 px-2.5 py-1 text-[12px] text-fg transition-colors hover:bg-panel-2 disabled:opacity-40">
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!aiOn && <p className="text-[12px] text-warn">Live AI is paused on this server, so questions can&apos;t be answered right now. The checks, one-click fixes and auto-tune still work.</p>}
+          </div>
         )}
         <AnimatePresence initial={false}>
           {messages.map((m, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
-              {m.kind === "user" && <div className="ml-auto max-w-[85%] bg-panel-2 px-3 py-2 text-[13px]">{m.text}</div>}
+              {m.kind === "user" && <div className="ml-auto max-w-[85%] rounded-2xl bg-panel-2 px-3 py-2 text-[13px]">{m.text}</div>}
+              {m.kind === "assist" && (
+                <div className="border-l-2 pl-3" style={{ borderImage: "var(--spectrum) 1" }}>
+                  <p className="text-[13px] leading-relaxed">{m.reply}</p>
+                  {m.done.length > 0 && (
+                    <div className={`mt-2 rounded-xl border border-line bg-void p-2.5 ${m.undone ? "opacity-50" : ""}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11.5px] font-medium text-ok">{m.undone ? "Undone" : "Changed"}</p>
+                        {m.snap && !m.undone && (
+                          <button onClick={() => onUndo(i)} disabled={!!busy} className="rounded-lg border border-line-2 px-2 py-0.5 text-[11px] text-fg transition-colors hover:bg-panel-2 disabled:opacity-40">
+                            Undo
+                          </button>
+                        )}
+                      </div>
+                      <ul className="mt-1 space-y-0.5 text-[12px] text-mute">
+                        {m.done.map((d) => (
+                          <li key={d} className="flex gap-1.5">
+                            <span className="text-dim">▸</span>
+                            {d}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {m.suggestions.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      {m.suggestions.map((a, j) => (
+                        <div key={j} className="flex items-start justify-between gap-2 rounded-xl border border-line bg-void p-2.5">
+                          <p className="min-w-0 text-[12px] leading-snug text-mute">
+                            <span className="font-medium text-fg">{actionLabel(a)}</span>
+                            <br />
+                            {a.why}
+                          </p>
+                          <button
+                            onClick={() => onApplySuggestion(i, j)}
+                            disabled={!!busy || m.applied.includes(j)}
+                            className="shrink-0 rounded-lg border border-line-2 px-2 py-0.5 text-[11px] text-fg transition-colors hover:bg-panel-2 disabled:opacity-40"
+                          >
+                            {m.applied.includes(j) ? "Applied" : "Apply"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {m.skipped.length > 0 && <p className="mt-1.5 text-[11.5px] text-warn">{m.skipped.join(" ")}</p>}
+                  <p className="mono-label mt-2 text-[9px] text-dim">
+                    {m.model}
+                    {usageNote(m.usage)}
+                  </p>
+                </div>
+              )}
               {m.kind === "event" && (
                 <p className="mono-label flex items-center gap-2 text-[10px] text-dim">
                   <span className="h-px flex-1 bg-line" />
@@ -665,7 +777,7 @@ export function Copilot({
                       );
                     })}
                   </div>
-                  <p className="mono-label mt-2 text-[9px] text-dim">{m.advice.source === "meta" ? "Meta Muse Spark" : "Offline advisor"} · on v{m.forIteration}
+                  <p className="mono-label mt-2 text-[9px] text-dim">{m.advice.source === "meta" ? modelName : "Offline advisor"} · on v{m.forIteration}
                     {usageNote(m.advice.usage)}
                   </p>
                 </div>
@@ -676,12 +788,13 @@ export function Copilot({
         <div ref={endRef} />
       </div>
       <div className="border-t border-line p-3">
+        {!simple && (
         <div className="mb-2 grid grid-cols-3 gap-1.5">
           <GhostButton
             onClick={() => onAsk()}
             disabled={!ready || !!busy}
             className="justify-center"
-            title={aiOn ? "Ask Meta Muse Spark to explain this response (a live call, about 1¢)" : "Explain with the offline advisor"}
+            title={aiOn ? `Ask ${modelName} to explain this response (a live call, about 1¢)` : "Explain with the offline advisor"}
           >
             <Lightbulb className="size-3" /> Explain
           </GhostButton>
@@ -692,11 +805,12 @@ export function Copilot({
             {busy === "auto" ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />} Iterate
           </GhostButton>
         </div>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             if (!q.trim()) return;
-            onAsk(q.trim());
+            onAssist(q.trim());
             setQ("");
           }}
           className="flex items-center border border-line-2 bg-void focus-within:border-fg/40 rounded-xl"
@@ -704,17 +818,25 @@ export function Copilot({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            disabled={!ready}
-            placeholder={ready ? "Ask: why does it oscillate? make it faster…" : "Build a model first"}
+            disabled={!ready || !aiOn}
+            placeholder={!ready ? "Build a machine first" : !aiOn ? "Live AI is paused" : "Ask, or say what to change…"}
             className="h-9 min-w-0 flex-1 bg-transparent px-3 text-[13px] outline-none placeholder:text-dim"
           />
-          <button type="submit" disabled={!ready || !!busy || !q.trim()} className="flex size-9 items-center justify-center text-mute hover:text-fg disabled:opacity-30">
+          <button type="submit" disabled={!ready || !aiOn || !!busy || !q.trim()} className="flex size-9 items-center justify-center text-mute hover:text-fg disabled:opacity-30">
             <Send className="size-3.5" />
           </button>
         </form>
       </div>
     </div>
   );
+}
+
+/** A suggested change in plain words. */
+function actionLabel(a: AssistAction): string {
+  if (a.kind === "swap_part" || a.kind === "swap_machine_part") return `Swap ${a.target.replace(/_/g, " ")} → ${a.value}`;
+  if (a.kind === "set_size") return `Set ${a.target.replace(/_/g, " ")} to ${a.value}`;
+  if (a.kind === "apply_fix") return "Apply the fix for this check";
+  return `Gains: Kp ${fmtNum(a.kp)} · Ki ${fmtNum(a.ki)} · Kd ${fmtNum(a.kd)}`;
 }
 
 // ---------------------------------------------------------------------------

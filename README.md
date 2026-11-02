@@ -7,10 +7,11 @@
 </p>
 
 <p align="center">
-  <a href="https://robocraftlaunch.vercel.app"><img alt="Live demo" src="https://img.shields.io/badge/live%20demo-robocraftlaunch.vercel.app-8B7FFF?style=flat-square" /></a>
+  <a href="https://robocraftlabs.vercel.app"><img alt="Live demo" src="https://img.shields.io/badge/live%20demo-robocraftlabs.vercel.app-8B7FFF?style=flat-square" /></a>
   <img alt="Meta Muse Spark" src="https://img.shields.io/badge/Meta-Muse%20Spark-0082FB?style=flat-square" />
+  <img alt="Meta Muse Wonder" src="https://img.shields.io/badge/Meta-Muse%20Wonder-0082FB?style=flat-square" />
   <img alt="SAM 3.1" src="https://img.shields.io/badge/Meta-SAM%203.1-0082FB?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-124%20passing-2ea44f?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-139%20passing-2ea44f?style=flat-square" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111?style=flat-square&logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-222?style=flat-square&logo=react" />
   <img alt="Three.js" src="https://img.shields.io/badge/Three.js-r186-222?style=flat-square&logo=threedotjs" />
@@ -19,10 +20,10 @@
 </p>
 
 <p align="center">
-  <a href="https://robocraftlaunch.vercel.app"><b>Live demo</b></a> ·
+  <a href="https://robocraftlabs.vercel.app"><b>Live demo</b></a> ·
   <a href="#new-here-start-in-two-minutes"><b>Get started</b></a> ·
-  <a href="https://robocraftlaunch.vercel.app/create">Create</a> ·
-  <a href="https://robocraftlaunch.vercel.app/lab?preset=arm">Control Lab</a> ·
+  <a href="https://robocraftlabs.vercel.app/create">Create</a> ·
+  <a href="https://robocraftlabs.vercel.app/lab?preset=arm">Control Lab</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#how-we-use-metas-models">Meta models</a> ·
   <a href="#run-it-locally">Run it</a>
@@ -56,6 +57,8 @@ You describe a robot in a sentence. RoboCraft gives you a **machine**, not a mes
    and the environment it works in (the laundry room, the warehouse shelf, the ball to fetch).
 2. **Real physics.** Rigid bodies and cloth in [Rapier](https://rapier.rs), with inverse-kinematics
    motion planning, so you watch it actually try the task, step by step, and see which steps fail.
+   A hand only holds what its fingers touch, arms keep out of the robot's own body and the
+   furniture, and every step is judged by where things really end up.
 3. **Real hardware inside.** Every joint gets a real actuator from a library of datasheet-rated
    parts. The machine is wired to a real board, driver and battery, and checked live: torque,
    current, voltage, runtime, balance and reach.
@@ -82,43 +85,51 @@ No account, no install, no maths needed. Pick the path that sounds like you.
 
 | You are… | Start here | You'll see |
 |---|---|---|
-| **New to robots** (makers, students, the curious) | [Guided tour](https://robocraftlaunch.vercel.app/lab?onboard=1) → *"I'm new to robots"* | **Simple mode**: plain words, a report card, one-click fixes |
-| **Learning engineering** | [Guided tour](https://robocraftlaunch.vercel.app/lab?onboard=1) → *"I'm learning engineering"* | **Pro mode**: the graphs, poles, Bode plots and maths behind every move |
-| **Already building robots** | [Control Lab](https://robocraftlaunch.vercel.app/lab?preset=arm) or [Create](https://robocraftlaunch.vercel.app/create) | The full lab: tuning, validation, firmware |
+| **New to robots** (makers, students, the curious) | [Guided tour](https://robocraftlabs.vercel.app/lab?onboard=1) → *"I'm new to robots"* | **Simple mode**: plain words, a report card, one-click fixes |
+| **Learning engineering** | [Guided tour](https://robocraftlabs.vercel.app/lab?onboard=1) → *"I'm learning engineering"* | **Pro mode**: the graphs, poles, Bode plots and maths behind every move |
+| **Already building robots** | [Control Lab](https://robocraftlabs.vercel.app/lab?preset=arm) or [Create](https://robocraftlabs.vercel.app/create) | The full lab: tuning, validation, firmware |
 
 ### Path 1: drive a ready-made robot (works without AI)
 
-1. Open the **[guided tour](https://robocraftlaunch.vercel.app/lab?onboard=1)**. Robo, the in-app guide,
+1. Open the **[guided tour](https://robocraftlabs.vercel.app/lab?onboard=1)**. Robo, the in-app guide,
    asks who you are and what you want to build: a rover, an arm, a self-balancing robot or a drone.
 2. A short tour points at each part of the screen. **Drag** to spin the robot, **scroll** to zoom,
    and **click any part** (a motor, the battery, the board) to see what it does.
-3. Choose a mission (pick and place, a figure-8, a climb) and press **Simulate**. The motion
+3. Press **X-ray** above the 3D view to make the body transparent and see the real actuators,
+   electronics, battery and wiring inside. Turn it off to return to the finished outer body.
+4. Choose a mission (pick and place, a figure-8, a climb) and press **Simulate**. The motion
    comes from real physics: the motors, the weight and the battery you chose.
-4. **Swap a part** in the Parts panel. Pick a weaker motor or a bigger battery and the robot,
+5. **Swap a part** in the Parts panel. Pick a weaker motor or a bigger battery and the robot,
    its current draw, its cost and its checks all update at once.
-5. Read **Design checks**. Anything that wouldn't work on a real bench (an overloaded driver, an
+6. Read **Design checks**. Anything that wouldn't work on a real bench (an overloaded driver, an
    over-volted servo) is explained in plain words, with a **one-click fix**. In Simple mode,
    **Make it better** tunes the robot for you.
-6. Switch to **Pro** to see the scope, poles and Bode plots, the validation suite and the
+7. Switch to **Pro** to see the scope, poles and Bode plots, the validation suite and the
    **Firmware** for the real board. **Export** the parts list and code when you're happy.
 
 ### Path 2: design your own robot from a sentence
 
-1. Open **[Create](https://robocraftlaunch.vercel.app/create)**. On your first visit Robo welcomes
+1. Open **[Create](https://robocraftlabs.vercel.app/create)**. On your first visit Robo welcomes
    you: open a **ready-made robot** (a laundry humanoid, a robot dog, a desk buddy or a water
    carrier; they open instantly, with no AI call) and a short tour shows you around the studio.
    Or describe your own robot and its job, typed or dictated with the microphone.
-2. Muse Spark designs it in 40 to 120 seconds: the body, the joints, the room it works in, and
-   the task. RoboCraft then simulates every step and shows which ones succeed.
+2. Pick the model in the top bar, **Muse Spark** (the default, about 30 to 60 seconds) or
+   **Muse Wonder** (deeper reasoning, about 45 to 90 seconds), and it designs the body, the joints,
+   the room it works in, and the task. RoboCraft then simulates every step and shows which ones
+   succeed.
 3. Make it yours:
    - **Change**: say what to change ("make it 20% taller", "add a second table").
      Every version is kept, and you can step back to any of them.
    - **Edit**: click any part to resize it or change its material and colour.
    - **Task**: watch each step of the job, scrub the timeline, change the speed.
    - **Engineer**: joint loads, actuator sizing and one-click safety fixes.
-   - **Video**: upload a phone clip of a real robot to compare it with the simulation.
+   - **Agent**: an engineering agent (Muse Wonder or Muse Spark) inspects the design, simulates
+     it, diagnoses the failures from the data, revises and re-simulates until the physics passes.
+   - **Video**: upload a clip of a real robot or its workspace. Muse Spark reads the scene and
+     builds it in 3D; SAM 3.1 tracks the real motion to compare it with the simulation.
 4. Press **Open in Control Lab**. Your robot arrives with the body exactly as designed and real
-   hardware inside. Press **X-ray** to see the servos, the board, the battery and the wiring.
+   hardware inside. Press **X-ray** to make the body transparent and see the servos, the board,
+   the battery and the wiring before checking the build.
    From here it's Path 1, steps 4 to 6.
 
 > [!TIP]
@@ -128,7 +139,7 @@ No account, no install, no maths needed. Pick the path that sounds like you.
 > - Light and dark themes are in the top-right corner.
 
 > [!NOTE]
-> Designing a *new* robot from a sentence needs a live Muse Spark call. If the hosted demo shows
+> Designing a *new* robot from a sentence needs a live Muse Spark or Muse Wonder call. If the hosted demo shows
 > "New designs are paused on this demo right now", live AI is switched off to protect the
 > hackathon's credit budget. The ready-made robots in Create, the four Control Lab demos, the
 > physics, the parts, the checks and the firmware all work without it.
@@ -137,12 +148,12 @@ No account, no install, no maths needed. Pick the path that sounds like you.
 
 ```mermaid
 flowchart LR
-    A["Sentence, voice<br/>or phone video"] --> B["Muse Spark<br/>strict JSON schema"]
+    A["Sentence, voice<br/>or phone video"] --> B["Muse Spark or Wonder<br/>strict JSON schema"]
     V["SAM 3.1<br/>video tracking"] -.-> A
     B --> C["Sanitiser<br/>mirroring · joint axes · masses"]
     C --> D["3D design<br/>shapes · materials · joints"]
     C --> E["Physics<br/>Rapier + cloth worker"]
-    E --> F["Task planner<br/>CCD IK · posture search"]
+    E --> F["Task planner<br/>CCD IK · posture search<br/>clearance · contact · outcomes"]
     D --> G["Control Lab<br/>design → real hardware"]
     F --> G
     G --> H["Checks<br/>torque · current · balance"]
@@ -151,10 +162,12 @@ flowchart LR
     I --> J
 ```
 
-**1. Design.** Muse Spark answers in a strict JSON schema (`robot_design`): free-form shapes
+**1. Design.** Muse Spark or Muse Wonder (the user's choice) answers in a strict JSON schema (`robot_design`): free-form shapes
 (box, cylinder, capsule, lathe, extrude, tube, torus…), PBR materials, a joint tree with axes,
 limits and actuators, effectors, the scene, a task plan and a hardware block. A long designer
-guide teaches it build quality, human-scale proportions, actuator sizing, mirroring and mobility.
+guide teaches it build quality, human-scale proportions, actuator sizing, mirroring and mobility,
+and to keep machines grounded and plausible (standing on the floor or mounted on a surface that
+exists, the work in front of it, arms clear of the body).
 
 **2. Sanitise.** Model output is never trusted blindly. `sanitizeDesign` mirrors left/right limbs,
 repairs joint housing orientation and elbow/knee axes, computes masses from real material
@@ -164,7 +177,8 @@ re-sanitised on load, so old designs pick up every fix.
 **3. Simulate.** Rapier rigid bodies plus a Verlet cloth solver run in a Web Worker. Each task
 step (reach, grasp, lift, place, fold, walk, fly) is planned with closed-loop CCD inverse
 kinematics and a posture search (crouch, lean from the pelvis, shift the base), then checked
-against joint torque, balance, reach and collisions. The result is a recording you can scrub.
+against joint torque, balance, reach, collisions and the step's real outcome (see
+[Physics you can trust](#physics-you-can-trust)). The result is a recording you can scrub.
 
 **4. Engineer.** `designToAssembly` turns the design into a machine without another AI call and
 without changing the body: a shell per part, a real actuator per joint (picked by measured load
@@ -178,6 +192,28 @@ driver drop), proposes PID or LQR gains, and simulates in a dependency-free **C+
 to WebAssembly** (RK4, dead time, saturation, noise, closed-loop poles, Bode margins, system ID).
 Eight validation checks (stability, margins, specs, actuator limits, ±30% model error, sensor
 noise, load disturbance, and a WASM-versus-TypeScript cross-check) run before you build.
+
+## Physics you can trust
+
+<p align="center">
+  <img src="docs/assets/create-desk-buddy-pen.png" alt="The desk buddy holding a red pen out in its fingers after picking it from its cup: 14 of 14 task steps succeeded" width="100%" />
+</p>
+
+A simulation is only useful if it can't be fooled, including by the AI that designed the robot.
+RoboCraft holds every task to what would really happen:
+
+| | |
+|---|---|
+| **A hand holds only what it touches** | A grasp takes hold only when the fingertips are within 2.5 cm of the object's actual surface (its oriented box, not its centre). Reaches aim at the surface nearest the hand, so fingers close on things instead of passing into them. A carried object stays exactly where the hand touched it. |
+| **Outcomes, not motions** | After a release the object is left to settle in the physics, then checked: *"The pen is on the desk"*, or *"The pen didn't end up on the desk. It fell to the floor when the hand let go."*. Lifting or placing with nothing in hand fails the step. A step passes only if the world actually changed the way it says. |
+| **Arms keep out of the body and the furniture** | Forearms, wrists, hands and anything held are checked against the robot's own torso, hips and legs and against the scene. A hand that rests inside a hip is swung clear before the task; among arm configurations that reach a target equally well, the clearest wins; reaches onto furniture come down from above. Whatever clipping is left is reported by name: *"the right palm is inside the right thigh"*, with how long. |
+| **Set out like a real workcell** | If a design puts a loose item beyond a fixed arm's reach, it's slid along its surface (with the cup it stands in) until the arm's own inverse kinematics reaches it, and the report says so. Mobile robots stop with their body clear of what they're working on, turn to face it, and edge closer only into free space. |
+| **Gestures are honest too** | "Hold the pen out to you" without a target means a point in front of the robot; if it's beyond the arm, the robot reaches as far as it can and says how far short it is. |
+
+The four ready-made robots run their tasks this way: the desk buddy **14 / 14** steps, the robot
+dog **12 / 12**, the laundry humanoid **39 / 39**. The water carrier's arms only swing fore and aft,
+so it can't reach its bucket's handle; the simulation reports exactly that, which is what the
+**Agent** tab is for.
 
 ## The Control Lab
 
@@ -201,11 +237,12 @@ robot, quadcopter), lands in a lab tailored to it:
 
 | Model | Where | What it does |
 |---|---|---|
-| **Muse Spark** (text) | `lib/create/ai.ts` | Designs a robot, its environment and its task from a sentence (`robot_design`), and revises it from a change request while keeping everything else (`robot_design_revision`). |
+| **Muse Spark** or **Muse Wonder** (text, the user picks) | `lib/create/ai.ts` | Designs a robot, its environment and its task from a sentence (`robot_design`), and revises it from a change request while keeping everything else (`robot_design_revision`). Spark is the default; Wonder reasons more deeply. Both run at low reasoning effort, so a design takes about 35 s (Spark) or 50 s (Wonder). |
+| **Muse Wonder** or **Muse Spark** (tool calling) | `lib/agent/` | The engineering agent: a bounded closed loop where the model calls deterministic tools (`inspect_design`, `run_simulation`, `revise_design`, `finish`), diagnoses failures from the physics data and revises until the task passes. The verdict is computed from the simulation, never taken from the model. |
 | **Muse Spark** (text) | `lib/lab/ai.ts` | Models a physical system as a plant (`plant_model`), designs a parts-level assembly (`machine_assembly`), explains a controller's response (`controller_advice`), reviews feasibility (`feasibility_review`), and finds a real part online with sources (`find_part`). |
 | **Muse Spark** (vision) | `lib/create/ai.ts` | Reads keyframes from a phone video: the robot, its moving parts, the objects around it, and real sizes judged from things of known size (`video_scene`). That observation can seed a new design. |
 | **SAM 3.1** | `lib/meta/sam.ts` | Tracks the robot's moving part through a real video. In Create the tracked path is overlaid on the simulated one, so you see where the model and the machine disagree. In the Control Lab the tracked boxes become step-response data that the engine fits a plant to. |
-| **Muse Wonder, Muse Image** | landing film | The launch film on the landing page. |
+| **Muse Image** | landing film | The launch film on the landing page. |
 
 ### Built to respect a small credit budget
 
@@ -304,7 +341,8 @@ validation suite cross-checks the two.
 
 ```bash
 cd frontend
-npm test              # 124 Vitest tests: design sanitising, kinematics, IK, simulation,
+npm test              # 139 Vitest tests: design sanitising, kinematics, IK, simulation,
+                      # arm clearance, real contact, the engineering agent,
                       # design → assembly, firmware, hardware checks, validation
 npm run lint
 npm run typecheck
@@ -317,6 +355,8 @@ npm run typecheck
 - **Closing the loop with the real robot:** SAM 3.1 tracking from a live camera, with the
   simulation's parameters fitted to what the camera sees.
 - **Shareable projects** and accounts, instead of browser-only storage.
+- **Contact forces for the robot itself:** its links move by inverse kinematics with clearance
+  checks today; next is driving them as physics bodies, so pushes and contact forces are simulated too.
 
 ---
 

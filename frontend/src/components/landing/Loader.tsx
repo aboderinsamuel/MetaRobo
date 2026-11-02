@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import RoboMark from "@/components/brand/RoboMark";
 
-const LINES = ["LOADING PLANTSIM ENGINE", "COMPILING C++ → WASM MODULE", "WARMING RK4 INTEGRATOR", "CALIBRATING CONTROLLERS"];
+const LINES = ["LOADING THE PHYSICS ENGINE", "STARTING THE C++ CORE", "WARMING UP THE SIMULATOR", "READY"];
 
 /** Boot screen shown once per browser session. */
 export default function Loader() {

@@ -29,8 +29,10 @@ function rawGeometry(s: ShapeSpec): THREE.BufferGeometry {
     case "torus":
       return new THREE.TorusGeometry(Math.max(1e-3, (a - b) / 2), b / 2, 20, 72, (c || 360) * DEG);
     case "lathe": {
+      // Centred on its height like every other shape, so `offset` is the middle of the shell.
       const pts = s.points.map(([r, y]) => new THREE.Vector2(Math.max(0, r), y));
-      return new THREE.LatheGeometry(pts, 64);
+      const ys = pts.map((p) => p.y);
+      return new THREE.LatheGeometry(pts, 64).translate(0, -(Math.min(...ys) + Math.max(...ys)) / 2, 0);
     }
     case "extrude": {
       const shape = new THREE.Shape(s.points.map(([x, y]) => new THREE.Vector2(x, y)));

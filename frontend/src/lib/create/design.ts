@@ -109,7 +109,7 @@ export const StepOut = z.object({
   action: z
     .enum(STEP_ACTIONS)
     .describe(
-      "move_to: walk/drive to stand in front of `target`, facing it (always give a target when going to an object; without one, `at` = [x, 0, z] on the floor). reach: move an effector to the target object (+ `at` offset). grasp: close the effector on the target (cloth is pinched, rigid objects are held). lift: raise what's held by `at`[1] metres. place: carry what's held to the target object (+ `at` offset, e.g. above a basket). release: open and let go. fold: fold the target cloth in half (both hands if available). open / close: swing the target's hinge to its max / min. pose: set joints directly (`joints`). wait: pause.",
+      "move_to: walk/drive to stand in front of `target`, facing it (always give a target when going to an object; without one, `at` = [x, 0, z] on the floor). reach: move an effector to the target object (+ `at` offset); with no target, to the point `at` = [sideways (+ is the robot's left), height above the floor, distance in front of the robot]. grasp: close the effector on the target (cloth is pinched, rigid objects are held). lift: raise what's held by `at`[1] metres. place: carry what's held to the target object (+ `at` offset, e.g. above a basket); with no target, to the point `at` in front of the robot (as for reach), e.g. holding something out to a person. release: open and let go. fold: fold the target cloth in half (both hands if available). open / close: swing the target's hinge to its max / min. pose: set joints directly (`joints`). wait: pause.",
     ),
   effector: z.string().describe("Effector id, 'both', or ''"),
   target: z.string().describe("Object id or ''"),

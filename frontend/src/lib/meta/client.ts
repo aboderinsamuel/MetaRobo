@@ -215,6 +215,61 @@ export async function metaJson<S extends z.ZodType>(req: JsonRequest<S>): Promis
   return { data, usage, cached: false, model };
 }
 
+/** The long-horizon engineering agent's model (tool calling, multi-step). */
+export const AGENT_MODEL = process.env.META_AGENT_MODEL || "muse-wonder-1.0";
+
+export interface ChatToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+export interface ChatTurn {
+  message: { content: string | null; tool_calls?: ChatToolCall[] };
+  usage: Usage;
+  cached: boolean;
+  model: string;
+}
+
+// One tool-calling turn of a Chat Completions conversation. Cached by the exact request (same
+// conversation + same tool results → same answer, free), costed, capped, retried once on 5xx.
+export async function metaChat(req: { messages: unknown[]; tools: unknown[]; model?: string; maxTokens?: number; effort?: "minimal" | "low" | "medium" | "high"; label?: string }): Promise<ChatTurn> {
+  const model = req.model ?? AGENT_MODEL;
+  const body = { model, messages: req.messages, tools: req.tools, max_completion_tokens: req.maxTokens ?? 4000, reasoning_effort: req.effort ?? "medium" };
+  const key = createHash("sha256").update(JSON.stringify(body)).digest("hex");
+  const file = await cachePath(key);
+  try {
+    const hit = JSON.parse(await readFile(file, "utf8")) as { message: ChatTurn["message"] };
+    if (hit.message) return { message: hit.message, usage: zeroUsage(), cached: true, model };
+  } catch {
+    // Not cached: go live.
+  }
+  await assertCanSpend();
+  type AgentResponse = { choices?: { finish_reason?: string; message?: ChatTurn["message"] }[]; usage?: ChatResponse["usage"]; error?: { message?: string } };
+  let json: AgentResponse | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(`${BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.MODEL_API_KEY}` },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(150_000),
+    });
+    json = (await res.json().catch(() => null)) as AgentResponse | null;
+    if (res.ok && json) break;
+    if (res.status < 500 || attempt === 1) throw new MetaError(json?.error?.message ?? `Meta API error ${res.status}`, res.status);
+  }
+  const u = json!.usage ?? {};
+  const raw = { inputTokens: u.prompt_tokens ?? 0, cachedTokens: u.prompt_tokens_details?.cached_tokens ?? 0, outputTokens: u.completion_tokens ?? 0, reasoningTokens: u.completion_tokens_details?.reasoning_tokens ?? 0 };
+  const usage = { ...raw, costUsd: estimateCost(model, raw) };
+  await recordUsage(model, req.label ?? "agent_turn", usage);
+  const choice = json!.choices?.[0];
+  const msg = choice?.message;
+  if (!msg) throw new MetaError("The model returned no message.");
+  if (choice?.finish_reason === "length" && !msg.tool_calls?.length) throw new MetaError("The model ran out of output tokens before finishing.");
+  const message = { content: msg.content ?? null, ...(msg.tool_calls?.length ? { tool_calls: msg.tool_calls.map((c) => ({ id: c.id, type: "function" as const, function: { name: c.function.name, arguments: c.function.arguments ?? "{}" } })) } : {}) };
+  await writeFile(file, JSON.stringify({ model, schemaName: req.label ?? "agent_turn", message })).catch(() => {});
+  return { message, usage, cached: false, model };
+}
+
 export function zeroUsage(): Usage {
   return { inputTokens: 0, cachedTokens: 0, outputTokens: 0, reasoningTokens: 0, costUsd: 0 };
 }
