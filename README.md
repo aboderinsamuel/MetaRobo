@@ -95,14 +95,16 @@ No account, no install, no maths needed. Pick the path that sounds like you.
    asks who you are and what you want to build: a rover, an arm, a self-balancing robot or a drone.
 2. A short tour points at each part of the screen. **Drag** to spin the robot, **scroll** to zoom,
    and **click any part** (a motor, the battery, the board) to see what it does.
-3. Choose a mission (pick and place, a figure-8, a climb) and press **Simulate**. The motion
+3. Press **X-ray** above the 3D view to make the body transparent and see the real actuators,
+   electronics, battery and wiring inside. Turn it off to return to the finished outer body.
+4. Choose a mission (pick and place, a figure-8, a climb) and press **Simulate**. The motion
    comes from real physics: the motors, the weight and the battery you chose.
-4. **Swap a part** in the Parts panel. Pick a weaker motor or a bigger battery and the robot,
+5. **Swap a part** in the Parts panel. Pick a weaker motor or a bigger battery and the robot,
    its current draw, its cost and its checks all update at once.
-5. Read **Design checks**. Anything that wouldn't work on a real bench (an overloaded driver, an
+6. Read **Design checks**. Anything that wouldn't work on a real bench (an overloaded driver, an
    over-volted servo) is explained in plain words, with a **one-click fix**. In Simple mode,
    **Make it better** tunes the robot for you.
-6. Switch to **Pro** to see the scope, poles and Bode plots, the validation suite and the
+7. Switch to **Pro** to see the scope, poles and Bode plots, the validation suite and the
    **Firmware** for the real board. **Export** the parts list and code when you're happy.
 
 ### Path 2: design your own robot from a sentence
@@ -126,7 +128,8 @@ No account, no install, no maths needed. Pick the path that sounds like you.
    - **Video**: upload a clip of a real robot or its workspace. Muse Spark reads the scene and
      builds it in 3D; SAM 3.1 tracks the real motion to compare it with the simulation.
 4. Press **Open in Control Lab**. Your robot arrives with the body exactly as designed and real
-   hardware inside. Press **X-ray** to see the servos, the board, the battery and the wiring.
+   hardware inside. Press **X-ray** to make the body transparent and see the servos, the board,
+   the battery and the wiring before checking the build.
    From here it's Path 1, steps 4 to 6.
 
 > [!TIP]

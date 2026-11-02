@@ -143,6 +143,7 @@ export function tourSteps(mode: Mode, kind: RigKind): TourStep[] {
   const f = FRIENDLY[kind];
   return [
     { target: "robot", title: `This is your ${f.name.toLowerCase()}`, body: "Drag to spin it around and scroll to zoom. Click any part (a motor, the battery, the brain) to see what it does or swap it for another." },
+    { target: "xray", title: "See inside with X-ray", body: "Press X-ray to make the outer body transparent and reveal the real actuators, electronics, battery and wiring inside your robot." },
     { target: "programs", title: "Pick what it should do", body: kind === "rover" ? "Drive straight up a ramp, a square, a figure-8 or a spin." : "Each button is a different mission. Try them all." },
     { target: "simulate", title: "Press Simulate", body: "Watch it move. Everything you see comes from real physics: the motors, the weight and the battery you chose." },
     {

@@ -326,13 +326,15 @@ export default function HardwareView({
             </button>
           )}
           {machine?.parts.some((p) => p.internal) && (
-            <button
-              onClick={() => setXray((v) => !v)}
-              title={xray ? "Hide the hardware inside the body" : "See the real hardware inside the body: actuators, electronics, wiring"}
-              className={`rounded-xl mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${xray ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
-            >
-              <ScanEye className="size-3" /> X-ray
-            </button>
+            <div data-tour="xray">
+              <button
+                onClick={() => setXray((v) => !v)}
+                title={xray ? "Hide the hardware inside the body" : "See the real hardware inside the body: actuators, electronics, wiring"}
+                className={`rounded-xl mono-label flex items-center gap-1 border px-2 py-1 text-[10px] backdrop-blur ${xray ? "border-spec-1/40 bg-spec-1/10 text-spec-1" : "border-line-2 bg-void/80 text-dim"}`}
+              >
+                <ScanEye className="size-3" /> X-ray
+              </button>
+            </div>
           )}
           <button
             onClick={() => setLabels((v) => !v)}
