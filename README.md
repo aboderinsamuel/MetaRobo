@@ -11,7 +11,6 @@
   <img alt="Meta Muse Spark" src="https://img.shields.io/badge/Meta-Muse%20Spark-0082FB?style=flat-square" />
   <img alt="Meta Muse Wonder" src="https://img.shields.io/badge/Meta-Muse%20Wonder-0082FB?style=flat-square" />
   <img alt="SAM 3.1" src="https://img.shields.io/badge/Meta-SAM%203.1-0082FB?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-139%20passing-2ea44f?style=flat-square" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111?style=flat-square&logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-222?style=flat-square&logo=react" />
   <img alt="Three.js" src="https://img.shields.io/badge/Three.js-r186-222?style=flat-square&logo=threedotjs" />
