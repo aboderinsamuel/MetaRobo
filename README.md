@@ -11,8 +11,6 @@
   <img alt="Meta Muse Spark" src="https://img.shields.io/badge/Meta-Muse%20Spark-0082FB?style=flat-square" />
   <img alt="Meta Muse Wonder" src="https://img.shields.io/badge/Meta-Muse%20Wonder-0082FB?style=flat-square" />
   <img alt="SAM 3.1" src="https://img.shields.io/badge/Meta-SAM%203.1-0082FB?style=flat-square" />
-  <a href="https://github.com/aboderinsamuel/MetaRobo/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/aboderinsamuel/MetaRobo/actions/workflows/ci.yml/badge.svg" /></a>
-  <img alt="Tests" src="https://img.shields.io/badge/tests-146%20passing-2ea44f?style=flat-square" />
   <img alt="Benchmark" src="https://img.shields.io/badge/benchmark-73%2F79%20task%20steps%20in%20physics-2ea44f?style=flat-square" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111?style=flat-square&logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-222?style=flat-square&logo=react" />
@@ -296,7 +294,7 @@ The whole hackathon ran on a $150 credit, so cost is engineered, not hoped for:
 | Control engine | C++17, no dependencies, flat C ABI, compiled to WebAssembly with Emscripten (about 94 KB); TypeScript fallback |
 | AI | Meta Muse Spark (text and vision), Muse Wonder (tool calling) and SAM 3.1 through the Meta Model API, server-side only |
 | Deploy | Vercel (one project, `vercel.json` routes the Next.js app and the Python service) |
-| Tests | Vitest (146 tests, including the physics benchmark), native engine tests (21 analytic checks), pytest for the Python engines, all on GitHub Actions |
+| Tests | Vitest (146 tests, including the physics benchmark), native engine tests (21 analytic checks), and pytest for the Python engines |
 
 ## Repository layout
 
@@ -388,7 +386,7 @@ npm run typecheck
 npm run bench         # the physics benchmark, written to docs/BENCHMARKS.md
 ```
 
-Every push runs the same checks on GitHub Actions ([CI](.github/workflows/ci.yml)), plus the C++ engine's native build and its 21 analytic checks.
+The repository includes repeatable local checks for the frontend, backend, physics benchmark, and native C++ engine.
 
 ## What's next
 
