@@ -35,7 +35,7 @@
 |---|---|
 | **Provenance** | Built from scratch during the hackathon window (Oct 26 – Nov 4, 2026), starting from an empty repository on Oct 27. Nothing predates it; [every step is a public commit](https://github.com/aboderinsamuel/MetaRobo/commits/main). |
 | **Track** | Push the Frontier |
-| **Demo video** | [youtu.be/oAomRdEClAo](https://youtu.be/oAomRdEClAo) · live app: [robocraftlabs.vercel.app](https://robocraftlabs.vercel.app) |
+| **Demo video** | [youtu.be/DkItopcQN84](https://youtu.be/DkItopcQN84) · live app: [robocraftlabs.vercel.app](https://robocraftlabs.vercel.app) |
 | **Meta models at runtime** | **Muse Spark 1.3** designs and revises robots, reads video scenes (vision), explains controllers, and changes the machine live in the Control Lab. **Muse Wonder** runs the engineering agent (a bounded tool-calling loop) and deeper designs on request. **SAM 3.1** tracks real robots in video against the simulation. The user chooses Spark or Wonder. ([details](#how-we-use-metas-models)) |
 | **Not a prompt wrapper** | The model proposes; deterministic code decides. Every design is simulated in Rapier physics with contact-based grasping and outcome checks, checked against real part datasheets, and validated by a C++ control engine compiled to WebAssembly. Verdicts come from the physics, never from the model. |
 | **Bonus categories targeted** | Best Agentic Use-Case · Best Creative Build |
