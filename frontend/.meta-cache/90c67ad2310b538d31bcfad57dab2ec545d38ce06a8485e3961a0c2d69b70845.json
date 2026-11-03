@@ -1,0 +1,1 @@
+{"model":"muse-spark-1.3","schemaName":"lab_assistant","content":"{\"actions\": [], \"mode\": \"answer\", \"reply\": \"No listed servo can lift 261.0 kg-cm. The strongest option DS3218 stalls at 21.5 kg-cm, still far below need.\"}"}

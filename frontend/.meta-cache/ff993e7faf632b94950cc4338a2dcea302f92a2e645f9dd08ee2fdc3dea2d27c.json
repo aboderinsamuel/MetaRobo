@@ -1,0 +1,1 @@
+{"model":"muse-wonder-1.0","schemaName":"engineering_agent","message":{"content":null,"tool_calls":[{"id":"call_ab2bfa20-e836-4203-ac9c-214d05a36089","type":"function","function":{"name":"run_simulation","arguments":"{}"}}]}}

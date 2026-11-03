@@ -1,0 +1,1 @@
+{"model":"muse-wonder-1.0","schemaName":"engineering_agent","message":{"content":"Fixing your warehouse shuttle — diagnosing tip-over and lift loads in simulation.","tool_calls":[{"id":"call_c2531037-acaf-4b0a-9486-dbc230d64aa4","type":"function","function":{"name":"inspect_design","arguments":"{}"}}]}}

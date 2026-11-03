@@ -1,0 +1,1 @@
+{"model":"muse-spark-1.3","schemaName":"lab_assistant","content":"{\"actions\": [], \"mode\": \"answer\", \"reply\": \"No catalogue servo can hold 59.8 kg-cm. Strongest DS3218 stalls at 21.5 kg-cm, still 38.3 kg-cm short. Shorten upper and forearm and cut the 500 g payload to get load under ~13 kg-cm.\"}"}
