@@ -11,7 +11,7 @@
   <img alt="Meta Muse Spark" src="https://img.shields.io/badge/Meta-Muse%20Spark-0082FB?style=flat-square" />
   <img alt="Meta Muse Wonder" src="https://img.shields.io/badge/Meta-Muse%20Wonder-0082FB?style=flat-square" />
   <img alt="SAM 3.1" src="https://img.shields.io/badge/Meta-SAM%203.1-0082FB?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-139%20passing-2ea44f?style=flat-square" />
+  <img alt="Benchmark" src="https://img.shields.io/badge/benchmark-73%2F79%20task%20steps%20in%20physics-2ea44f?style=flat-square" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111?style=flat-square&logo=nextdotjs" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-222?style=flat-square&logo=react" />
   <img alt="Three.js" src="https://img.shields.io/badge/Three.js-r186-222?style=flat-square&logo=threedotjs" />
@@ -28,6 +28,19 @@
   <a href="#how-we-use-metas-models">Meta models</a> ·
   <a href="#run-it-locally">Run it</a>
 </p>
+
+## Meta Global AI Developer Hackathon 2026 · Submission
+
+| | |
+|---|---|
+| **Provenance** | Built from scratch during the hackathon window (Oct 26 – Nov 4, 2026), starting from an empty repository on Oct 27. Nothing predates it; [every step is a public commit](https://github.com/aboderinsamuel/MetaRobo/commits/main). |
+| **Track** | Push the Frontier |
+| **Demo video** | [youtu.be/DkItopcQN84](https://youtu.be/DkItopcQN84) · live app: [robocraftlabs.vercel.app](https://robocraftlabs.vercel.app) |
+| **Meta models at runtime** | **Muse Spark 1.3** designs and revises robots, reads video scenes (vision), explains controllers, and changes the machine live in the Control Lab. **Muse Wonder** runs the engineering agent (a bounded tool-calling loop) and deeper designs on request. **SAM 3.1** tracks real robots in video against the simulation. The user chooses Spark or Wonder. ([details](#how-we-use-metas-models)) |
+| **Not a prompt wrapper** | The model proposes; deterministic code decides. Every design is simulated in Rapier physics with contact-based grasping and outcome checks, checked against real part datasheets, and validated by a C++ control engine compiled to WebAssembly. Verdicts come from the physics, never from the model. |
+| **Bonus categories targeted** | Best Agentic Use-Case · Best Creative Build |
+| **Benchmarks** | 73 of 79 task steps succeed (92%) across 4 robots in full physics; Muse Spark fixes a blocked arm in 5 s for $0.006. [See below](#benchmarks). |
+| **Try it without a key** | The ready-made robots in Create, the four Control Lab demos, physics, parts, checks, firmware, `npm test` and `npm run bench` all run with no API key. [Run it locally](#run-it-locally) |
 
 <br />
 
@@ -240,6 +253,7 @@ robot, quadcopter), lands in a lab tailored to it:
 | **Muse Spark** or **Muse Wonder** (text, the user picks) | `lib/create/ai.ts` | Designs a robot, its environment and its task from a sentence (`robot_design`), and revises it from a change request while keeping everything else (`robot_design_revision`). Spark is the default; Wonder reasons more deeply. Both run at low reasoning effort, so a design takes about 35 s (Spark) or 50 s (Wonder). |
 | **Muse Wonder** or **Muse Spark** (tool calling) | `lib/agent/` | The engineering agent: a bounded closed loop where the model calls deterministic tools (`inspect_design`, `run_simulation`, `revise_design`, `finish`), diagnoses failures from the physics data and revises until the task passes. The verdict is computed from the simulation, never taken from the model. |
 | **Muse Spark** (text) | `lib/lab/ai.ts` | Models a physical system as a plant (`plant_model`), designs a parts-level assembly (`machine_assembly`), explains a controller's response (`controller_advice`), reviews feasibility (`feasibility_review`), and finds a real part online with sources (`find_part`). |
+| **Muse Spark** or **Muse Wonder** (the user picks) | `lib/lab/assist.ts` | The Control Lab assistant. It sees the machine's live state (parts and their real alternatives, sizes, failing checks and their fixes, the controller and its performance). Asked to change something, it changes it at once, with Undo; asked what to do, it suggests changes. Every change is checked against the real catalogue and limits before it's applied (`lab_assistant`). |
 | **Muse Spark** (vision) | `lib/create/ai.ts` | Reads keyframes from a phone video: the robot, its moving parts, the objects around it, and real sizes judged from things of known size (`video_scene`). That observation can seed a new design. |
 | **SAM 3.1** | `lib/meta/sam.ts` | Tracks the robot's moving part through a real video. In Create the tracked path is overlaid on the simulated one, so you see where the model and the machine disagree. In the Control Lab the tracked boxes become step-response data that the engine fits a plant to. |
 | **Muse Image** | landing film | The launch film on the landing page. |
@@ -278,9 +292,9 @@ The whole hackathon ran on a $150 credit, so cost is engineered, not hoped for:
 | 3D | Three.js r186, React Three Fiber 9, drei, custom procedural geometry (lathe, extrude, tube, bins) |
 | Physics | Rapier 3D (rigid bodies, joints, contacts), Verlet cloth with a broad phase, both in a Web Worker |
 | Control engine | C++17, no dependencies, flat C ABI, compiled to WebAssembly with Emscripten (about 94 KB); TypeScript fallback |
-| AI | Meta Muse Spark (text and vision) and SAM 3.1 through the Meta Model API, server-side only |
+| AI | Meta Muse Spark (text and vision), Muse Wonder (tool calling) and SAM 3.1 through the Meta Model API, server-side only |
 | Deploy | Vercel (one project, `vercel.json` routes the Next.js app and the Python service) |
-| Tests | Vitest (124 tests), native engine tests (21 analytic checks), pytest for the Python engines |
+| Tests | Vitest (146 tests, including the physics benchmark), native engine tests (21 analytic checks), and pytest for the Python engines |
 
 ## Repository layout
 
@@ -337,16 +351,42 @@ If the WASM file is missing, the app falls back to a TypeScript port of the same
 validation suite cross-checks the two.
 </details>
 
+## Benchmarks
+
+**Physics (reproducible, no key):** `cd frontend && npm run bench` runs every ready-made robot (real Muse Spark designs stored in the repo) through its whole task in full physics and writes [docs/BENCHMARKS.md](docs/BENCHMARKS.md). `npm test` runs the same benchmark as a regression guard.
+
+| Robot | Joints | Task steps succeeded | Grasps that held (real contact) | Simulated time |
+|---|---:|---:|---:|---:|
+| Desk buddy | 12 | 14 / 14 | 1 / 1 | 16.9 s |
+| Robot dog | 17 | 12 / 12 | n/a | 30.5 s |
+| Laundry humanoid | 38 | 39 / 39 | 7 / 7 | 112.0 s |
+| Water carrier | 19 | 8 / 14 | 0 / 2 | 37.9 s |
+| **Total** | | **73 / 79 (92%)** | **8 / 10** | |
+
+The water carrier's arms only swing fore and aft, so they can't reach its bucket's handle; the simulation reports exactly that instead of faking the grasp (fixing it is what the engineering agent is for).
+
+**Live Meta models (measured Nov 1, 2026, real calls):**
+
+| Call | Model | Time | Cost |
+|---|---|---:|---:|
+| Design a robot from a sentence | Muse Spark 1.3 | 34 s | $0.055 |
+| Design a robot from a sentence | Muse Wonder | 50 s | $0.28 |
+| "Fix the problems" on a blocked arm (driver swapped, controller retuned: not feasible → feasible, overshoot 31.3% → 5.0%, settling 1.81 s → 1.24 s) | Muse Spark 1.3 | 5 s | $0.006 |
+
 ## Testing
 
 ```bash
 cd frontend
-npm test              # 139 Vitest tests: design sanitising, kinematics, IK, simulation,
-                      # arm clearance, real contact, the engineering agent,
+npm test              # 146 Vitest tests: design sanitising, kinematics, IK, simulation,
+                      # arm clearance, real contact, the engineering agent, the lab
+                      # assistant's safety checks, the four-robot physics benchmark,
                       # design → assembly, firmware, hardware checks, validation
 npm run lint
 npm run typecheck
+npm run bench         # the physics benchmark, written to docs/BENCHMARKS.md
 ```
+
+The repository includes repeatable local checks for the frontend, backend, physics benchmark, and native C++ engine.
 
 ## What's next
 

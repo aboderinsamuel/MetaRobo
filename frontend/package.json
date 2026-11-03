@@ -12,7 +12,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "engine:test": "cd ../engine && cmake -S . -B build && cmake --build build && ctest --test-dir build --output-on-failure",
-    "engine:wasm": "bash ../engine/build-wasm.sh"
+    "engine:wasm": "bash ../engine/build-wasm.sh",
+    "bench": "vitest run tests/benchmark.test.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.14.0",
