@@ -1549,12 +1549,14 @@ export default function Lab({ initialPreset, onboard = false, fromCreate = false
 
 function Tabs<T extends string>({ value, onChange, items, layoutId }: { value: T; onChange: (v: T) => void; items: { id: T; label: string; icon: typeof Activity }[]; layoutId: string }) {
   return (
-    <div className="rc-scroll flex shrink-0 overflow-x-auto border-b border-line">
+    <div className="grid shrink-0 gap-1 border-b border-line p-2" style={{ gridTemplateColumns: `repeat(${Math.min(3, items.length)}, minmax(0, 1fr))` }} role="tablist" aria-label="Lab tools">
       {items.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
+          role="tab"
+          aria-selected={value === id}
           onClick={() => onChange(id)}
-          className={`mono-label relative flex h-9 min-w-[84px] flex-1 shrink-0 items-center justify-center gap-1.5 px-2 text-[10.5px] transition-colors ${value === id ? "text-fg" : "text-dim hover:text-mute"}`}
+          className={`relative flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-[11px] font-medium transition-colors ${value === id ? "bg-accent-soft text-fg" : "text-mute hover:bg-surface-2 hover:text-fg"}`}
         >
           <Icon className="size-3.5" /> {label}
           {value === id && <motion.span layoutId={layoutId} className="absolute inset-x-3 bottom-0 h-px" style={{ background: "var(--spectrum)" }} />}

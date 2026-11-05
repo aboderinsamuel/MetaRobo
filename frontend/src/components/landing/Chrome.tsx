@@ -61,8 +61,8 @@ export function Nav() {
           <span className="hidden sm:block">
             <ThemeToggle />
           </span>
-          <Link href="/lab" className="hidden px-2 text-[13.5px] font-medium text-mute transition-colors hover:text-fg md:block">
-            Control Lab
+          <Link href="/hardware" className="hidden px-2 text-[13.5px] font-medium text-mute transition-colors hover:text-fg md:block">
+            Hardware Studio
           </Link>
           {/* Wrapped: the button's own inline-flex would override a hidden class on it. */}
           <span className="hidden sm:block">
@@ -86,8 +86,8 @@ export function Nav() {
                 {s.label} <ArrowUpRight className="size-3.5" />
               </a>
             ))}
-            <Link href="/lab" onClick={() => setOpen(false)} className="flex items-center justify-between border-b border-line px-4 py-4 text-[15px] font-medium text-mute">
-              Control Lab <ArrowUpRight className="size-3.5" />
+            <Link href="/hardware" onClick={() => setOpen(false)} className="flex items-center justify-between border-b border-line px-4 py-4 text-[15px] font-medium text-mute">
+              Hardware Studio <ArrowUpRight className="size-3.5" />
             </Link>
             <div className="flex items-center gap-3 p-4">
               <ThemeToggle />

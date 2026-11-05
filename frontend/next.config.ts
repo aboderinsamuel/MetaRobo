@@ -9,6 +9,7 @@ const onVercel = Boolean(process.env.VERCEL);
 const backend = (process.env.BACKEND_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: { "/api/hardware/compile": ["./src/data/uno-heartbeat.json"] },
   // Vercel packages the app itself; the standalone server is for the Docker image.
   output: onVercel ? undefined : "standalone",
   async rewrites() {

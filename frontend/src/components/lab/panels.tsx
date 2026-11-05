@@ -39,7 +39,7 @@ import type { CatalogPart } from "@/lib/lab/catalog/parts";
 
 export function SectionLabel({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between px-4 pt-4 pb-2">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 pt-4 pb-2">
       <span className="text-[12px] font-semibold tracking-wide text-mute uppercase">{children}</span>
       {right}
     </div>
@@ -83,7 +83,7 @@ function MetaMeter({ aiOn, spend, modelName }: { aiOn: boolean | null; spend: { 
   if (!aiOn) return <span className="mono-label text-warn" title="Live AI is switched off on this server; ready-made machines, checks and tuning still work">Live AI paused</span>;
   const pct = spend ? Math.min(100, (spend.usd / spend.budgetUsd) * 100) : 0;
   return (
-    <span className="mono-label flex items-center gap-2 text-[10px] text-mute" title="Estimated Meta API spend today, against the daily cap">
+    <span className="mono-label flex shrink-0 flex-wrap items-center gap-2 whitespace-nowrap text-[10px] text-mute" title="Estimated Meta API spend today, against the daily cap">
       <span className="text-spectrum font-semibold">{modelName}</span>
       {spend && (
         <>
@@ -156,7 +156,7 @@ export function DescribePanel({
   return (
     <div>
       <SectionLabel right={<MetaMeter aiOn={aiOn} spend={spend} modelName={modelName} />}>
-        01 · Modeler · {modelName}
+        Describe your machine
       </SectionLabel>
       {promptHistory.length > 0 && (
         <div className="border-b border-line px-4 pb-3">
@@ -913,6 +913,9 @@ export function CodePanel({ code, ts, filename, machine = false }: { code: strin
           </p>
         </div>
         <div className="flex gap-2">
+          <GhostButton onClick={() => { try { sessionStorage.setItem("rc-hardware-handoff", code); window.location.assign("/hardware"); } catch { alert("Could not transfer the sketch. Download it and paste it into Hardware Studio."); } }}>
+            <Upload className="size-3" /> Open in Hardware Studio
+          </GhostButton>
           <GhostButton
             onClick={() => {
               void navigator.clipboard.writeText(code).then(() => {

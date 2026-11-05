@@ -4,6 +4,7 @@ import EngineSection from "@/components/landing/EngineSection";
 import Footer from "@/components/landing/Footer";
 import HackathonLog from "@/components/landing/HackathonLog";
 import Hero from "@/components/landing/Hero";
+import HardwareBridge from "@/components/landing/HardwareBridge";
 import Loader from "@/components/landing/Loader";
 import LoopStory from "@/components/landing/LoopStory";
 import MetaStack from "@/components/landing/MetaStack";
@@ -18,6 +19,7 @@ export default function Home() {
       <SideIndex />
       <main>
         <Hero />
+        <HardwareBridge />
         <MetaStack />
         <LoopStory />
         <Systems />

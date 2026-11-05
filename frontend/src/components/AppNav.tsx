@@ -8,6 +8,7 @@ import RoboMark from "@/components/brand/RoboMark";
 import { cx } from "@/components/create/ui";
 
 const LINKS = [
+  { href: "/hardware", label: "Hardware", hint: "Write, compile and upload Arduino firmware directly over USB" },
   { href: "/create", label: "Create", hint: "Describe any robot; Muse Spark designs it and it's simulated" },
   { href: "/lab", label: "Control lab", hint: "Pick real parts, tune the controller, scope, Bode, firmware; demos included" },
 ];
