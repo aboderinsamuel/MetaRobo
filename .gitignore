@@ -6,4 +6,5 @@ node_modules/
 .env.*.local
 .meta-cache/
 *.tsbuildinfo
+*.egg-info/
 .hardware-preview/
