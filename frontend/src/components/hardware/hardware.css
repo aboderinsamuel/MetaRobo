@@ -111,6 +111,53 @@
   justify-content: flex-end;
   margin-top: 24px;
 }
+.hw-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+}
+.hw-tour-dim {
+  position: absolute;
+  inset: 0;
+  background: rgb(4 5 6 / 74%);
+}
+.hw-tour-spotlight {
+  position: absolute;
+  border: 2px solid var(--hw-teal);
+  border-radius: 7px;
+  pointer-events: none;
+}
+.hw-tour-card {
+  position: absolute;
+  padding: 16px;
+  border: 1px solid #66e0c266;
+  border-radius: 16px;
+  background: var(--color-surface);
+  box-shadow: 0 24px 70px #00000066;
+  pointer-events: auto;
+}
+.hw-tour-card h2 {
+  margin: 5px 0 6px;
+  font-size: 15px;
+  font-weight: 550;
+}
+.hw-tour-card > p:not(.hw-eyebrow) {
+  color: var(--color-mute);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.hw-tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+}
+.hw-tour-actions > div {
+  display: flex;
+  gap: 6px;
+}
 .hw-title {
   display: flex;
   align-items: center;

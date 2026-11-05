@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, useEffect, useRef, useState, type ReactNode } from "react";
+import { Component, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -50,22 +50,13 @@ type Proposal = {
 };
 const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong. Try again.");
 const initialCodes = { arduino: HEARTBEAT, verilog: HDL_START, vhdl: VHDL_START };
-const ONBOARDING_STEPS = [
-  {
-    title: "Start with Board heartbeat",
-    body: "This verified demo needs only an Arduino Uno R3 and a USB data cable. It is the one sketch that builds without a separate compiler service.",
-    label: "Load Board heartbeat",
-  },
-  {
-    title: "Connect the board",
-    body: "Use desktop Chrome or Edge on HTTPS or localhost. Close Arduino IDE and other serial monitors, plug in a data cable, then choose the Uno port.",
-    label: "Connect Uno",
-  },
-  {
-    title: "Build, review, upload",
-    body: "Build creates the firmware image. Review the code and wiring, then upload. The browser verifies the written flash before reporting success.",
-    label: "Open the code step",
-  },
+const HARDWARE_TOUR_STEPS = [
+  { target: "hardware-recipe", title: "1. Choose Board heartbeat", body: "Start here. This verified sketch needs only an Arduino Uno R3 and a USB data cable, and it builds without a hosted compiler." },
+  { target: "hardware-connect", title: "2. Plug in your Uno", body: "Use a data cable, close Arduino IDE or other serial monitors, then click Connect Uno and choose the port in the browser dialog." },
+  { target: "hardware-build", title: "3. Build the sketch", body: "Click Build sketch. The browser prepares the firmware image and shows the build evidence. No board is changed by this step." },
+  { target: "hardware-review", title: "4. Review before flashing", body: "Read the sketch and open Wiring. Check that the code and physical wiring match your Uno, then tick this acknowledgement." },
+  { target: "hardware-upload", title: "5. Upload and verify", body: "Click Upload to Uno. RoboCraft writes the flash, reads it back, and reports success only after verification. Watch the amber L LED for two pulses." },
+  { target: "hardware-serial", title: "6. See the real result", body: "Open Serial monitor, keep 9600 baud, and click Start monitor. The heartbeat prints a message after each pair of LED pulses." },
 ] as const;
 const importedRecipe: Recipe = {
   id: "imported",
@@ -127,7 +118,6 @@ export default function HardwareStudio() {
   );
   const [guide, setGuide] = useState(true);
   const [onboarding, setOnboarding] = useState(true);
-  const [onboardingStep, setOnboardingStep] = useState(0);
   const [view3d, setView3d] = useState(true);
   const port = useRef<HardwarePort | null>(null);
   const serialReader = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
@@ -166,7 +156,7 @@ export default function HardwareStudio() {
         );
       }
       setGuide(localStorage.getItem("rc-hardware-guide") !== "done");
-      setOnboarding(localStorage.getItem("rc-hardware-onboarding") !== "done");
+      setOnboarding(localStorage.getItem("rc-hardware-tour") !== "done");
     } catch {}
     setHydrated(true);
     fetch("/api/hardware/compile")
@@ -404,17 +394,8 @@ export default function HardwareStudio() {
   const finishOnboarding = () => {
     setOnboarding(false);
     try {
-      localStorage.setItem("rc-hardware-onboarding", "done");
+      localStorage.setItem("rc-hardware-tour", "done");
     } catch {}
-  };
-  const onboardingAction = () => {
-    if (onboardingStep === 0) selectRecipe(RECIPES[0]);
-    if (onboardingStep === 1 && supported) void connect();
-    if (onboardingStep === 2) {
-      setTab("code");
-      finishOnboarding();
-    }
-    if (onboardingStep < ONBOARDING_STEPS.length - 1) setOnboardingStep((step) => step + 1);
   };
   const steps = ["Choose a sketch", "Connect USB", "Build & upload", "See it work"];
 
@@ -435,37 +416,6 @@ export default function HardwareStudio() {
         </div>
       </header>
       <main className="hw-shell">
-        {onboarding && (
-          <div className="hw-onboarding-backdrop" role="presentation">
-            <section className="hw-onboarding" role="dialog" aria-modal="true" aria-labelledby="hw-onboarding-title">
-              <div className="hw-onboarding-topline">
-                <span className="hw-eyebrow">HARDWARE STUDIO · GETTING STARTED</span>
-                <button className="hw-icon" onClick={finishOnboarding} aria-label="Skip onboarding">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="hw-onboarding-progress" aria-label={`Step ${onboardingStep + 1} of 3`}>
-                {ONBOARDING_STEPS.map((step, index) => (
-                  <span key={step.title} className={index <= onboardingStep ? "active" : ""} />
-                ))}
-              </div>
-              <p className="hw-onboarding-count">Step {onboardingStep + 1} of 3</p>
-              <h2 id="hw-onboarding-title">{ONBOARDING_STEPS[onboardingStep].title}</h2>
-              <p className="hw-onboarding-body">{ONBOARDING_STEPS[onboardingStep].body}</p>
-              <div className="hw-onboarding-actions">
-                <button className="hw-button" onClick={finishOnboarding}>Skip for now</button>
-                <button
-                  className="hw-button primary"
-                  disabled={onboardingStep === 1 && supported === null}
-                  onClick={onboardingAction}
-                >
-                  {onboardingStep === 1 && !supported ? "Read connection steps" : ONBOARDING_STEPS[onboardingStep].label}{" "}
-                  <ArrowRight size={15} />
-                </button>
-              </div>
-            </section>
-          </div>
-        )}
         <div className="hw-title">
           <div>
             <p className="hw-eyebrow">
@@ -480,6 +430,7 @@ export default function HardwareStudio() {
             <span className={connected ? "hw-dot on" : "hw-dot"} />
             {connected ? "USB port selected" : "No board connected"}
             <button
+              data-tour="hardware-connect"
               className={connected ? "hw-button" : "hw-button primary"}
               disabled={!!busy || !supported}
               onClick={
@@ -557,6 +508,7 @@ export default function HardwareStudio() {
             <div className="hw-recipes">
               {filtered.map((r, i) => (
                 <button
+                  data-tour={r.id === "heartbeat" ? "hardware-recipe" : undefined}
                   disabled={!!busy}
                   className={`hw-recipe ${r.id === recipe.id && language === "arduino" ? "selected" : ""}`}
                   key={r.id}
@@ -680,7 +632,8 @@ export default function HardwareStudio() {
             <div className="hw-editor-top">
               <div className="hw-editor-tabs" role="tablist" aria-label="Hardware workspace">
                 {(["code", "wiring", "serial"] as const).map((t) => (
-                  <button role="tab" aria-selected={tab === t} key={t} onClick={() => setTab(t)}>
+                  <button                   data-tour={t === "serial" ? "hardware-serial" : undefined}
+                  role="tab" aria-selected={tab === t} key={t} onClick={() => setTab(t)}>
                     {t === "code" ? (
                       <Code2 size={15} />
                     ) : t === "wiring" ? (
@@ -862,6 +815,7 @@ export default function HardwareStudio() {
                 ))}
                 <div className="hw-actions">
                   <button
+                    data-tour="hardware-upload"
                     className="hw-button primary"
                     onClick={() => {
                       const next = proposal;
@@ -889,6 +843,7 @@ export default function HardwareStudio() {
               )}
               <div className="hw-build-actions">
                 <button
+                  data-tour="hardware-build"
                   className="hw-button"
                   disabled={!!busy || !canBuild}
                   onClick={compile}
@@ -919,7 +874,7 @@ export default function HardwareStudio() {
                   Upload to Uno
                 </button>
               </div>
-              <label className="hw-review">
+              <label data-tour="hardware-review" className="hw-review">
                 <input
                   type="checkbox"
                   checked={reviewed}
@@ -979,6 +934,103 @@ export default function HardwareStudio() {
           <span>Uno R3 USB upload · 10 kit recipes · Meta AI editing</span>
         </footer>
       </main>
+      {onboarding && <HardwareTour steps={HARDWARE_TOUR_STEPS} onClose={finishOnboarding} />}
+    </div>
+  );
+}
+
+function HardwareTour({
+  steps,
+  onClose,
+}: {
+  steps: readonly { target: string; title: string; body: string }[];
+  onClose: () => void;
+}) {
+  const [index, setIndex] = useState(0);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const step = steps[index];
+  useLayoutEffect(() => {
+    document.querySelector(`[data-tour="${step.target}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [step.target]);
+  useEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      const next = document.querySelector(`[data-tour="${step.target}"]`)?.getBoundingClientRect() ?? null;
+      setRect((previous) =>
+        previous &&
+        next &&
+        previous.x === next.x &&
+        previous.y === next.y &&
+        previous.width === next.width &&
+        previous.height === next.height
+          ? previous
+          : next,
+      );
+      frame = requestAnimationFrame(measure);
+    };
+    frame = requestAnimationFrame(measure);
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowRight") setIndex((value) => Math.min(steps.length - 1, value + 1));
+      if (event.key === "ArrowLeft") setIndex((value) => Math.max(0, value - 1));
+    };
+    window.addEventListener("keydown", key);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", key);
+    };
+  }, [onClose, step.target, steps.length]);
+  const vw = typeof window === "undefined" ? 1200 : window.innerWidth;
+  const vh = typeof window === "undefined" ? 800 : window.innerHeight;
+  const cardWidth = Math.min(350, vw - 32);
+  const box = rect && { x: rect.x - 6, y: rect.y - 6, w: rect.width + 12, h: rect.height + 12 };
+  let left = vw / 2 - cardWidth / 2;
+  let top = vh / 2 - 100;
+  if (box) {
+    if (box.x + box.w + cardWidth + 16 < vw) {
+      left = box.x + box.w + 12;
+      top = box.y;
+    } else if (box.x - cardWidth - 16 > 0) {
+      left = box.x - cardWidth - 12;
+      top = box.y;
+    } else {
+      left = box.x + box.w / 2 - cardWidth / 2;
+      top = box.y + box.h + 12 < vh ? box.y + box.h + 12 : box.y - 190;
+    }
+  }
+  left = Math.max(16, Math.min(vw - cardWidth - 16, left));
+  top = Math.max(16, Math.min(vh - 210, top));
+  const last = index === steps.length - 1;
+  return (
+    <div className="hw-tour" aria-live="polite">
+      {box ? (
+        <div
+          className="hw-tour-spotlight"
+          style={{
+            left: box.x,
+            top: box.y,
+            width: box.w,
+            height: box.h,
+            boxShadow: "0 0 0 9999px rgb(4 5 6 / 0.74), 0 0 24px rgb(102 224 194 / 0.55)",
+          }}
+        />
+      ) : (
+        <div className="hw-tour-dim" />
+      )}
+      <div className="hw-tour-card" style={{ left, top, width: cardWidth }} role="dialog" aria-label={step.title}>
+        <p className="hw-eyebrow">TOUR · {index + 1} / {steps.length}</p>
+        <h2>{step.title}</h2>
+        <p>{step.body}</p>
+        <div className="hw-tour-actions">
+          <button className="hw-button" onClick={onClose}>Skip tour</button>
+          <div>
+            {index > 0 && <button className="hw-button" onClick={() => setIndex((value) => value - 1)}>Back</button>}
+            <button className="hw-button primary" onClick={() => (last ? onClose() : setIndex((value) => value + 1))}>
+              {last ? "Let's go" : "Next"} <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
