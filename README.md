@@ -59,11 +59,18 @@
 | **Board heartbeat:** two amber pulses on the built-in `L` LED. Only your Uno and a USB data cable are needed. Its real compiled binary is bundled. | **Ten kit recipes:** LED, button, potentiometer, piezo, servo, distance sensor, character LCD, light sensor, and stepper with wiring guides. Custom builds use the hosted Arduino compiler. |
 | **Guided onboarding:** choose a sketch → connect USB → build and upload → observe the board. | **Meta coding copilot:** review a proposed sketch and wiring before applying it. Export Arduino C++, Verilog, or VHDL. HDL drafts require an FPGA toolchain. |
 
-<p align="center">
-  <img src="frontend/public/hardware/uno-desk.jpeg" alt="Physical Arduino Uno R3 connected to a laptop by USB on a workbench" width="340" />
-  <img src="docs/assets/controller-targets.png" alt="ESP32, Raspberry Pi Pico RP2040, and STM32 Blue Pill or Nucleo boards beside a telemetry laptop" width="340" />
-  <br /><sub>Physical bench references: the Uno R3 is the supported browser-upload target today; the ESP32, RP2040, and STM32 boards illustrate broader controller targets and integration directions.</sub>
-</p>
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="frontend/public/hardware/uno-desk.jpeg" alt="Physical Arduino Uno R3 connected to a laptop by USB on a workbench" width="100%" />
+      <br /><sub><b>Arduino Uno R3</b><br />Supported browser-upload target today.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/assets/controller-targets.png" alt="ESP32, Raspberry Pi Pico RP2040, and STM32 Blue Pill or Nucleo boards beside a telemetry laptop" width="100%" />
+      <br /><sub><b>Broader controller targets</b><br />ESP32, RP2040, and STM32 integration directions.</sub>
+    </td>
+  </tr>
+</table>
 
 **Try the board you have now:** open **Hardware** → **Board heartbeat** → **Connect Uno** → select its USB port → **Build sketch** → review the code/wiring checkbox → **Upload to Uno**. Watch for two short amber `L` flashes. The serial monitor at 9600 baud reads messages from the running sketch.
 
