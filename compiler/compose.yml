@@ -1,0 +1,15 @@
+services:
+  compiler:
+    build: .
+    ports: ["127.0.0.1:8080:8080"]
+    environment:
+      COMPILER_TOKEN: ${COMPILER_TOKEN:?Set a random compiler secret}
+      ARDUINO_BUILD_CACHE_PATH: /tmp/arduino-cache
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=256m,mode=1777"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    cpus: 1.5
+    pids_limit: 96
+    restart: unless-stopped

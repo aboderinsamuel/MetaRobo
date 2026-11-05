@@ -1,0 +1,48 @@
+{
+  "name": "robocraft-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:hardware": "node scripts/dev-hardware.mjs",
+    "hardware:build-demo": "node scripts/build-hardware-demo.mjs",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "engine:test": "cd ../engine && cmake -S . -B build && cmake --build build && ctest --test-dir build --output-on-failure",
+    "engine:wasm": "bash ../engine/build-wasm.sh",
+    "bench": "vitest run tests/benchmark.test.ts"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.14.0",
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.8.0",
+    "@vercel/analytics": "^2.0.1",
+    "lucide-react": "^1.47.0",
+    "motion": "^14.7.1",
+    "next": "16.3.6",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "three": "^0.186.0",
+    "zod": "^4.6.7",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.186.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.6",
+    "prettier": "^3.9.9",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^5.0.5"
+  }
+}

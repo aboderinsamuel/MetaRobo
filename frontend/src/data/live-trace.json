@@ -1,0 +1,88 @@
+{
+  "rig": {
+    "kind": "rover",
+    "signal": "speed"
+  },
+  "title": "Small Two-Motor Robot Car Speed Control",
+  "summary": "Small two-motor robot car modeled as a first-order voltage-to-speed drivetrain. We control forward wheel speed to 1 m/s using a common motor voltage command.",
+  "domain": "electromechanical",
+  "input": {
+    "name": "motor drive voltage",
+    "unit": "V"
+  },
+  "output": {
+    "name": "forward speed",
+    "unit": "m/s"
+  },
+  "params": [
+    {
+      "symbol": "K",
+      "name": "steady-state gain voltage to speed",
+      "value": 0.35,
+      "unit": "(m/s)/V"
+    },
+    {
+      "symbol": "tau",
+      "name": "drivetrain time constant",
+      "value": 0.25,
+      "unit": "s"
+    },
+    {
+      "symbol": "r",
+      "name": "wheel radius",
+      "value": 0.035,
+      "unit": "m"
+    },
+    {
+      "symbol": "Vmax",
+      "name": "motor rated voltage",
+      "value": 6,
+      "unit": "V"
+    }
+  ],
+  "equations": [
+    "tau dv/dt + v = K u + d",
+    "v is forward speed, u is motor voltage, d is load disturbance in speed units"
+  ],
+  "assumptions": [
+    "Both DC motors driven by a common voltage command for straight-line motion, no differential steering",
+    "Linearized around 1 m/s forward on flat ground, no wheel slip",
+    "Motor inductance and battery voltage sag neglected, first-order drivetrain dominates",
+    "Load disturbance models slope / friction / payload as equivalent input voltage"
+  ],
+  "plant": {
+    "kind": "tf",
+    "num": [
+      0.35
+    ],
+    "den": [
+      0.25,
+      1
+    ],
+    "delay": 0
+  },
+  "controller": {
+    "type": "pid",
+    "kp": 2,
+    "ki": 7,
+    "kd": 0.05,
+    "N": 20
+  },
+  "controllerRationale": "PI-dominated speed loop with small filtered D for noise robustness. IMC tuning for first-order plant with closed-loop lambda ~0.4 s gives kp=tau/(K*lambda) ~2.0 and ki=kp/tau ~7.0 for ~1.8 s settling and zero steady-state error. kd small, N=20 rad/s ~5x bandwidth.",
+  "specs": {
+    "maxOvershootPct": 10,
+    "maxSettlingTime": 2,
+    "maxSsErrorPct": 2,
+    "uMin": 0,
+    "uMax": 6
+  },
+  "sim": {
+    "tEnd": 6,
+    "ref": 1,
+    "disturbance": {
+      "time": 3,
+      "magnitude": -0.8
+    }
+  },
+  "source": "meta"
+}

@@ -1,0 +1,407 @@
+@import "tailwindcss";
+
+/* dark: follows the theme toggle (<html data-theme>), not only the OS setting. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-pixel: var(--font-pixel);
+}
+
+/* Official dark palette: neutral charcoal (#161616 page, #222222 / #2B2B2A surfaces), hairline
+   grid, violet accent #8B7FFF and the Meta-style blue-to-pink spectrum for highlights. */
+@theme {
+  --color-void: #161616;
+  --color-panel: #222222;
+  --color-panel-2: #2b2b2a;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-2: rgb(255 255 255 / 0.14);
+  --color-fg: #ededed;
+  --color-mute: #a3a3a3;
+  --color-dim: #6b6b6b;
+  --color-spec-1: #2dd4ff;
+  --color-spec-2: #0082fb;
+  --color-spec-3: #9b5cff;
+  --color-spec-4: #d946ef;
+  --color-spec-5: #ff5ca8;
+  --color-spec-6: #ff8ac4;
+  --color-ok: #4ade80;
+  --color-warn: #fbbf24;
+  --color-bad: #f87171;
+  /* Workspace accent (selection, primary actions) and its soft tint. */
+  --color-accent: #8b7fff;
+  --color-accent-soft: rgb(139 127 255 / 0.16);
+  --color-accent-fg: #ffffff;
+  /* Floating surfaces in the workspace. */
+  --color-surface: #222222;
+  --color-surface-2: #2b2b2a;
+  --color-canvas: #161616;
+}
+
+@theme {
+  --color-ink-950: #161616;
+  --color-ink-900: #1c1c1c;
+  --color-ink-850: #222222;
+  --color-ink-800: #2b2b2a;
+  --color-ink-700: #3a3a39;
+  --color-ink-600: #4d4d4c;
+  --color-ink-400: #8a8a8a;
+  --color-ink-300: #b4b4b4;
+  --color-ink-100: #ededed;
+  --color-brand-300: #7ee8f5;
+  --color-brand-400: #3dd6ec;
+  --color-brand-500: #16b8d2;
+  --color-brand-600: #0e93aa;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+/* Light theme: soft daylight greys for long building sessions. No pure white surfaces (they glare
+   on bright screens), graphite text instead of black (≈12:1 contrast, well past WCAG AAA for
+   body text), and a calmer accent. Its own palette, not an inversion of the dark one.
+   Set on <html data-theme="light"> before first paint; see the theme script in the layout. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-void: #e3e4e7;
+  --color-panel: #edeef0;
+  --color-panel-2: #e2e3e7;
+  --color-line: rgb(28 32 40 / 0.1);
+  --color-line-2: rgb(28 32 40 / 0.17);
+  --color-fg: #24272d;
+  --color-mute: #5d626c;
+  --color-dim: #8b909a;
+  --color-ok: #16794a;
+  --color-warn: #a1561a;
+  --color-bad: #b83636;
+  --color-accent: #5b4bd6;
+  --color-accent-soft: rgb(91 75 214 / 0.11);
+  --color-accent-fg: #f4f3fb;
+  --color-surface: #ecedf0;
+  --color-surface-2: #e0e2e6;
+  --color-canvas: #dcdee2;
+  --color-ink-950: #e3e4e7;
+  --color-ink-900: #ecedf0;
+  --color-ink-850: #e6e7ea;
+  --color-ink-800: #dcdee2;
+  --color-ink-700: #cbced4;
+  --color-ink-600: #afb3bb;
+  --color-ink-400: #6a6f79;
+  --color-ink-300: #4b4f58;
+  --color-ink-100: #24272d;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-ink-100);
+}
+
+/* Range inputs styled to match the studio */
+input[type="range"].rc-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--color-brand-400) 0%,
+    var(--color-brand-400) var(--fill, 50%),
+    var(--color-ink-700) var(--fill, 50%),
+    var(--color-ink-700) 100%
+  );
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"].rc-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--color-ink-100);
+  border: 2px solid var(--color-brand-400);
+  box-shadow: 0 0 0 3px rgb(61 214 236 / 0.15);
+}
+input[type="range"].rc-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--color-ink-100);
+  border: 2px solid var(--color-brand-400);
+}
+input[type="range"].rc-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgb(61 214 236 / 0.4);
+}
+
+.rc-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-700) transparent;
+}
+.rc-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.rc-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.rc-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: var(--color-ink-700);
+}
+.rc-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-500);
+}
+
+.rc-grid-bg {
+  background-image:
+    linear-gradient(to right, rgb(125 139 163 / 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(125 139 163 / 0.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Control Lab + landing                                                                       */
+/* ------------------------------------------------------------------------------------------ */
+
+:root {
+  --spectrum: linear-gradient(
+    90deg,
+    var(--color-spec-1),
+    var(--color-spec-2),
+    var(--color-spec-3),
+    var(--color-spec-4),
+    var(--color-spec-5),
+    var(--color-spec-6)
+  );
+  --spectrum-conic: conic-gradient(
+    from 200deg,
+    var(--color-spec-1),
+    var(--color-spec-2),
+    var(--color-spec-3),
+    var(--color-spec-4),
+    var(--color-spec-5),
+    var(--color-spec-6),
+    var(--color-spec-1)
+  );
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: rgb(155 92 255 / 0.4);
+}
+
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.text-spectrum {
+  background: var(--spectrum);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 1px gradient border on any element (put content inside, keep its own background). */
+.spectrum-border {
+  position: relative;
+  isolation: isolate;
+}
+.spectrum-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--spectrum);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Corner brackets, as on the reference button and headline boxes. */
+.brackets {
+  position: relative;
+}
+.brackets::before,
+.brackets::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  border-color: currentColor;
+  opacity: 0.6;
+}
+.brackets::before {
+  top: -4px;
+  left: -4px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+.brackets::after {
+  right: -4px;
+  bottom: -4px;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+}
+
+.grid-lines {
+  background-image:
+    linear-gradient(to right, var(--color-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-line) 1px, transparent 1px);
+  background-size: 120px 120px;
+}
+.grid-fine {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.glow-spectrum {
+  box-shadow:
+    0 0 40px -10px rgb(45 212 255 / 0.35),
+    0 0 60px -20px rgb(155 92 255 / 0.35);
+}
+
+@keyframes rc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes rc-blink {
+  0%,
+  92%,
+  100% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.15;
+  }
+}
+@keyframes rc-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes rc-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.caret::after {
+  content: "▍";
+  margin-left: 1px;
+  animation: rc-caret 1s steps(1) infinite;
+}
+.flow-dash {
+  stroke-dasharray: 4 8;
+  animation: rc-dash 0.8s linear infinite;
+}
+
+.lab-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, var(--color-fg) var(--fill, 50%), var(--color-line-2) var(--fill, 50%));
+  outline: none;
+  cursor: pointer;
+}
+.lab-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--color-void);
+  border: 1.5px solid var(--color-fg);
+}
+.lab-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--color-void);
+  border: 1.5px solid var(--color-fg);
+}
+.lab-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgb(155 92 255 / 0.5);
+}
+
+/* Rotating gradient ring, used for "live" Meta badges. */
+@property --ring-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes rc-ring {
+  to {
+    --ring-angle: 360deg;
+  }
+}
+.meta-ring {
+  position: relative;
+  isolation: isolate;
+}
+.meta-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from var(--ring-angle), var(--color-spec-1), var(--color-spec-2), var(--color-spec-3), var(--color-spec-4), var(--color-spec-5), var(--color-spec-1));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: rc-ring 4s linear infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Soft blue-violet aurora behind Meta sections. */
+.meta-aurora {
+  background:
+    radial-gradient(ellipse 40% 50% at 30% 40%, rgb(0 130 251 / 0.14), transparent 70%),
+    radial-gradient(ellipse 35% 45% at 70% 60%, rgb(155 92 255 / 0.12), transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .flow-dash,
+  .caret::after,
+  .meta-ring::before {
+    animation: none;
+  }
+}
+
+/* App surfaces (Control Lab, studios) share the workspace's design system: labels are calm sans
+   text instead of tiny mono capitals, and controls get soft corners. The landing page keeps its
+   mono labels as part of its look. */
+.app-ui .mono-label {
+  font-family: var(--font-sans);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: 12px;
+}
+.app-ui select,
+.app-ui input[type="text"],
+.app-ui input[type="number"],
+.app-ui textarea {
+  border-radius: 0.6rem;
+}

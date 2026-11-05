@@ -1,0 +1,137 @@
+"use client";
+
+import { ArrowRight, ArrowUpRight, Menu, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import RoboMark from "@/components/brand/RoboMark";
+import { ThemeToggle } from "@/components/create/ui";
+
+// `nav` marks the sections linked from the top bar; the side rail shows them all.
+export const SECTIONS = [
+  { id: "intro", label: "Intro" },
+  { id: "meta", label: "Meta models", nav: true },
+  { id: "loop", label: "How it works", nav: true },
+  { id: "systems", label: "Systems" },
+  { id: "trace", label: "Agent", nav: true },
+  { id: "engine", label: "Engine", nav: true },
+  { id: "validation", label: "Validation" },
+  { id: "pricing", label: "Pricing", nav: true },
+  { id: "log", label: "Build log", nav: true },
+  { id: "builder", label: "Builder" },
+];
+
+export function LaunchButton({ className = "", label = "Start building", href = "/create" }: { className?: string; label?: string; href?: string }) {
+  return (
+    <Link
+      href={href}
+      className={`group inline-flex h-9 items-center gap-1.5 rounded-xl bg-fg px-4 text-[13.5px] font-semibold text-void shadow-[0_8px_24px_-12px_rgb(0_130_251/0.6)] transition-transform hover:-translate-y-px ${className}`}
+    >
+      {label} <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+    </Link>
+  );
+}
+
+export function Nav() {
+  const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 24);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
+  return (
+    <header
+      className={`fixed inset-x-0 top-0 z-50 border-b transition-colors duration-300 ${scrolled ? "border-line bg-void/80 backdrop-blur-md" : "border-transparent"}`}
+    >
+      <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-4 sm:px-6">
+        <Link href="/" className="flex items-center gap-2.5">
+          <RoboMark className="size-7" />
+          <span className="text-[16px] font-semibold tracking-[-0.02em]">RoboCraft</span>
+        </Link>
+        <nav className="hidden items-center gap-7 lg:flex">
+          {SECTIONS.filter((s) => s.nav).map((s) => (
+            <a key={s.id} href={`#${s.id}`} className="text-[13.5px] font-medium text-mute transition-colors hover:text-fg">
+              {s.label}
+            </a>
+          ))}
+        </nav>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:block">
+            <ThemeToggle />
+          </span>
+          <Link href="/hardware" className="hidden px-2 text-[13.5px] font-medium text-mute transition-colors hover:text-fg md:block">
+            Hardware Studio
+          </Link>
+          {/* Wrapped: the button's own inline-flex would override a hidden class on it. */}
+          <span className="hidden sm:block">
+            <LaunchButton />
+          </span>
+          <button className="flex size-9 items-center justify-center text-mute lg:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
+            {open ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
+        </div>
+      </div>
+      <AnimatePresence>
+        {open && (
+          <motion.nav
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-t border-line bg-void lg:hidden"
+          >
+            {SECTIONS.filter((s) => s.nav).map((s) => (
+              <a key={s.id} href={`#${s.id}`} onClick={() => setOpen(false)} className="flex items-center justify-between border-b border-line px-4 py-4 text-[15px] font-medium text-mute">
+                {s.label} <ArrowUpRight className="size-3.5" />
+              </a>
+            ))}
+            <Link href="/hardware" onClick={() => setOpen(false)} className="flex items-center justify-between border-b border-line px-4 py-4 text-[15px] font-medium text-mute">
+              Hardware Studio <ArrowUpRight className="size-3.5" />
+            </Link>
+            <div className="flex items-center gap-3 p-4">
+              <ThemeToggle />
+              <LaunchButton className="h-10 flex-1 justify-center" />
+            </div>
+          </motion.nav>
+        )}
+      </AnimatePresence>
+    </header>
+  );
+}
+
+/** Right-hand section rail with a live position marker. */
+export function SideIndex() {
+  const [active, setActive] = useState("intro");
+  useEffect(() => {
+    const els = SECTIONS.map((s) => document.getElementById(s.id)).filter(Boolean) as HTMLElement[];
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting) setActive(e.target.id);
+      },
+      { rootMargin: "-45% 0px -50% 0px" },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+  return (
+    <aside className="fixed top-1/2 right-5 z-40 hidden -translate-y-1/2 2xl:block">
+      <ol className="flex flex-col items-end gap-3">
+        {SECTIONS.map((s) => {
+          const on = s.id === active;
+          return (
+            <li key={s.id}>
+              <a href={`#${s.id}`} className="group flex items-center gap-2.5">
+                <span className={`mono-label text-[10px] transition-all ${on ? "text-fg" : "text-dim group-hover:text-mute"}`}>{s.label}</span>
+                <span className="relative flex size-2 items-center justify-center">
+                  {on && <motion.span layoutId="rail-dot" className="absolute size-2 rounded-full" style={{ background: "var(--spectrum-conic)" }} />}
+                  <span className={`size-1 rounded-full ${on ? "bg-transparent" : "bg-dim"}`} />
+                </span>
+              </a>
+            </li>
+          );
+        })}
+      </ol>
+    </aside>
+  );
+}

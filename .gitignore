@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.tools/
+.env
+.env.local
+.env.*.local
+.meta-cache/
+*.tsbuildinfo
+.hardware-preview/
