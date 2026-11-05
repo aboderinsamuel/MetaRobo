@@ -238,6 +238,13 @@ export default function HardwareStudio() {
     setError("");
     setCompiled(null);
     setVerified(false);
+    if (!canBuild) {
+      setError(
+        "Custom sketches need the hosted Arduino compiler. Choose Board heartbeat to try the built-in verified demo, or configure ARDUINO_COMPILER_URL and ARDUINO_COMPILER_TOKEN on the frontend server.",
+      );
+      setStatus("Build unavailable · choose Board heartbeat or connect the compiler");
+      return;
+    }
     setBusy("compile");
     setStatus("Compiling for Arduino Uno R3…");
     try {
@@ -366,6 +373,8 @@ export default function HardwareStudio() {
   const filtered = RECIPES.filter((r) =>
     `${r.name} ${r.parts} ${r.group}`.toLowerCase().includes(search.toLowerCase()),
   );
+  const heartbeatReady = language === "arduino" && code === HEARTBEAT;
+  const canBuild = language === "arduino" && (heartbeatReady || compiler === true);
   const dismissGuide = () => {
     setGuide(false);
     try {
@@ -432,7 +441,7 @@ export default function HardwareStudio() {
         {guide && (
           <section className="hw-guide" aria-label="Getting started">
             <div className="hw-guide-heading">
-              <strong>Your first blink, in four small steps.</strong>
+              <strong>Start with a real board, in four small steps.</strong>
               <button className="hw-icon" onClick={dismissGuide} aria-label="Dismiss getting started guide">
                 <X size={16} />
               </button>
@@ -448,10 +457,10 @@ export default function HardwareStudio() {
                     <p>
                       {
                         [
-                          "Start with Board heartbeat. No extra parts.",
-                          "Plug in your Uno and choose its USB port.",
+                          "Choose Board heartbeat. It builds here without a compiler service.",
+                          "Use a USB data cable in desktop Chrome or Edge.",
                           "Build, review the code, then upload.",
-                          "Watch the amber L LED blink twice.",
+                          "Watch the amber L LED blink twice and read serial at 9600 baud.",
                         ][i]
                       }
                     </p>
@@ -813,7 +822,18 @@ export default function HardwareStudio() {
                 <progress value={progress} max={100} aria-label="Upload and verification progress" />
               )}
               <div className="hw-build-actions">
-                <button className="hw-button" disabled={!!busy || language !== "arduino"} onClick={compile}>
+                <button
+                  className="hw-button"
+                  disabled={!!busy || !canBuild}
+                  onClick={compile}
+                  title={
+                    language !== "arduino"
+                      ? "An Uno runs Arduino C++, not HDL."
+                      : canBuild
+                        ? "Build this sketch for Arduino Uno R3."
+                        : "Choose Board heartbeat or configure the hosted Arduino compiler."
+                  }
+                >
                   {busy === "compile" ? <Loader2 className="animate-spin" size={16} /> : <Code2 size={16} />}
                   1. Build sketch
                 </button>
@@ -849,8 +869,15 @@ export default function HardwareStudio() {
                     ? "Checking compiler connection…"
                     : compiler
                       ? "Hosted compiler connected · custom sketches enabled"
-                      : "Demo mode · Board heartbeat is ready. Custom builds need the hosted compiler."}
+                      : heartbeatReady
+                        ? "Demo mode · this Board heartbeat is ready to build without a compiler service."
+                        : "Custom build unavailable · choose Board heartbeat or configure the hosted compiler."}
               </p>
+              {language === "arduino" && compiler === false && !heartbeatReady && (
+                <button className="hw-button hw-build-fallback" onClick={() => selectRecipe(RECIPES[0])}>
+                  Load Board heartbeat
+                </button>
+              )}
               {compiled && (
                 <details>
                   <summary>Build evidence · SHA-256 {compiled.sourceHash.slice(0, 12)}…</summary>
