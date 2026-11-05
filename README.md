@@ -60,8 +60,9 @@
 | **Guided onboarding:** choose a sketch → connect USB → build and upload → observe the board. | **Meta coding copilot:** review a proposed sketch and wiring before applying it. Export Arduino C++, Verilog, or VHDL. HDL drafts require an FPGA toolchain. |
 
 <p align="center">
-  <img src="frontend/public/hardware/uno-desk.jpeg" alt="Our real Uno R3 connected to a laptop by USB; reference hardware photo, not an upload result" width="340" />
-  <br /><sub>The real board on our bench. The studio's rotating 3D board is a preview; physical proof comes from USB flash verification and observing the actual hardware.</sub>
+  <img src="frontend/public/hardware/uno-desk.jpeg" alt="Physical Arduino Uno R3 connected to a laptop by USB on a workbench" width="340" />
+  <img src="docs/assets/controller-targets.png" alt="ESP32, Raspberry Pi Pico RP2040, and STM32 Blue Pill or Nucleo boards beside a telemetry laptop" width="340" />
+  <br /><sub>Physical bench references: the Uno R3 is the supported browser-upload target today; the ESP32, RP2040, and STM32 boards illustrate broader controller targets and integration directions.</sub>
 </p>
 
 **Try the board you have now:** open **Hardware** → **Board heartbeat** → **Connect Uno** → select its USB port → **Build sketch** → review the code/wiring checkbox → **Upload to Uno**. Watch for two short amber `L` flashes. The serial monitor at 9600 baud reads messages from the running sketch.
