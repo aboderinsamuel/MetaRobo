@@ -62,7 +62,7 @@ export async function flashUno(
         if (failure) throw failure;
         if (Date.now() > deadline)
           throw new Error(
-            "Uno did not respond. Close other serial apps, check the USB cable, and reconnect.",
+            "The Uno bootloader did not respond. Close Arduino IDE or any serial monitor, reconnect the USB data cable, choose the Uno port again, and retry. If it still fails, press the Uno RESET button immediately after starting the upload.",
           );
         await delay(5);
       }
@@ -75,12 +75,12 @@ export async function flashUno(
     let synced = false;
     for (let attempt = 0; attempt < 3 && !synced; attempt++) {
       await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-      await delay(100);
+      await delay(250);
       await port.setSignals({ dataTerminalReady: true, requestToSend: true });
-      await delay(80);
+      await delay(250);
       queue.length = 0;
       try {
-        await command([0x30], 0, 300);
+        await command([0x30], 0, 800);
         synced = true;
       } catch (e) {
         if (attempt === 2) throw e;

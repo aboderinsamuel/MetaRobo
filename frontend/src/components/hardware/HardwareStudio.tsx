@@ -50,6 +50,23 @@ type Proposal = {
 };
 const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong. Try again.");
 const initialCodes = { arduino: HEARTBEAT, verilog: HDL_START, vhdl: VHDL_START };
+const ONBOARDING_STEPS = [
+  {
+    title: "Start with Board heartbeat",
+    body: "This verified demo needs only an Arduino Uno R3 and a USB data cable. It is the one sketch that builds without a separate compiler service.",
+    label: "Load Board heartbeat",
+  },
+  {
+    title: "Connect the board",
+    body: "Use desktop Chrome or Edge on HTTPS or localhost. Close Arduino IDE and other serial monitors, plug in a data cable, then choose the Uno port.",
+    label: "Connect Uno",
+  },
+  {
+    title: "Build, review, upload",
+    body: "Build creates the firmware image. Review the code and wiring, then upload. The browser verifies the written flash before reporting success.",
+    label: "Open the code step",
+  },
+] as const;
 const importedRecipe: Recipe = {
   id: "imported",
   name: "Your custom sketch",
@@ -109,6 +126,8 @@ export default function HardwareStudio() {
     typeof window === "undefined" ? true : !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const [guide, setGuide] = useState(true);
+  const [onboarding, setOnboarding] = useState(true);
+  const [onboardingStep, setOnboardingStep] = useState(0);
   const [view3d, setView3d] = useState(true);
   const port = useRef<HardwarePort | null>(null);
   const serialReader = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
@@ -147,6 +166,7 @@ export default function HardwareStudio() {
         );
       }
       setGuide(localStorage.getItem("rc-hardware-guide") !== "done");
+      setOnboarding(localStorage.getItem("rc-hardware-onboarding") !== "done");
     } catch {}
     setHydrated(true);
     fetch("/api/hardware/compile")
@@ -381,6 +401,21 @@ export default function HardwareStudio() {
       localStorage.setItem("rc-hardware-guide", "done");
     } catch {}
   };
+  const finishOnboarding = () => {
+    setOnboarding(false);
+    try {
+      localStorage.setItem("rc-hardware-onboarding", "done");
+    } catch {}
+  };
+  const onboardingAction = () => {
+    if (onboardingStep === 0) selectRecipe(RECIPES[0]);
+    if (onboardingStep === 1 && supported) void connect();
+    if (onboardingStep === 2) {
+      setTab("code");
+      finishOnboarding();
+    }
+    if (onboardingStep < ONBOARDING_STEPS.length - 1) setOnboardingStep((step) => step + 1);
+  };
   const steps = ["Choose a sketch", "Connect USB", "Build & upload", "See it work"];
 
   return (
@@ -400,6 +435,37 @@ export default function HardwareStudio() {
         </div>
       </header>
       <main className="hw-shell">
+        {onboarding && (
+          <div className="hw-onboarding-backdrop" role="presentation">
+            <section className="hw-onboarding" role="dialog" aria-modal="true" aria-labelledby="hw-onboarding-title">
+              <div className="hw-onboarding-topline">
+                <span className="hw-eyebrow">HARDWARE STUDIO · GETTING STARTED</span>
+                <button className="hw-icon" onClick={finishOnboarding} aria-label="Skip onboarding">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="hw-onboarding-progress" aria-label={`Step ${onboardingStep + 1} of 3`}>
+                {ONBOARDING_STEPS.map((step, index) => (
+                  <span key={step.title} className={index <= onboardingStep ? "active" : ""} />
+                ))}
+              </div>
+              <p className="hw-onboarding-count">Step {onboardingStep + 1} of 3</p>
+              <h2 id="hw-onboarding-title">{ONBOARDING_STEPS[onboardingStep].title}</h2>
+              <p className="hw-onboarding-body">{ONBOARDING_STEPS[onboardingStep].body}</p>
+              <div className="hw-onboarding-actions">
+                <button className="hw-button" onClick={finishOnboarding}>Skip for now</button>
+                <button
+                  className="hw-button primary"
+                  disabled={onboardingStep === 1 && supported === null}
+                  onClick={onboardingAction}
+                >
+                  {onboardingStep === 1 && !supported ? "Read connection steps" : ONBOARDING_STEPS[onboardingStep].label}{" "}
+                  <ArrowRight size={15} />
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
         <div className="hw-title">
           <div>
             <p className="hw-eyebrow">
